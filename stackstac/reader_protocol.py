@@ -1,15 +1,27 @@
 from __future__ import annotations
-from typing import Optional, Protocol, Type, TYPE_CHECKING, Union
+from typing import Optional, Protocol, Type, TYPE_CHECKING, TypeVar, Union
 
 import numpy as np
 
 if TYPE_CHECKING:
     from .raster_spec import RasterSpec
+    from .rio_env import LayeredEnv
     from rasterio.windows import Window
     from rasterio.enums import Resampling
 
 
-class Reader(Protocol):
+PickleState = TypeVar("PickleState")
+
+
+class Pickleable(Protocol[PickleState]):
+    def __getstate__(self) -> PickleState:
+        ...
+
+    def __setstate__(self, state: PickleState) -> None:
+        ...
+
+
+class Reader(Pickleable, Protocol):
     """
     Protocol for a thread-safe, lazily-loaded object for reading data from a single-band STAC asset.
     """
@@ -22,7 +34,7 @@ class Reader(Protocol):
         dtype: np.dtype,
         fill_value: Optional[Union[int, float]] = np.nan,
         rescale: bool = True,
-        **kwargs,
+        gdal_env: Optional[LayeredEnv] = None,
     ) -> None:
         """
         Construct the Dataset *without* fetching any data.
@@ -43,12 +55,10 @@ class Reader(Protocol):
             If None, whatever nodata value is set in the asset will be used.
         rescale:
             Rescale the output array according to any scales and offsets set in the asset.
+        gdal_env:
+            A `~.LayeredEnv` of GDAL configuration options to use while opening
+            and reading datasets. If None (default), `~.DEFAULT_GDAL_ENV` is used.
         """
-        if fill_value is not None and not np.can_cast(fill_value, dtype):
-            raise ValueError(
-                f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
-                f"Try using `dtype={np.array(fill_value).dtype.name!r}`."
-            )
         # TODO colormaps?
 
     def read(self, window: Window) -> np.ndarray:
@@ -102,6 +112,12 @@ class FakeReader:
         return np.random.random((window.height, window.width))
 
     def close(self) -> None:
+        pass
+
+    def __getstate__(self):
+        pass
+
+    def __setstate__(self, state):
         pass
 
 

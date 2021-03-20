@@ -289,7 +289,7 @@ class SelfCleaningDatasetReader(rio.DatasetReader):
         self.close()
 
 
-class AutoParallelRioReader(Reader):
+class AutoParallelRioReader:
     """
     rasterio-based Reader that picks the appropriate concurrency mechanism after opening the file.
 
@@ -309,9 +309,11 @@ class AutoParallelRioReader(Reader):
         rescale: bool,
         gdal_env: Optional[LayeredEnv] = None,
     ) -> None:
-        super().__init__(
-            url, spec, resampling, dtype, fill_value=fill_value, rescale=rescale
-        )
+        if fill_value is not None and not np.can_cast(fill_value, dtype):
+            raise ValueError(
+                f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
+                f"Try using `dtype={np.array(fill_value).dtype.name!r}`."
+            )
 
         self.url = url
         self.spec = spec
@@ -319,13 +321,13 @@ class AutoParallelRioReader(Reader):
         self.dtype = dtype
         self.rescale = rescale
         self.fill_value = fill_value
-        self.env = gdal_env or DEFAULT_GDAL_ENV
+        self.gdal_env = gdal_env or DEFAULT_GDAL_ENV
 
         self._dataset: Optional[ThreadsafeRioDataset] = None
         self._dataset_lock = threading.Lock()
 
     def _open(self) -> ThreadsafeRioDataset:
-        with self.env.open:
+        with self.gdal_env.open:
             with time(f"Initial read for {self.url!r} on {_curthread()}: {{t}}"):
                 ds = SelfCleaningDatasetReader(rio.parse_path(self.url), sharing=False)
             if ds.count != 1:
@@ -351,7 +353,7 @@ class AutoParallelRioReader(Reader):
                 "height": ds.height,
                 "width": ds.width,
             }:
-                with self.env.open_vrt:
+                with self.gdal_env.open_vrt:
                     vrt = WarpedVRT(
                         ds,
                         sharing=False,
@@ -370,7 +372,7 @@ class AutoParallelRioReader(Reader):
                 vrt = None
 
         if ds.driver in MULTITHREADED_DRIVER_ALLOWLIST:
-            return ThreadLocalRioDataset(self.env, ds, vrt=vrt)
+            return ThreadLocalRioDataset(self.gdal_env, ds, vrt=vrt)
             # ^ NOTE: this forces all threads to wait for the `open()` we just did before they can open their
             # thread-local datasets. In principle, this would double the wall-clock open time, but if the above `open()`
             # is cached, it can actually be faster than all threads duplicating the same request in parallel.
@@ -380,7 +382,7 @@ class AutoParallelRioReader(Reader):
             #     f"Falling back on single-threaded reader for {self.url!r} (driver: {ds.driver!r}). "
             #     "This will be slow!"
             # )
-            return SingleThreadedRioDataset(self.env, ds, vrt=vrt)
+            return SingleThreadedRioDataset(self.gdal_env, ds, vrt=vrt)
 
     @property
     def dataset(self):
@@ -426,6 +428,41 @@ class AutoParallelRioReader(Reader):
             # can happen when running multithreaded. I think this somehow occurs when `__del__`
             # happens before `__init__` has even run? Is that possible?
             pass
+
+    def __getstate__(
+        self,
+    ) -> Tuple[
+        str,
+        RasterSpec,
+        Resampling,
+        np.dtype,
+        Optional[Union[int, float]],
+        bool,
+        Optional[LayeredEnv],
+    ]:
+        return (
+            self.url,
+            self.spec,
+            self.resampling,
+            self.dtype,
+            self.fill_value,
+            self.rescale,
+            self.gdal_env,
+        )
+
+    def __setstate__(
+        self,
+        state: Tuple[
+            str,
+            RasterSpec,
+            Resampling,
+            np.dtype,
+            Optional[Union[int, float]],
+            bool,
+            Optional[LayeredEnv],
+        ],
+    ):
+        self.__init__(*state)
 
 
 # Type assertion

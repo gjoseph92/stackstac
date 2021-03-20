@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Tuple, Union
 
 import rasterio as rio
 
@@ -101,3 +101,14 @@ class LayeredEnv:
         _read = dict(self._read, **read) if read else self._read
 
         return type(self)(always=_always, open=_open, open_vrt=_open_vrt, read=_read)
+
+    def __getstate__(
+        self,
+    ) -> Tuple[EnvDict, Optional[EnvDict], Optional[EnvDict], Optional[EnvDict]]:
+        return (self._always, self._open, self._open_vrt, self._read)
+
+    def __setstate__(
+        self,
+        state: Tuple[EnvDict, Optional[EnvDict], Optional[EnvDict], Optional[EnvDict]],
+    ):
+        self.__init__(*state)
