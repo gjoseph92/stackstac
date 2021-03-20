@@ -22,6 +22,12 @@ insipid-sphinx-theme = {version = "^0.2.3", optional = true}
 nbsphinx = {version = "^0.8.2", optional = true}
 sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
 ipython = {version = "^7.20.0", optional = true}
+dask-labextension = "^5.0.1"
+aiohttp = "^3.7.4"
+aiohttp_cors = "^0.7.0"
+mercantile = "^1.1.6"
+scipy = "^1.6.1"
+Pillow = "^8.1.2"
 
 [tool.poetry.dev-dependencies]
 Pympler = "^0.9"
@@ -44,6 +50,8 @@ twine = "^3.4.1"
 keyring = "^23.0.1"
 pystac-client = "^0.1.1"
 planetary-computer = "^0.1.0"
+graphviz = "^0.16"
+ipywidgets = "^7.6.3"
 
 [tool.poetry.extras]
 docs = [
