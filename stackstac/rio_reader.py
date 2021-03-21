@@ -309,12 +309,6 @@ class AutoParallelRioReader:
         rescale: bool,
         gdal_env: Optional[LayeredEnv] = None,
     ) -> None:
-        if fill_value is not None and not np.can_cast(fill_value, dtype):
-            raise ValueError(
-                f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
-                f"Try using `dtype={np.array(fill_value).dtype.name!r}`."
-            )
-
         self.url = url
         self.spec = spec
         self.resampling = resampling

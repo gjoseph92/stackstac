@@ -29,6 +29,12 @@ def items_to_dask(
     reader: Type[Reader] = AutoParallelRioReader,
     gdal_env: Optional[LayeredEnv] = None,
 ) -> da.Array:
+    if fill_value is not None and not np.can_cast(fill_value, dtype):
+        raise ValueError(
+            f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
+            f"Either use `dtype={np.array(fill_value).dtype.name!r}`, or pick a different `fill_value`."
+        )
+
     # The overall strategy in this function is to materialize the outer two dimensions (items, assets)
     # as one dask array, then the chunks of the inner two dimensions (y, x) as another dask array, then use
     # Blockwise to represent the cartesian product between them, to avoid materializing that entire graph.
