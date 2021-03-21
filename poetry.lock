@@ -80,7 +80,7 @@ python-versions = "*"
 name = "anyio"
 version = "2.2.0"
 description = "High level compatibility layer for multiple asynchronous event loop implementations"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6.2"
 
@@ -115,7 +115,7 @@ python-versions = "*"
 name = "argon2-cffi"
 version = "20.1.0"
 description = "The secure Argon2 password hashing algorithm."
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -233,7 +233,7 @@ webencodings = "*"
 name = "bokeh"
 version = "2.3.0"
 description = "Interactive plots and applications in the browser from Python"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -437,7 +437,7 @@ distributed = ["distributed (>=2021.03.0)"]
 name = "dask-labextension"
 version = "5.0.1"
 description = "A JupyterLab extension for Dask."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -635,7 +635,7 @@ sphinx = ">=3.1.2"
 name = "ipykernel"
 version = "5.5.0"
 description = "IPython Kernel for Jupyter"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.5"
 
@@ -773,7 +773,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 name = "json5"
 version = "0.9.5"
 description = "A Python implementation of the JSON5 data format."
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -833,7 +833,7 @@ traitlets = "*"
 name = "jupyter-packaging"
 version = "0.7.12"
 description = "Jupyter Packaging Utilities"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -847,7 +847,7 @@ test = ["pytest"]
 name = "jupyter-server"
 version = "1.4.1"
 description = "The backend—i.e. core services, APIs, and REST endpoints—to Jupyter web applications."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -874,7 +874,7 @@ test = ["coverage", "requests", "pytest", "pytest-cov", "pytest-tornasync", "pyt
 name = "jupyter-server-proxy"
 version = "3.0.2"
 description = "Jupyter server extension to supervise and proxy web services"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -887,7 +887,7 @@ simpervisor = ">=0.4"
 name = "jupyterlab"
 version = "3.0.12"
 description = "The JupyterLab server extension."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -921,7 +921,7 @@ pygments = ">=2.4.1,<3"
 name = "jupyterlab-server"
 version = "2.3.0"
 description = "JupyterLab Server"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -1056,7 +1056,7 @@ python-versions = "*"
 name = "nbclassic"
 version = "0.2.6"
 description = "Jupyter Notebook as a Jupyter Server Extension."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -1163,7 +1163,7 @@ python-versions = ">=3.5"
 name = "notebook"
 version = "6.2.0"
 description = "A web-based notebook environment for interactive computing"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.5"
 
@@ -1331,7 +1331,7 @@ python-versions = "*"
 name = "prometheus-client"
 version = "0.9.0"
 description = "Python client for the Prometheus monitoring system."
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -1496,7 +1496,7 @@ python-versions = "*"
 name = "pywinpty"
 version = "0.5.7"
 description = "Python bindings for the winpty library"
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -1669,7 +1669,7 @@ numpy = ">=1.16.5"
 name = "send2trash"
 version = "1.5.0"
 description = "Send file to trash natively under Mac OS X, Windows and Linux."
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -1690,7 +1690,7 @@ vectorized = ["numpy"]
 name = "simpervisor"
 version = "0.4"
 description = "Simple async process supervisor"
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -1717,7 +1717,7 @@ tornado = ">=2.0"
 name = "sniffio"
 version = "1.2.0"
 description = "Sniff out which async library your code is running under"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.5"
 
@@ -1754,7 +1754,7 @@ python-versions = "*"
 
 [[package]]
 name = "sphinx"
-version = "3.5.2"
+version = "3.5.3"
 description = "Python documentation generator"
 category = "main"
 optional = false
@@ -1896,7 +1896,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 name = "terminado"
 version = "0.9.3"
 description = "Tornado websocket backend for the Xterm.js Javascript terminal emulator library."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -2120,7 +2120,7 @@ docs = ["Sphinx", "numpydoc", "sphinx-autodoc-typehints", "pandoc", "nbsphinx", 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "d1b1fbd0284404cc1421633681e6902d0cf2a1d4f603f3da9db456e809625c98"
+content-hash = "175d7b59e3ac7f97426fce04ac875cfb6b6d081721314566cd8faa0ef2812582"
 
 [metadata.files]
 affine = [
@@ -3304,8 +3304,8 @@ sortedcontainers = [
     {file = "sortedcontainers-2.3.0.tar.gz", hash = "sha256:59cc937650cf60d677c16775597c89a960658a09cf7c1a668f86e1e4464b10a1"},
 ]
 sphinx = [
-    {file = "Sphinx-3.5.2-py3-none-any.whl", hash = "sha256:ef64a814576f46ec7de06adf11b433a0d6049be007fefe7fd0d183d28b581fac"},
-    {file = "Sphinx-3.5.2.tar.gz", hash = "sha256:672cfcc24b6b69235c97c750cb190a44ecd72696b4452acaf75c2d9cc78ca5ff"},
+    {file = "Sphinx-3.5.3-py3-none-any.whl", hash = "sha256:3f01732296465648da43dec8fb40dc451ba79eb3e2cc5c6d79005fd98197107d"},
+    {file = "Sphinx-3.5.3.tar.gz", hash = "sha256:ce9c228456131bab09a3d7d10ae58474de562a6f79abb3dc811ae401cf8c1abc"},
 ]
 sphinx-autobuild = [
     {file = "sphinx-autobuild-2020.9.1.tar.gz", hash = "sha256:4b184a7db893f2100bbd831991ae54ca89167a2b9ce68faea71eaa9e37716aed"},

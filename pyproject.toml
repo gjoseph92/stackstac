@@ -1,43 +1,45 @@
 [tool.poetry]
 authors = ["Gabe Joseph <gjoseph92@gmail.com>"]
 description = "Load a STAC collection into xarray with dask"
+homepage = "https://stackstac.readthedocs.io/en/latest/index.html"
 license = "MIT"
 name = "stackstac"
 readme = "README.md"
 repository = "https://github.com/gjoseph92/stackstac"
-homepage = "https://stackstac.readthedocs.io/en/latest/index.html"
 version = "0.1.0"
 
 [tool.poetry.dependencies]
-python = "^3.7"
-dask = {extras = ["array"], version = "^2021.2.0"}
-numpy = "^1.20.0"
-pyproj = "^3.0.0"
-rasterio = "^1.2.0"
-xarray = "^0.17.0"
+Pillow = "^8.1.2"
 Sphinx = {version = "^3.5.2", optional = true}
-numpydoc = {version = "^1.1.0", optional = true}
-pandoc = {version = "^1.0.2", optional = true}
-insipid-sphinx-theme = {version = "^0.2.3", optional = true}
-nbsphinx = {version = "^0.8.2", optional = true}
-sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
-ipython = {version = "^7.20.0", optional = true}
-dask-labextension = "^5.0.1"
 aiohttp = "^3.7.4"
 aiohttp_cors = "^0.7.0"
+dask = {extras = ["array"], version = ">=2.3.0"}
+distributed = ">=2.3.0"
+insipid-sphinx-theme = {version = "^0.2.3", optional = true}
+ipython = {version = "^7.20.0", optional = true}
 mercantile = "^1.1.6"
+nbsphinx = {version = "^0.8.2", optional = true}
+numpy = "^1.20.0"
+numpydoc = {version = "^1.1.0", optional = true}
+pandoc = {version = "^1.0.2", optional = true}
+pyproj = "^3.0.0"
+python = "^3.7"
+rasterio = "^1.2.0"
 scipy = "^1.6.1"
-Pillow = "^8.1.2"
+sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
+xarray = "^0.17.0"
 
 [tool.poetry.dev-dependencies]
 Pympler = "^0.9"
 awkward = {version = "^1.1.2", allow-prereleases = true}
 black = "^20.8b1"
 coiled = "^0.0.36"
+dask-labextension = "^5.0.1"
 debugpy = "^1.2.1"
-distributed = "^2021.2.0"
 filprofiler = "^0.17.0"
 flake8 = "^3.8.4"
+graphviz = "^0.16"
+ipywidgets = "^7.6.3"
 jupyterlab = "^3.0.7"
 matplotlib = "^3.3.4"
 py-spy = "^0.3.4"
@@ -46,9 +48,7 @@ sat-search = "^0.3.0"
 sat-stac = "^0.4.1"
 snakeviz = "^2.1.0"
 sphinx-autobuild = "^2020.9.1"
-graphviz = "^0.16"
 xarray-leaflet = "^0.1.13"
-ipywidgets = "^7.6.3"
 
 [tool.poetry.extras]
 docs = [
