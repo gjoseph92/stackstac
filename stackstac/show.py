@@ -1,10 +1,11 @@
 from __future__ import annotations
 from stackstac.raster_spec import RasterSpec
 
-from typing import Awaitable, Dict, Optional, Tuple, cast
+from typing import Awaitable, Dict, NamedTuple, Optional, Tuple, cast
 import io
 import asyncio
 import logging
+import warnings
 
 # import urllib.parse
 
@@ -16,10 +17,11 @@ import numpy as np
 import xarray as xr
 from PIL import Image
 import ipyleaflet
+import dask.array as da
 
 from . import geom_utils
 
-Scales = Tuple[float, float]
+Range = Tuple[float, float]
 
 TILESIZE = 256
 PORT = 8000
@@ -36,10 +38,24 @@ routes = web.RouteTableDef()
 
 # arrs: weakref.WeakValueDictionary[str, xr.DataArray] = weakref.WeakValueDictionary()
 
-TOKEN_TO_ARRAY: Dict[str, xr.DataArray] = {}
+
+class Displayable(NamedTuple):
+    arr: xr.DataArray
+    range: Range
+    checkerboard: bool
 
 
-def show(arr: xr.DataArray, center=None, zoom=None, **map_kwargs) -> ipyleaflet.Map:
+TOKEN_TO_ARRAY: Dict[str, Displayable] = {}
+
+
+def show(
+    arr: xr.DataArray,
+    center=None,
+    zoom=None,
+    range: Optional[Range] = None,
+    checkerboard: bool = True,
+    **map_kwargs,
+) -> ipyleaflet.Map:
     """
     Quickly create a Map displaying a DataArray
     """
@@ -54,12 +70,16 @@ def show(arr: xr.DataArray, center=None, zoom=None, **map_kwargs) -> ipyleaflet.
     if zoom is not None:
         map_.zoom = zoom
 
-    add_to_map(arr, map_)
+    add_to_map(arr, map_, range=range, checkerboard=checkerboard)
     return map_
 
 
 def add_to_map(
-    arr: xr.DataArray, map: ipyleaflet.Map, name: Optional[str] = None
+    arr: xr.DataArray,
+    map: ipyleaflet.Map,
+    name: Optional[str] = None,
+    range: Optional[Range] = None,
+    checkerboard: bool = True,
 ) -> ipyleaflet.Layer:
     """
     Add the DataArray to a Map, as a new layer or replacing an existing one with the same name.
@@ -67,7 +87,7 @@ def add_to_map(
     By giving a name, you can change and re-run notebook cells without piling up extraneous layers on
     your map.
     """
-    url = register(arr)
+    url = register(arr, range=range, checkerboard=checkerboard)
     if name is not None:
         for lyr in map.layers:
             if lyr.name == name:
@@ -82,7 +102,9 @@ def add_to_map(
     return lyr
 
 
-def register(arr: xr.DataArray) -> str:
+def register(
+    arr: xr.DataArray, range: Optional[Range] = None, checkerboard: bool = True
+) -> str:
     ensure_server()
 
     if arr.dtype.kind == "b":
@@ -103,20 +125,36 @@ def register(arr: xr.DataArray) -> str:
             f"Array must have the dimensions 'x', 'y', and optionally 'band', not {arr.dims!r}"
         )
 
-    token = dask.base.tokenize(arr)
-    TOKEN_TO_ARRAY[token] = arr
+    if range is None:
+        warnings.warn(
+            "Calculating 2nd and 98th percentile of the entire array, since no range was given. "
+            "This could be expensive!"
+        )
+
+        def bandwise_percentile(arr: xr.DataArray, p):
+            # TODO auto-use tdigest if available
+            percentiles = da.concatenate(
+                [da.percentile(band.flatten(), p) for band in arr.data]
+            )
+            return xr.DataArray(percentiles, dims=["band"], coords=dict(band=arr.band))
+
+        flat = arr.data.flatten()
+        mins, maxes = (
+            da.percentile(flat, 2).persist(),
+            da.percentile(flat, 98).persist()
+            # bandwise_percentile(arr, 2).persist(),
+            # bandwise_percentile(arr, 98).persist(),
+        )
+        arr = (arr - mins) / (maxes - mins)
+        range = (0, 1)
+
+    disp = Displayable(arr, range, checkerboard)
+    token = dask.base.tokenize(disp)
+    TOKEN_TO_ARRAY[token] = disp
 
     # TODO proxy through jupyter so another port doesn't have to be open to the internet
     return f"http://localhost:{PORT}/{token}/{{z}}/{{y}}/{{x}}.png"
-
-
-def unregister(arr: xr.DataArray) -> bool:
-    token = dask.base.tokenize(arr)
-    try:
-        TOKEN_TO_ARRAY.pop(token)
-        return True
-    except KeyError:
-        return False
+    # TODO some way to unregister (this is hard because we may have modified `arr` in `register`)
 
 
 def ensure_server():
@@ -159,7 +197,7 @@ def _launch_server():
 async def handler(request: web.Request) -> web.Response:
     hash = request.match_info["hash"]
     try:
-        arr = TOKEN_TO_ARRAY[hash]
+        disp = TOKEN_TO_ARRAY[hash]
     except KeyError:
         raise web.HTTPNotFound(
             reason=f"{hash} not found. Have {list(TOKEN_TO_ARRAY)}."
@@ -173,7 +211,7 @@ async def handler(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(reason="z, y, and z parameters must be ints")
 
     # TODO request cancellation
-    png = await compute_tile(arr, z, y, x)
+    png = await compute_tile(disp, z, y, x)
     return web.Response(
         body=png,
         status=200,
@@ -182,27 +220,18 @@ async def handler(request: web.Request) -> web.Response:
     )
 
 
-async def compute_tile(arr: xr.DataArray, z: int, y: int, x: int) -> bytes:
+async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
     client = distributed.get_client()
     bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
 
     if not geom_utils.bounds_overlap(
-        bounds, geom_utils.array_bounds(arr, to_epsg=3857)
+        bounds, geom_utils.array_bounds(disp.arr, to_epsg=3857)
     ):
-        return EMPTY_TILE
-
-    # # xs = np.linspace(bounds.left, bounds.right, TILESIZE)
-    # # ys = np.linspace(bounds.top, bounds.bottom, TILESIZE)
-    # epsg = geom_utils.array_epsg(arr)
-    # if epsg != 3857:
-    #     pass
-    # else:
-
-    # tile = arr.interp(x=xs, y=ys, method="linear", kwargs=dict(fill_value=None))
+        return EMPTY_TILE_CHECKERBOARD if disp.checkerboard else EMPTY_TILE
 
     minx, miny, maxx, maxy = bounds
     tile = geom_utils.reproject_array(
-        arr,
+        disp.arr,
         RasterSpec(
             epsg=3857,
             bounds=bounds,
@@ -215,7 +244,9 @@ async def compute_tile(arr: xr.DataArray, z: int, y: int, x: int) -> bytes:
     ), f"Wrong shape after interpolation: {tile.shape}"
 
     ordered = tile.transpose("band", "y", "x")
-    delayed_png = delayed_arr_to_png(ordered.data, scales=(0, 4000))
+    delayed_png = delayed_arr_to_png(
+        ordered.data, range=disp.range, checkerboard=disp.checkerboard
+    )
     future = cast(distributed.Future, client.compute(delayed_png, sync=False))
 
     awaitable = future if client.asynchronous else future._result()
@@ -224,15 +255,16 @@ async def compute_tile(arr: xr.DataArray, z: int, y: int, x: int) -> bytes:
     return await cast(Awaitable[bytes], awaitable)
 
 
-def arr_to_png(arr: np.ndarray, scales: Scales, checkerboard: bool = True) -> bytes:
+def arr_to_png(arr: np.ndarray, range: Range, checkerboard: bool) -> bytes:
     assert len(arr) <= 3, f"Array must have at most 3 bands. Array shape: {arr.shape}"
 
     alpha_mask = ~np.isnan(arr).all(axis=0)  # TODO non-nan fill value
     alpha = alpha_mask.astype("uint8", copy=False) * 255
 
+    # TODO boolean arrays
+    # TODO multi-band scales?
     # TODO colormap within here??
-    # TODO boolean arrays?
-    min_, max_ = scales
+    min_, max_ = range
     if min_ != max_:
         arr -= min_
         arr /= max_ - min_
@@ -272,4 +304,9 @@ def make_checkerboard(arr_size: int, checker_size: int):
     return board
 
 
-EMPTY_TILE = arr_to_png(np.full((1, TILESIZE, TILESIZE), np.nan), scales=(0, 1))
+EMPTY_TILE_CHECKERBOARD = arr_to_png(
+    np.full((1, TILESIZE, TILESIZE), np.nan), range=(0, 1), checkerboard=True
+)
+EMPTY_TILE = arr_to_png(
+    np.full((1, TILESIZE, TILESIZE), np.nan), range=(0, 1), checkerboard=False
+)
