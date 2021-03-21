@@ -16,21 +16,17 @@ from typing import (
     cast,
 )
 
-import functools
-import math
 
 import affine
-import pyproj
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from .raster_spec import IntFloat, Bbox, Resolutions, RasterSpec
 from .stac_types import ItemSequence
-from . import accumulate_metadata
+from . import accumulate_metadata, geom_utils
 
 ASSET_TABLE_DT = np.dtype([("url", object), ("bounds", "float64", 4)])
-cached_transformer = functools.lru_cache(pyproj.Transformer.from_crs)
 
 
 class Mimetype(NamedTuple):
@@ -161,7 +157,9 @@ def prepare_items(
             # ^ because if it was None initially, and we didn't error out in the above check, it's now always set
 
             if bounds_latlon is not None and out_bounds is None:
-                out_bounds = bounds = reproject_bounds(bounds_latlon, 4326, out_epsg)
+                out_bounds = bounds = geom_utils.reproject_bounds(
+                    bounds_latlon, 4326, out_epsg
+                )
                 # NOTE: we wait to reproject until now, so we can use the inferred CRS
 
             # Compute the asset's bbox in the output CRS.
@@ -181,7 +179,9 @@ def prepare_items(
                 # bbox from asset, then transform from asset, then bbox from item,
                 # then transform from item, then latlon bbox from item
             ):
-                asset_bbox_proj = reproject_bounds(asset_bbox, asset_epsg, out_epsg)
+                asset_bbox_proj = geom_utils.reproject_bounds(
+                    asset_bbox, asset_epsg, out_epsg
+                )
 
             # If there's no bbox (or asset-level metadata is more accurate), compute one from the shape and geotrans
             else:
@@ -191,7 +191,7 @@ def prepare_items(
                     and asset_epsg is not None
                 ):
                     asset_affine = affine.Affine(*asset_transform[:6])
-                    asset_bbox_proj = bounds_from_affine(
+                    asset_bbox_proj = geom_utils.bounds_from_affine(
                         asset_affine,
                         asset_shape[0],
                         asset_shape[1],
@@ -208,7 +208,7 @@ def prepare_items(
                             asset_bbox_proj = None
                         else:
                             # TODO handle error
-                            asset_bbox_proj = reproject_bounds(
+                            asset_bbox_proj = geom_utils.reproject_bounds(
                                 bbox_lonlat, 4326, out_epsg
                             )
                             item_bbox_proj = asset_bbox_proj
@@ -232,11 +232,11 @@ def prepare_items(
                 out_bounds = (
                     asset_bbox_proj
                     if out_bounds is None
-                    else union_bounds(asset_bbox_proj, out_bounds)
+                    else geom_utils.union_bounds(asset_bbox_proj, out_bounds)
                 )
             else:
                 # Drop asset if it doesn't overlap with the output bounds at all
-                if asset_bbox_proj is not None and not bounds_overlap(
+                if asset_bbox_proj is not None and not geom_utils.bounds_overlap(
                     asset_bbox_proj, bounds
                 ):
                     # I've got a blank space in my ndarray, baby / And I'll write your name
@@ -267,7 +267,7 @@ def prepare_items(
                             asset_affine * np.array([(0, 0), (0, 1), (1, 1), (1, 0)]).T
                         )
 
-                        transformer = cached_transformer(
+                        transformer = geom_utils.cached_transformer(
                             asset_epsg, out_epsg, skip_equivalent=True, always_xy=True
                         )
                         out_px_corner_xs, out_px_corner_ys = transformer.transform(
@@ -319,7 +319,7 @@ def prepare_items(
     out_epsg = cast(int, out_epsg)
 
     if snap_bounds:
-        out_bounds = snapped_bounds(out_bounds, out_resolutions_xy)
+        out_bounds = geom_utils.snapped_bounds(out_bounds, out_resolutions_xy)
     spec = RasterSpec(
         epsg=out_epsg,
         bounds=out_bounds,
@@ -344,7 +344,7 @@ def to_coords(
     items: ItemSequence,
     asset_ids: List[str],
     spec: RasterSpec,
-    xy_coords: Union[Literal["center"], Literal["topleft"], Literal[False]] = "center",
+    xy_coords: Union[Literal["center"], Literal["topleft"], Literal[False]] = "topleft",
     properties: Union[bool, str, Sequence[str]] = True,
     band_coords: bool = True,
 ) -> Tuple[Dict[str, Union[pd.Index, np.ndarray, list]], List[str]]:
@@ -497,6 +497,9 @@ def to_coords(
                 )
             )
 
+    # Add `epsg` last in case it's also a field in properties; our data model assumes it's a coordinate
+    coords["epsg"] = spec.epsg
+
     return coords, dims
 
 
@@ -509,72 +512,3 @@ def to_attrs(spec: RasterSpec) -> Dict[str, Any]:
     else:
         attrs["resolution_xy"] = resolutions
     return attrs
-
-
-def bounds_from_affine(
-    af: affine.Affine, ysize: int, xsize: int, from_epsg: int, to_epsg: int
-) -> Bbox:
-    ul_x, ul_y = af * (0, 0)
-    ll_x, ll_y = af * (0, ysize)
-    lr_x, lr_y = af * (xsize, ysize)
-    ur_x, ur_y = af * (0, xsize)
-
-    xs = [ul_x, ll_x, lr_x, ur_x]
-    ys = [ul_y, ll_y, lr_y, ur_y]
-
-    if from_epsg != to_epsg:
-        transformer = cached_transformer(
-            from_epsg, to_epsg, skip_equivalent=True, always_xy=True
-        )
-        # TODO handle error
-        xs_proj, ys_proj = transformer.transform(xs, ys, errcheck=True)
-    else:
-        xs_proj = xs
-        ys_proj = ys
-
-    return min(xs_proj), min(ys_proj), max(xs_proj), max(ys_proj)
-
-
-# TODO: use `rio.warp.transform_bounds` instead, for densification? or add our own densification?
-# ours is likely faster due to transformer caching.
-def reproject_bounds(bounds: Bbox, from_epsg: int, to_epsg: int) -> Bbox:
-    if from_epsg == to_epsg:
-        return bounds
-
-    minx, miny, maxx, maxy = bounds
-    # generate the four corners (in CCW order, starting at upper-left)
-    # read this in pairs, downward by column
-    xs = [minx, minx, maxx, maxx]
-    ys = [maxy, miny, miny, maxy]
-    transformer = cached_transformer(
-        from_epsg, to_epsg, skip_equivalent=True, always_xy=True
-    )
-    xs_proj, ys_proj = transformer.transform(xs, ys, errcheck=True)  # TODO handle error
-    return min(xs_proj), min(ys_proj), max(xs_proj), max(ys_proj)
-
-
-def union_bounds(*bounds: Bbox) -> Bbox:
-    pairs = zip(*bounds)
-    return (
-        min(next(pairs)),
-        min(next(pairs)),
-        max(next(pairs)),
-        max(next(pairs)),
-    )
-
-
-def bounds_overlap(*bounds: Bbox) -> bool:
-    min_xs, min_ys, max_xs, max_ys = zip(*bounds)
-    return max(min_xs) < min(max_xs) and max(min_ys) < min(max_ys)
-
-
-def snapped_bounds(bounds: Bbox, resolutions_xy: Resolutions) -> Bbox:
-    minx, miny, maxx, maxy = bounds
-    xres, yres = resolutions_xy
-
-    minx = math.floor(minx / xres) * xres
-    maxx = math.ceil(maxx / xres) * xres
-    miny = math.floor(miny / yres) * yres
-    maxy = math.ceil(maxy / yres) * yres
-
-    return (minx, miny, maxx, maxy)
