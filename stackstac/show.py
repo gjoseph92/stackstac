@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import Awaitable, Optional, Tuple, cast
-import sys
-import functools
-import traceback
+from typing import Awaitable, Tuple, cast
 import weakref
 import io
 import asyncio
@@ -70,18 +67,7 @@ def show(arr: xr.DataArray, map_: ipyleaflet.Map) -> ipyleaflet.Layer:
     return lyr
 
 
-# _async_client: Optional[distributed.Client] = None
 _started: bool = False
-
-
-# def get_async_client():
-#     global _async_client
-#     current_cluster = distributed.get_client().cluster
-#     if _async_client is None or _async_client.cluster is not current_cluster:
-#         _async_client = distributed.Client(
-#             current_cluster, asynchronous=True, set_as_default=False
-#         )
-#     return _async_client
 
 
 def ensure_server():
@@ -92,7 +78,7 @@ def ensure_server():
 
 
 def _launch_server():
-    distributed.get_client()  # just for the error; make sure there is one
+    client = distributed.get_client()  # if there isn't one yet, this will error
 
     app = web.Application()
     app.add_routes(routes)
@@ -111,7 +97,11 @@ def _launch_server():
         finally:
             await runner.cleanup()
 
-    asyncio.create_task(run())
+    # Ensure our server runs in the same event loop as the distributed client,
+    # so the server can properly `await` results
+    client.loop.spawn_callback(run)
+    # ^ NOTE: tornado equivalent of `asyncio.create_task(run())`
+    # (note that it takes the function itself, not the coroutine object)
 
 
 @routes.get("/{hash}/{z}/{y}/{x}.png")
@@ -154,7 +144,6 @@ async def compute_tile(arr: xr.DataArray, z: int, y: int, x: int) -> bytes:
     if not bounds_overlap(bounds, arr_bounds):
         return EMPTY_TILE
 
-    # TODO this seems to be off-by-one-ish. Also pixel centers vs corners?
     xs = np.linspace(bounds.left, bounds.right, TILESIZE)
     ys = np.linspace(bounds.top, bounds.bottom, TILESIZE)
     tile = arr.interp(x=xs, y=ys, method="linear", kwargs=dict(fill_value=None))
@@ -165,12 +154,12 @@ async def compute_tile(arr: xr.DataArray, z: int, y: int, x: int) -> bytes:
 
     ordered = tile.transpose("band", "y", "x")
     delayed_png = delayed_arr_to_png(ordered.data, scales=(0, 4000))
-    future = client.compute(delayed_png, sync=False)
+    future = cast(distributed.Future, client.compute(delayed_png, sync=False))
 
     awaitable = future if client.asynchronous else future._result()
-    return await awaitable  # sneak into async api
-
-    # return await cast(Awaitable[bytes], client.compute(png))
+    # ^ sneak into the async api if the client isn't set up to be async.
+    # this _should_ be okay, since we're running within the client's own event loop.
+    return await cast(Awaitable[bytes], awaitable)
 
 
 def arr_to_png(arr: np.ndarray, scales: Scales, checkerboard: bool = True) -> bytes:
@@ -194,7 +183,7 @@ def arr_to_png(arr: np.ndarray, scales: Scales, checkerboard: bool = True) -> by
     arr = arr.astype("uint8", copy=False)
 
     if checkerboard:
-        checkers = _checkerboard(max(arr.shape[1:]), 8)
+        checkers = make_checkerboard(max(arr.shape[1:]), 8)
         checkers = checkers[: arr.shape[1], : arr.shape[2]]
         alpha[~alpha_mask & checkers] = 30
 
@@ -213,11 +202,11 @@ def arr_to_png(arr: np.ndarray, scales: Scales, checkerboard: bool = True) -> by
 delayed_arr_to_png = dask.delayed(arr_to_png, pure=True)
 
 
-def _checkerboard(size, cell_size):
-    n_cells = size // cell_size
+def make_checkerboard(arr_size: int, checker_size: int):
+    n_cells = arr_size // checker_size
     n_half_cells = n_cells // 2
     base = [[True, False] * n_half_cells, [False, True] * n_half_cells] * n_half_cells
-    board = np.kron(base, np.ones((cell_size, cell_size), dtype=bool))
+    board = np.kron(base, np.ones((checker_size, checker_size), dtype=bool))
     return board
 
 
