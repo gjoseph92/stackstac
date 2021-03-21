@@ -1,7 +1,7 @@
 from __future__ import annotations
+from stackstac.raster_spec import RasterSpec
 
-from typing import Awaitable, Tuple, cast
-import weakref
+from typing import Awaitable, Dict, Optional, Tuple, cast
 import io
 import asyncio
 import logging
@@ -17,26 +17,80 @@ import xarray as xr
 from PIL import Image
 import ipyleaflet
 
-from .prepare import bounds_overlap
+from . import geom_utils
 
 Scales = Tuple[float, float]
 
 TILESIZE = 256
 PORT = 8000
-
-arrs: weakref.WeakValueDictionary[str, xr.DataArray] = weakref.WeakValueDictionary()
 routes = web.RouteTableDef()
 
-logger = logging.getLogger(__file__)
+# TODO figure out weakref situation.
+# We don't want to be the only ones holding onto a persisted Dask collection;
+# this would make it impossible for users to release a persisted collection from distributed memory.
+# However, just holding onto weakrefs can cause other issues: it's common to display an ephemeral
+# result like `.show(x + 1)`; if the value is dropped from our lookup dict immediately,
+# then the HTTP requests to render tiles will 404.
+# For now, we're calling future-leaking a future problem, and storing everything in a normal dict
+# until what we want from the visualization API is more fleshed out.
+
+# arrs: weakref.WeakValueDictionary[str, xr.DataArray] = weakref.WeakValueDictionary()
+
+TOKEN_TO_ARRAY: Dict[str, xr.DataArray] = {}
 
 
-def show(arr: xr.DataArray, map_: ipyleaflet.Map) -> ipyleaflet.Layer:
+def show(arr: xr.DataArray, center=None, zoom=None, **map_kwargs) -> ipyleaflet.Map:
+    """
+    Quickly create a Map displaying a DataArray
+    """
+    map_ = ipyleaflet.Map(**map_kwargs)
+    if center is None:
+        west, south, east, north = geom_utils.array_bounds(arr, to_epsg=4326)
+        map_.fit_bounds([[south, east], [north, west]])
+        # TODO ipyleaflet `fit_bounds` doesn't do a very good job
+    else:
+        map_.center = center
+
+    if zoom is not None:
+        map_.zoom = zoom
+
+    add_to_map(arr, map_)
+    return map_
+
+
+def add_to_map(
+    arr: xr.DataArray, map: ipyleaflet.Map, name: Optional[str] = None
+) -> ipyleaflet.Layer:
+    """
+    Add the DataArray to a Map, as a new layer or replacing an existing one with the same name.
+
+    By giving a name, you can change and re-run notebook cells without piling up extraneous layers on
+    your map.
+    """
+    url = register(arr)
+    if name is not None:
+        for lyr in map.layers:
+            if lyr.name == name:
+                lyr.url = url
+                break
+        else:
+            lyr = ipyleaflet.TileLayer(name=name, url=url)
+            map.add_layer(lyr)
+    else:
+        lyr = ipyleaflet.TileLayer(name=arr.name, url=url)
+        map.add_layer(lyr)
+    return lyr
+
+
+def register(arr: xr.DataArray) -> str:
     ensure_server()
 
-    assert getattr(arr, "crs", None) in (
-        "epsg:3857",
-        None,
-    ), "Only Web Mercator (EPSG:3857) arrays are supported currently"
+    if arr.dtype.kind == "b":
+        raise NotImplementedError(
+            "Boolean arrays aren't supported yet. Please convert to a numeric type."
+        )
+
+    geom_utils.array_epsg(arr)  # just for the error
     if arr.ndim == 2:
         assert set(arr.dims) == {"x", "y"}
         arr = arr.expand_dims("band")
@@ -50,31 +104,28 @@ def show(arr: xr.DataArray, map_: ipyleaflet.Map) -> ipyleaflet.Layer:
         )
 
     token = dask.base.tokenize(arr)
-    arrs[token] = arr
+    TOKEN_TO_ARRAY[token] = arr
 
     # TODO proxy through jupyter so another port doesn't have to be open to the internet
-
-    # browser_url = urllib.parse.urlparse(map_.window_url)
-    # base_url = f"{browser_url.scheme}://{browser_url.netloc}"
-    # url = urllib.parse.urljoin(
-    #     base_url, f"proxy/127.0.0.1/{PORT}/{token}/{{z}}/{{y}}/{{x}}.png"
-    # )
-    url = f"http://localhost:{PORT}/{token}/{{z}}/{{y}}/{{x}}.png"
-
-    # TODO everything around named layers. Maybe will switch keys from tokens to names too??
-    lyr = ipyleaflet.TileLayer(name=arr.name, url=url)
-    map_.add_layer(lyr)
-    return lyr
+    return f"http://localhost:{PORT}/{token}/{{z}}/{{y}}/{{x}}.png"
 
 
-_started: bool = False
+def unregister(arr: xr.DataArray) -> bool:
+    token = dask.base.tokenize(arr)
+    try:
+        TOKEN_TO_ARRAY.pop(token)
+        return True
+    except KeyError:
+        return False
 
 
 def ensure_server():
-    global _started
-    if not _started:
+    if not ensure_server._started:
         _launch_server()
-        _started = True
+        ensure_server._started = True
+
+
+ensure_server._started = False
 
 
 def _launch_server():
@@ -108,9 +159,11 @@ def _launch_server():
 async def handler(request: web.Request) -> web.Response:
     hash = request.match_info["hash"]
     try:
-        arr = arrs[hash]
+        arr = TOKEN_TO_ARRAY[hash]
     except KeyError:
-        raise web.HTTPNotFound(reason=f"{hash} not found. Have {list(arrs)}.") from None
+        raise web.HTTPNotFound(
+            reason=f"{hash} not found. Have {list(TOKEN_TO_ARRAY)}."
+        ) from None
 
     try:
         z = int(request.match_info["z"])
@@ -133,20 +186,29 @@ async def compute_tile(arr: xr.DataArray, z: int, y: int, x: int) -> bytes:
     client = distributed.get_client()
     bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
 
-    # TODO reprojection! (try just using xarray interp for warping for now, might actually work)
-    # for now, assume array is 3857.
-    arr_bounds = (
-        arr.x.min().item(),
-        arr.y.min().item(),
-        arr.x.max().item(),
-        arr.y.max().item(),
-    )
-    if not bounds_overlap(bounds, arr_bounds):
+    if not geom_utils.bounds_overlap(
+        bounds, geom_utils.array_bounds(arr, to_epsg=3857)
+    ):
         return EMPTY_TILE
 
-    xs = np.linspace(bounds.left, bounds.right, TILESIZE)
-    ys = np.linspace(bounds.top, bounds.bottom, TILESIZE)
-    tile = arr.interp(x=xs, y=ys, method="linear", kwargs=dict(fill_value=None))
+    # # xs = np.linspace(bounds.left, bounds.right, TILESIZE)
+    # # ys = np.linspace(bounds.top, bounds.bottom, TILESIZE)
+    # epsg = geom_utils.array_epsg(arr)
+    # if epsg != 3857:
+    #     pass
+    # else:
+
+    # tile = arr.interp(x=xs, y=ys, method="linear", kwargs=dict(fill_value=None))
+
+    minx, miny, maxx, maxy = bounds
+    tile = geom_utils.reproject_array(
+        arr,
+        RasterSpec(
+            epsg=3857,
+            bounds=bounds,
+            resolutions_xy=((maxx - minx) / TILESIZE, (maxy - miny) / TILESIZE),
+        ),
+    )
     assert tile.shape[1:] == (
         TILESIZE,
         TILESIZE,
