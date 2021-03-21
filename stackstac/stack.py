@@ -32,7 +32,7 @@ def stack(
     fill_value: Optional[Union[int, float]] = np.nan,
     rescale: bool = True,
     sortby_date: Union[Literal["asc"], Literal["desc"], Literal[False]] = "asc",
-    xy_coords: Union[Literal["center"], Literal["topleft"], Literal[False]] = "center",
+    xy_coords: Union[Literal["center"], Literal["topleft"], Literal[False]] = "topleft",
     properties: Union[bool, str, Sequence[str]] = True,
     band_coords: bool = True,
     gdal_env: Optional[LayeredEnv] = None,
@@ -213,9 +213,10 @@ def stack(
         allowing for spatial indexing. The coordinates will be in the coordinate reference system given
         by ``epsg``
 
-        If ``"center"`` (default), the coordinates are for each pixel's centroid, following xarray conventions.
+        If ``"topleft"`` (default), the coordinates are for each pixel's upper-left corner,
+        following raster conventions.
 
-        If ``"topleft"``, the coordinates are for each pixel's upper-left corner.
+        If ``"center"``, the coordinates are for each pixel's centroid, following xarray conventions.
 
         If False, ``x`` and ``y`` will just be indexed by row/column numbers, saving a small amount of time
         and local memory.

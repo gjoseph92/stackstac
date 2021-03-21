@@ -3,7 +3,7 @@ from .rio_reader import DEFAULT_GDAL_ENV, MULTITHREADED_DRIVER_ALLOWLIST
 from .stack import stack
 
 # try:
-from .show import show
+from .show import show, add_to_map
 
 # except ImportError:
 #     pass
@@ -14,4 +14,5 @@ __all__ = [
     "MULTITHREADED_DRIVER_ALLOWLIST",
     "stack",
     "show",
+    "add_to_map",
 ]
