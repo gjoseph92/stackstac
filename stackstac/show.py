@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Awaitable, Dict, NamedTuple, Optional, Tuple, Union, cast
+import math
 import io
 import asyncio
 import logging
@@ -361,7 +362,10 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
     ), f"Wrong shape after interpolation: {tile.shape}"
 
     delayed_png = delayed_arr_to_png(
-        tile.data, range=disp.range, checkerboard=disp.checkerboard
+        tile.data,
+        range=disp.range,
+        colormap=disp.colormap,
+        checkerboard=disp.checkerboard,
     )
     future = cast(distributed.Future, client.compute(delayed_png, sync=False))
 
@@ -399,7 +403,8 @@ def arr_to_png(
     if colormap is not None:
         # NOTE: `Colormap` automatically uses `np.isnan(x)` as the mask
         cmapped = colormap(norm_arr, bytes=True)
-        u8_arr, alpha = cmapped[:-1], cmapped[-1:]
+        cmapped = np.moveaxis(np.squeeze(cmapped), -1, 0)
+        u8_arr, alpha = cmapped[:-1], cmapped[-1]
     else:
         u8_arr = np.clip(np.nan_to_num(norm_arr * 255), 0, 255).astype("uint8")
         mask = np.isnan(arr).any(axis=0)
@@ -429,13 +434,14 @@ delayed_arr_to_png = dask.delayed(arr_to_png, pure=True)
 
 
 def make_checkerboard(arr_size: int, checker_size: int):
-    n_cells = arr_size // checker_size
-    n_half_cells = n_cells // 2
+    n_cells = arr_size / checker_size
+    n_half_cells = math.ceil(n_cells / 2)
     base = [[True, False] * n_half_cells, [False, True] * n_half_cells] * n_half_cells
     board = np.kron(base, np.ones((checker_size, checker_size), dtype=bool))
     return board
 
 
+# TODO don't do at import
 EMPTY_TILE_CHECKERBOARD = arr_to_png(
     np.full((1, TILESIZE, TILESIZE), np.nan), range=(0, 1), checkerboard=True
 )
