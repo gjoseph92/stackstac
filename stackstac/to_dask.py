@@ -140,7 +140,10 @@ def asset_entry_to_reader_and_window(
         #     # ^ NOTE: this lock only protects the file cache, not the file itself.
         #     # xarray's file cache is already thread-safe, so using a lock is pointless.
         # ),
-        # NOTE: skip the `CachingFileManager` for now to be sure datasets aren't leaked
+        # NOTE: skip the `CachingFileManager` for now to be sure datasets aren't leaked.
+        # There are a few issues with `CachingFileManager`: faulty ref-counting logic,
+        # and misleading `close` and `lock` interfaces. Either refactor that upstream,
+        # or implement our own caching logic.
         reader(
             url=url,
             spec=spec,
