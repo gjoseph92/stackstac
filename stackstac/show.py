@@ -1,5 +1,4 @@
 from __future__ import annotations
-import functools
 
 from typing import Awaitable, Dict, NamedTuple, Optional, Tuple, Union, cast
 import io
@@ -26,7 +25,7 @@ from .raster_spec import RasterSpec
 
 Range = Tuple[float, float]
 
-# TILESIZE = 256
+TILESIZE = 256
 PORT = 8000
 routes = web.RouteTableDef()
 
@@ -47,7 +46,6 @@ class Displayable(NamedTuple):
     range: Range
     colormap: Optional[matplotlib.colors.Colormap]
     checkerboard: bool
-    tilesize: int
 
 
 TOKEN_TO_ARRAY: Dict[str, Displayable] = {}
@@ -60,7 +58,6 @@ def show(
     range: Optional[Range] = None,
     colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
-    tilesize: int = 512,
     **map_kwargs,
 ) -> ipyleaflet.Map:
     """
@@ -97,16 +94,6 @@ def show(
 
         Note that only NaN is considered a missing value; any custom fill value should be converted
         to NaN before visualizing.
-    tilesize:
-        The size (in pixels) of tiles to render (default: 512).
-
-        Web browsers only allow a fixed number of connections to be open at once (for example,
-        6 per host in Chrome), and each tile visible on the map consumes one connection.
-        It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
-        only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles.
-
-        Using a larger ``tilesize`` might make the map load faster, but potentially put more memory
-        pressure on your workers.
 
     Returns
     -------
@@ -124,7 +111,7 @@ def show(
     if zoom is not None:
         map_.zoom = zoom
 
-    add_to_map(arr, map_, range=range, colormap=colormap, checkerboard=checkerboard, tilesize=tilesize)
+    add_to_map(arr, map_, range=range, colormap=colormap, checkerboard=checkerboard)
     return map_
 
 
@@ -135,7 +122,6 @@ def add_to_map(
     range: Optional[Range] = None,
     colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
-    tilesize: int = 512,
 ) -> ipyleaflet.Layer:
     """
     Add the `~xarray.DataArray` to a `~ipyleaflet.Map`, as a new layer or replacing an existing one with the same name.
@@ -177,35 +163,23 @@ def add_to_map(
 
         Note that only NaN is considered a missing value; any custom fill value should be converted
         to NaN before visualizing.
-    tilesize:
-        The size (in pixels) of tiles to render (default: 512).
-
-        Web browsers only allow a fixed number of connections to be open at once (for example,
-        6 per host in Chrome), and each tile visible on the map consumes one connection.
-        It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
-        only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles.
-
-        Using a larger ``tilesize`` might make the map load faster, but potentially put more memory
-        pressure on your workers.
 
     Returns
     -------
     ipyleaflet.Layer:
         The new or existing layer for visualizing this array.
     """
-    url = register(arr, range=range, colormap=colormap, checkerboard=checkerboard, tilesize=tilesize)
+    url = register(arr, range=range, colormap=colormap, checkerboard=checkerboard)
     if name is not None:
         for lyr in map.layers:
             if lyr.name == name:
                 lyr.url = url
-                lyr.tile_size = tilesize
-                # ^ TODO upading this on an existing layer probably won't work?
                 break
         else:
-            lyr = ipyleaflet.TileLayer(name=name, url=url, tile_size=tilesize)
+            lyr = ipyleaflet.TileLayer(name=name, url=url)
             map.add_layer(lyr)
     else:
-        lyr = ipyleaflet.TileLayer(name=arr.name, url=url, tile_size=tilesize)
+        lyr = ipyleaflet.TileLayer(name=arr.name, url=url)
         map.add_layer(lyr)
     return lyr
 
@@ -215,7 +189,6 @@ def register(
     range: Optional[Range] = None,
     colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
-    tilesize: int = 512,
 ) -> str:
     """
     Low-level method to register a `DataArray` for display on a web map, and spin up the HTTP server if necessary.
@@ -283,9 +256,7 @@ def register(
         if vmin > vmax:
             raise ValueError(f"Invalid range: min value {vmin} > max value {vmax}")
 
-    assert tilesize > 1, f"Tilesize must be greater than zero, not {tilesize}"
-
-    disp = Displayable(arr, range, colormap, checkerboard, tilesize)
+    disp = Displayable(arr, range, colormap, checkerboard)
     token = dask.base.tokenize(disp)
     TOKEN_TO_ARRAY[token] = disp
 
@@ -369,7 +340,7 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
     if not geom_utils.bounds_overlap(
         bounds, geom_utils.array_bounds(disp.arr, to_epsg=3857)
     ):
-        return empty_tile(disp.tilesize, disp.checkerboard)
+        return EMPTY_TILE_CHECKERBOARD if disp.checkerboard else EMPTY_TILE
 
     minx, miny, maxx, maxy = bounds
     tile = geom_utils.reproject_array(
@@ -377,15 +348,12 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
         RasterSpec(
             epsg=3857,
             bounds=bounds,
-            resolutions_xy=(
-                (maxx - minx) / disp.tilesize,
-                (maxy - miny) / disp.tilesize,
-            ),
+            resolutions_xy=((maxx - minx) / TILESIZE, (maxy - miny) / TILESIZE),
         ),
     )
     assert tile.shape[1:] == (
-        disp.tilesize,
-        disp.tilesize,
+        TILESIZE,
+        TILESIZE,
     ), f"Wrong shape after interpolation: {tile.shape}"
 
     delayed_png = delayed_arr_to_png(
@@ -464,7 +432,9 @@ def make_checkerboard(arr_size: int, checker_size: int):
     return board
 
 
-@functools.lru_cache(maxsize=64)
-def empty_tile(tilesize: int, checkerboard: bool) -> bytes:
-    empty = np.full((1, tilesize, tilesize), np.nan)
-    return arr_to_png(empty, range=(0, 1), checkerboard=checkerboard)
+EMPTY_TILE_CHECKERBOARD = arr_to_png(
+    np.full((1, TILESIZE, TILESIZE), np.nan), range=(0, 1), checkerboard=True
+)
+EMPTY_TILE = arr_to_png(
+    np.full((1, TILESIZE, TILESIZE), np.nan), range=(0, 1), checkerboard=False
+)
