@@ -6,7 +6,6 @@ import io
 import asyncio
 import logging
 import warnings
-import concurrent.futures
 
 # import urllib.parse
 
@@ -274,7 +273,6 @@ def ensure_server():
 
 
 ensure_server._started = False
-proc_pool = None
 
 
 def _launch_server():
@@ -282,10 +280,6 @@ def _launch_server():
 
     app = web.Application()
     app.add_routes(routes)
-
-    global proc_pool
-    if proc_pool is None:
-        proc_pool = concurrent.futures.ProcessPoolExecutor()
 
     async def run():
         runner = web.AppRunner(app, logger=logging.getLogger("root"))
@@ -300,9 +294,6 @@ def _launch_server():
                 await asyncio.sleep(3600)  # sleep forever
         finally:
             await runner.cleanup()
-            global proc_pool
-            proc_pool.shutdown()
-            proc_pool = None
 
     # Ensure our server runs in the same event loop as the distributed client,
     # so the server can properly `await` results
@@ -352,34 +343,19 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
     ):
         return EMPTY_TILE_CHECKERBOARD if disp.checkerboard else EMPTY_TILE
 
+    minx, miny, maxx, maxy = bounds
     # FIXME: `reproject_array` is really, really slow for large arrays
     # because of all the dask-graph-munging. Having a blocking, GIL-bound
     # function within an async handler like this also means we're basically
     # sending requests out serially per tile
-    # HACK HACK HACK wtf this actually seems to work pretty well.
-    # But spinning up a process pool just for dask graph munging is insane.
-    # The serialization overhead must be pretty high here...
-    minx, miny, maxx, maxy = bounds
-    spec = RasterSpec(
+    tile = geom_utils.reproject_array(
+        disp.arr,
+        RasterSpec(
             epsg=3857,
             bounds=bounds,
             resolutions_xy=((maxx - minx) / TILESIZE, (maxy - miny) / TILESIZE),
-        )
-    loop = asyncio.get_running_loop()
-    tile = await loop.run_in_executor(
-        proc_pool,
-        geom_utils.reproject_array,
-        disp.arr,
-        spec,
+        ),
     )
-    # tile = geom_utils.reproject_array(
-    #     disp.arr,
-    #     RasterSpec(
-    #         epsg=3857,
-    #         bounds=bounds,
-    #         resolutions_xy=((maxx - minx) / TILESIZE, (maxy - miny) / TILESIZE),
-    #     ),
-    # )
     assert tile.shape[1:] == (
         TILESIZE,
         TILESIZE,
