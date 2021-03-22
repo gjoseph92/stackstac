@@ -1,7 +1,6 @@
 from __future__ import annotations
-from stackstac.raster_spec import RasterSpec
 
-from typing import Awaitable, Dict, NamedTuple, Optional, Tuple, cast
+from typing import Awaitable, Dict, NamedTuple, Optional, Tuple, Union, cast
 import io
 import asyncio
 import logging
@@ -18,8 +17,11 @@ import xarray as xr
 from PIL import Image
 import ipyleaflet
 import dask.array as da
+import matplotlib.cm
+import matplotlib.colors
 
 from . import geom_utils
+from .raster_spec import RasterSpec
 
 Range = Tuple[float, float]
 
@@ -42,6 +44,7 @@ routes = web.RouteTableDef()
 class Displayable(NamedTuple):
     arr: xr.DataArray
     range: Range
+    colormap: Optional[matplotlib.colors.Colormap]
     checkerboard: bool
 
 
@@ -53,11 +56,49 @@ def show(
     center=None,
     zoom=None,
     range: Optional[Range] = None,
+    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
     **map_kwargs,
 ) -> ipyleaflet.Map:
     """
-    Quickly create a Map displaying a DataArray
+    Quickly create a `~ipyleaflet.Map` displaying a `~xarray.DataArray`.
+
+    Parameters
+    ----------
+    arr:
+        `~xarray.DataArray` to visualize. Must have ``x`` and ``y``, and optionally ``band`` dims,
+        and the ``epsg`` coordinate set.
+
+        ``arr`` must have 1-3 bands. Single-band data can be colormapped; multi-band data will be
+        displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
+        then shown as RGB.
+    center:
+        Centerpoint for the map. If None (default), the map will automatically be centered on the array.
+    zoom:
+        Initial zoom level for the map. If None (default), the map will automatically be zoomed to fit the entire array.
+    range:
+        Min and max values in ``arr`` which will become black (0) and white (255) in the visualization.
+
+        If None (default), it will automatically use the 2nd/98th percentile values of the *entire array*
+        (unless it's a boolean array; then we just use 0-1).
+        For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
+        passing an explicit range is usually a good idea.
+    colormap:
+        Colormap to use for single-band data. Can be a :doc:`matplotlib colormap name <matplotlib:colormap-reference>`
+        as a string, or a `~matplotlib.colors.Colormap` object for custom colormapping.
+
+        If None (default), the default matplotlib colormap (usually ``viridis``) will automatically
+        be used for 1-band data. Setting a colormap for multi-band data is an error.
+    checkerboard:
+        Whether to show a checkerboard pattern for missing data (default), or leave it fully transparent.
+
+        Note that only NaN is considered a missing value; any custom fill value should be converted
+        to NaN before visualizing.
+
+    Returns
+    -------
+    ipyleaflet.Map:
+        The new map showing this array.
     """
     map_ = ipyleaflet.Map(**map_kwargs)
     if center is None:
@@ -70,7 +111,7 @@ def show(
     if zoom is not None:
         map_.zoom = zoom
 
-    add_to_map(arr, map_, range=range, checkerboard=checkerboard)
+    add_to_map(arr, map_, range=range, colormap=colormap, checkerboard=checkerboard)
     return map_
 
 
@@ -79,15 +120,56 @@ def add_to_map(
     map: ipyleaflet.Map,
     name: Optional[str] = None,
     range: Optional[Range] = None,
+    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
 ) -> ipyleaflet.Layer:
     """
-    Add the DataArray to a Map, as a new layer or replacing an existing one with the same name.
+    Add the `~xarray.DataArray` to a `~ipyleaflet.Map`, as a new layer or replacing an existing one with the same name.
 
     By giving a name, you can change and re-run notebook cells without piling up extraneous layers on
     your map.
+
+    Parameters
+    ----------
+    arr:
+        `~xarray.DataArray` to visualize. Must have ``x`` and ``y``, and optionally ``band`` dims,
+        and the ``epsg`` coordinate set.
+
+        ``arr`` must have 1-3 bands. Single-band data can be colormapped; multi-band data will be
+        displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
+        then shown as RGB.
+    map:
+        `~ipyleaflet.Map` to show the array on.
+    name: str
+        Name of the layer. If there's already a layer with this name on the map, its URL will be updated.
+        Otherwise, a new layer is added.
+
+        If None (default), a new layer is always added, which will have the name ``arr.name``.
+    range:
+        Min and max values in ``arr`` which will become black (0) and white (255) in the visualization.
+
+        If None (default), it will automatically use the 2nd/98th percentile values of the *entire array*
+        (unless it's a boolean array; then we just use 0-1).
+        For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
+        passing an explicit range is usually a good idea.
+    colormap:
+        Colormap to use for single-band data. Can be a :doc:`matplotlib colormap name <matplotlib:colormap-reference>`
+        as a string, or a `~matplotlib.colors.Colormap` object for custom colormapping.
+
+        If None (default), the default matplotlib colormap (usually ``viridis``) will automatically
+        be used for 1-band data. Setting a colormap for multi-band data is an error.
+    checkerboard:
+        Whether to show a checkerboard pattern for missing data (default), or leave it fully transparent.
+
+        Note that only NaN is considered a missing value; any custom fill value should be converted
+        to NaN before visualizing.
+
+    Returns
+    -------
+    ipyleaflet.Layer:
+        The new or existing layer for visualizing this array.
     """
-    url = register(arr, range=range, checkerboard=checkerboard)
+    url = register(arr, range=range, colormap=colormap, checkerboard=checkerboard)
     if name is not None:
         for lyr in map.layers:
             if lyr.name == name:
@@ -103,14 +185,25 @@ def add_to_map(
 
 
 def register(
-    arr: xr.DataArray, range: Optional[Range] = None, checkerboard: bool = True
+    arr: xr.DataArray,
+    range: Optional[Range] = None,
+    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
+    checkerboard: bool = True,
 ) -> str:
-    ensure_server()
+    """
+    Low-level method to register a `DataArray` for display on a web map, and spin up the HTTP server if necessary.
 
-    if arr.dtype.kind == "b":
-        raise NotImplementedError(
-            "Boolean arrays aren't supported yet. Please convert to a numeric type."
-        )
+    Registration is necessary so that the local web server can look up the right
+    `~xarray.DataArray` object to render based on the URL requested.
+
+    A `distributed.Client` must already be created (and set as default) before calling this.
+
+    Once registered, an array cannot currrently be un-registered. Beware of this when visualizing
+    things you've called `~distributed.Client.persist` on: even if you try to release a persisted
+    object from your own code, if you've ever registered it for visualization, it won't be freed
+    from distributed memory.
+    """
+    ensure_server()
 
     geom_utils.array_epsg(arr)  # just for the error
     if arr.ndim == 2:
@@ -125,30 +218,45 @@ def register(
             f"Array must have the dimensions 'x', 'y', and optionally 'band', not {arr.dims!r}"
         )
 
+    arr = arr.transpose("band", "y", "x")
+
+    if arr.shape[0] == 1:
+        if colormap is None:
+            # use the default colormap for 1-band data (usually viridis)
+            colormap = matplotlib.cm.get_cmap()
+    elif colormap is not None:
+        raise ValueError(
+            f"Colormaps are only possible on single-band data; this array has {arr.shape[0]} bands: "
+            f"{arr.bands.data.tolist()}"
+        )
+
+    if isinstance(colormap, str):
+        colormap = matplotlib.cm.get_cmap(colormap)
+
     if range is None:
-        warnings.warn(
-            "Calculating 2nd and 98th percentile of the entire array, since no range was given. "
-            "This could be expensive!"
-        )
-
-        def bandwise_percentile(arr: xr.DataArray, p):
-            # TODO auto-use tdigest if available
-            percentiles = da.concatenate(
-                [da.percentile(band.flatten(), p) for band in arr.data]
+        if arr.dtype.kind == "b":
+            range = (0, 1)
+        else:
+            warnings.warn(
+                "Calculating 2nd and 98th percentile of the entire array, since no range was given. "
+                "This could be expensive!"
             )
-            return xr.DataArray(percentiles, dims=["band"], coords=dict(band=arr.band))
 
-        flat = arr.data.flatten()
-        mins, maxes = (
-            da.percentile(flat, 2).persist(),
-            da.percentile(flat, 98).persist()
-            # bandwise_percentile(arr, 2).persist(),
-            # bandwise_percentile(arr, 98).persist(),
-        )
-        arr = (arr - mins) / (maxes - mins)
-        range = (0, 1)
+            flat = arr.data.flatten()
+            mins, maxes = (
+                # TODO auto-use tdigest if available
+                # NOTE: we persist the percentiles to be sure they aren't recomputed when you pan/zoom
+                da.percentile(flat, 2).persist(),
+                da.percentile(flat, 98).persist(),
+            )
+            arr = (arr - mins) / (maxes - mins)
+            range = (0, 1)
+    else:
+        vmin, vmax = range
+        if vmin > vmax:
+            raise ValueError(f"Invalid range: min value {vmin} > max value {vmax}")
 
-    disp = Displayable(arr, range, checkerboard)
+    disp = Displayable(arr, range, colormap, checkerboard)
     token = dask.base.tokenize(disp)
     TOKEN_TO_ARRAY[token] = disp
 
@@ -195,6 +303,7 @@ def _launch_server():
 
 @routes.get("/{hash}/{z}/{y}/{x}.png")
 async def handler(request: web.Request) -> web.Response:
+    "Handle a HTTP GET request for an XYZ tile"
     hash = request.match_info["hash"]
     try:
         disp = TOKEN_TO_ARRAY[hash]
@@ -221,7 +330,11 @@ async def handler(request: web.Request) -> web.Response:
 
 
 async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
+    "Send an XYZ tile to be computed by the distributed client, and wait for it."
     client = distributed.get_client()
+    # TODO assert the client's loop is the same as our current event loop.
+    # If not... tell the server to shut down and restart on the new event loop?
+    # (could also do this within a watch loop in `_launch_server`.)
     bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
 
     if not geom_utils.bounds_overlap(
@@ -243,9 +356,8 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
         TILESIZE,
     ), f"Wrong shape after interpolation: {tile.shape}"
 
-    ordered = tile.transpose("band", "y", "x")
     delayed_png = delayed_arr_to_png(
-        ordered.data, range=disp.range, checkerboard=disp.checkerboard
+        tile.data, range=disp.range, checkerboard=disp.checkerboard
     )
     future = cast(distributed.Future, client.compute(delayed_png, sync=False))
 
@@ -255,39 +367,55 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
     return await cast(Awaitable[bytes], awaitable)
 
 
-def arr_to_png(arr: np.ndarray, range: Range, checkerboard: bool) -> bytes:
+def arr_to_png(
+    arr: np.ndarray,
+    range: Range,
+    colormap: Optional[matplotlib.colors.Colormap] = None,
+    checkerboard: bool = True,
+) -> bytes:
+    "Convert an ndarray into a PNG"
+    # TODO multi-band scales?
+    # TODO non-nan fill values
     assert len(arr) <= 3, f"Array must have at most 3 bands. Array shape: {arr.shape}"
 
-    alpha_mask = ~np.isnan(arr).all(axis=0)  # TODO non-nan fill value
-    alpha = alpha_mask.astype("uint8", copy=False) * 255
+    working_dtype = arr.dtype
+    # https://github.com/matplotlib/matplotlib/blob/8b02ed1f0af7956c7f42b76bf40a86f048a0454e/lib/matplotlib/colors.py#L1169-L1171
+    if np.issubdtype(working_dtype, np.integer) or working_dtype.type is np.bool_:
+        # bool_/int8/int16 -> float32; int32/int64 -> float64
+        working_dtype = np.promote_types(working_dtype, np.float32)
 
-    # TODO boolean arrays
-    # TODO multi-band scales?
-    # TODO colormap within here??
-    min_, max_ = range
-    if min_ != max_:
-        arr -= min_
-        arr /= max_ - min_
-        arr *= 255
+    vmin, vmax = range
+    norm_arr = arr.astype(working_dtype, copy=True)
+    if vmin == vmax:
+        norm_arr.fill(0)
     else:
-        arr[:] = 0
+        norm_arr -= vmin
+        norm_arr /= vmax - vmin
 
-    np.nan_to_num(arr, copy=False)
-    np.clip(arr, 0, 255, out=arr)
-    arr = arr.astype("uint8", copy=False)
+    if colormap is not None:
+        # NOTE: `Colormap` automatically uses `np.isnan(x)` as the mask
+        cmapped = colormap(norm_arr, bytes=True)
+        u8_arr, alpha = cmapped[:-1], cmapped[-1:]
+    else:
+        u8_arr = np.clip(np.nan_to_num(norm_arr * 255), 0, 255).astype("uint8")
+        mask = np.isnan(arr).any(axis=0)
+        alpha = (~mask).astype("uint8", copy=False)
+        alpha *= 255
 
     if checkerboard:
         checkers = make_checkerboard(max(arr.shape[1:]), 8)
         checkers = checkers[: arr.shape[1], : arr.shape[2]]
-        alpha[~alpha_mask & checkers] = 30
+        alpha[(alpha == 0) & checkers] = 30
 
-    arr = np.concatenate(
-        [arr, alpha[None]] if len(arr) != 2 else [arr, arr[[0]], alpha[None]],
+    img_arr = np.concatenate(
+        [u8_arr, alpha[None]]
+        if len(u8_arr) != 2
+        else [u8_arr, u8_arr[[0]], alpha[None]],
         axis=0,
     )
-    arr = np.moveaxis(arr, 0, -1).astype("uint8", copy=False)
+    img_arr = np.moveaxis(img_arr, 0, -1)
 
-    image = Image.fromarray(arr)
+    image = Image.fromarray(img_arr)
     file = io.BytesIO()
     image.save(file, format="png")
     return file.getvalue()
