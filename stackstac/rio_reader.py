@@ -282,6 +282,12 @@ class ThreadLocalRioDataset:
         with self._lock:
             self._threadlocal = threading.local()
 
+    def __getstate__(self):
+        raise RuntimeError("Don't pickle me bro!")
+
+    def __setstate__(self, state):
+        raise RuntimeError("Don't un-pickle me bro!")
+
 
 class SelfCleaningDatasetReader(rio.DatasetReader):
     # Unclear if this is even necessary, since `DatasetBase` implements `__dealloc__`,
