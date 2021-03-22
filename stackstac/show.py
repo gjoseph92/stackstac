@@ -343,6 +343,10 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
         return EMPTY_TILE_CHECKERBOARD if disp.checkerboard else EMPTY_TILE
 
     minx, miny, maxx, maxy = bounds
+    # FIXME: `reproject_array` is really, really slow for large arrays
+    # because of all the dask-graph-munging. Having a blocking, GIL-bound
+    # function within an async handler like this also means we're basically
+    # sending requests out serially per tile
     tile = geom_utils.reproject_array(
         disp.arr,
         RasterSpec(

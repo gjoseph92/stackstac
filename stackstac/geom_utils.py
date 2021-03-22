@@ -122,6 +122,11 @@ def reproject_array(
     spec: RasterSpec,
     method: Union[Literal["linear"], Literal["nearest"]] = "linear",
 ) -> xr.DataArray:
+    # TODO this scipy/`interp`-based approach still isn't block-parallel
+    # (seems like xarray just rechunks to fuse all the spatial chunks first),
+    # so this both won't scale, and can be crazy slow in dask graph construction
+    # (and the rechunk probably eliminates any hope of sending an HLG to the scheduler).
+
     from_epsg = array_epsg(arr)
     if (
         from_epsg == spec.epsg
