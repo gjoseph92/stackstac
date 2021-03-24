@@ -168,7 +168,7 @@ def stack(
         Otherwise, if those grids don't line up, processing one chunk of your Dask array could
         require reading many tiles from the data, parts of which will then be thrown out.
         Additionally, those same data tiles might need to be re-read (and re-thrown-out)
-        for a neigboring Dask chunk, which is just as inefficient as it sounds (though setting
+        for a neighboring Dask chunk, which is just as inefficient as it sounds (though setting
         a high ``GDAL_CACHEMAX`` via ``gdal_env`` will help keep more data tiles cached,
         at the expense of using more memory).
 
@@ -178,8 +178,8 @@ def stack(
 
         **This is the one parameter we can't pick for you automatically**, because the STAC
         specification offers no metadata about the internal tiling of the assets. We'd
-        have to the data files to find out, which is very slow. But to make an educated guess,
-        you should look at ``rasterio.open(url).block_shapes`` for a few sample assets.
+        have to open the data files to find out, which is very slow. But to make an educated
+        guess, you should look at ``rasterio.open(url).block_shapes`` for a few sample assets.
 
         The most important thing to avoid is making your ``chunksize`` here *smaller* than
         the internal tilesize of the data. If you want small Dask chunks for other reasons,

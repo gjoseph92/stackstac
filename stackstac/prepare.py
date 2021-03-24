@@ -176,7 +176,7 @@ def prepare_items(
                 and asset_transform == item_transform
                 and asset_shape == item_shape
                 # TODO this still misses the case where the asset overrides bbox, but not transform/shape.
-                # At that point would need to significatly restructure the code
+                # At that point would need to significantly restructure the code
                 # to express this complex of prioritization:
                 # bbox from asset, then transform from asset, then bbox from item,
                 # then transform from item, then latlon bbox from item
@@ -249,7 +249,7 @@ def prepare_items(
                     asset_affine = asset_affine or affine.Affine(*asset_transform[:6])
                     if asset_epsg == out_epsg:
                         # Fastpath-ish when asset is already in the output CRS:
-                        # pull directly from geotrans coefficeints
+                        # pull directly from geotrans coefficients
                         if not asset_affine.is_rectilinear:
                             raise NotImplementedError(
                                 f"Cannot automatically compute the resolution, "
