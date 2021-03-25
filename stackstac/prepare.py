@@ -339,7 +339,7 @@ def to_coords(
     items: ItemSequence,
     asset_ids: List[str],
     spec: RasterSpec,
-    xy_coords: Union[Literal["center"], Literal["topleft"], Literal[False]] = "center",
+    xy_coords: Literal["center", "topleft", False] = "center",
     properties: Union[bool, str, Sequence[str]] = True,
     band_coords: bool = True,
 ) -> Tuple[Dict[str, Union[pd.Index, np.ndarray, list]], List[str]]:
