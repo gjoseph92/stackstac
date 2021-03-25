@@ -28,6 +28,8 @@ rasterio = "^1.2.0"
 scipy = "^1.6.1"
 sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
 xarray = "^0.17.0"
+ipyleaflet = "^0.13.6"
+matplotlib = "^3.3.4"
 
 [tool.poetry.dev-dependencies]
 Pympler = "^0.9"

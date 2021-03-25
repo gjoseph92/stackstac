@@ -47,17 +47,6 @@ yarl = ">=1.0,<2.0"
 speedups = ["aiodns", "brotlipy", "cchardet"]
 
 [[package]]
-name = "aiohttp-cors"
-version = "0.7.0"
-description = "CORS support for aiohttp"
-category = "main"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-aiohttp = ">=1.1"
-
-[[package]]
 name = "aioitertools"
 version = "0.7.1"
 description = "itertools and builtins for AsyncIO and mixed iterables"
@@ -115,7 +104,7 @@ python-versions = "*"
 name = "argon2-cffi"
 version = "20.1.0"
 description = "The secure Argon2 password hashing algorithm."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -277,7 +266,7 @@ urllib3 = {version = ">=1.25.4,<1.27", markers = "python_version != \"3.4\""}
 name = "branca"
 version = "0.4.2"
 description = "Generate complex HTML+JS pages with Python"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 
@@ -398,7 +387,7 @@ test = ["flake8 (==3.7.8)", "hypothesis (==3.55.3)"]
 name = "cycler"
 version = "0.10.0"
 description = "Composable style cycles"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -635,7 +624,7 @@ sphinx = ">=3.1.2"
 name = "ipykernel"
 version = "5.5.0"
 description = "IPython Kernel for Jupyter"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 
@@ -653,7 +642,7 @@ test = ["pytest (!=5.3.4)", "pytest-cov", "flaky", "nose", "jedi (<=0.17.2)"]
 name = "ipyleaflet"
 version = "0.13.6"
 description = "A Jupyter widget for dynamic Leaflet maps"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -717,7 +706,7 @@ python-versions = "*"
 name = "ipywidgets"
 version = "7.6.3"
 description = "IPython HTML widgets for Jupyter"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -941,7 +930,7 @@ test = ["codecov", "ipykernel", "pytest (>=5.3.2)", "pytest-cov", "jupyter-serve
 name = "jupyterlab-widgets"
 version = "1.0.0"
 description = "A JupyterLab extension."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -949,7 +938,7 @@ python-versions = ">=3.6"
 name = "kiwisolver"
 version = "1.3.1"
 description = "A fast implementation of the Cassowary constraint solver"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -985,7 +974,7 @@ python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
 name = "matplotlib"
 version = "3.3.4"
 description = "Python plotting package"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -1163,7 +1152,7 @@ python-versions = ">=3.5"
 name = "notebook"
 version = "6.2.0"
 description = "A web-based notebook environment for interactive computing"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.5"
 
@@ -1331,7 +1320,7 @@ python-versions = "*"
 name = "prometheus-client"
 version = "0.9.0"
 description = "Python client for the Prometheus monitoring system."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1496,7 +1485,7 @@ python-versions = "*"
 name = "pywinpty"
 version = "0.5.7"
 description = "Python bindings for the winpty library"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1669,7 +1658,7 @@ numpy = ">=1.16.5"
 name = "send2trash"
 version = "1.5.0"
 description = "Send file to trash natively under Mac OS X, Windows and Linux."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1677,7 +1666,7 @@ python-versions = "*"
 name = "shapely"
 version = "1.7.1"
 description = "Geometric objects, predicates, and operations"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1896,7 +1885,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 name = "terminado"
 version = "0.9.3"
 description = "Tornado websocket backend for the Xterm.js Javascript terminal emulator library."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.6"
 
@@ -1966,7 +1955,7 @@ test = ["pytest"]
 name = "traittypes"
 version = "0.2.1"
 description = "Scipy trait types"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -2025,7 +2014,7 @@ python-versions = "*"
 name = "widgetsnbextension"
 version = "3.5.1"
 description = "IPython HTML widgets for Jupyter"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -2120,7 +2109,7 @@ docs = ["Sphinx", "numpydoc", "sphinx-autodoc-typehints", "pandoc", "nbsphinx", 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "175d7b59e3ac7f97426fce04ac875cfb6b6d081721314566cd8faa0ef2812582"
+content-hash = "58c6b2cd30b468e016682547c13cd9e1867a631e50a12d9d1c901b79813902f7"
 
 [metadata.files]
 affine = [
@@ -2168,10 +2157,6 @@ aiohttp = [
     {file = "aiohttp-3.7.4.post0-cp39-cp39-win32.whl", hash = "sha256:932bb1ea39a54e9ea27fc9232163059a0b8855256f4052e776357ad9add6f1c9"},
     {file = "aiohttp-3.7.4.post0-cp39-cp39-win_amd64.whl", hash = "sha256:02f46fc0e3c5ac58b80d4d56eb0a7c7d97fcef69ace9326289fb9f1955e65cfe"},
     {file = "aiohttp-3.7.4.post0.tar.gz", hash = "sha256:493d3299ebe5f5a7c66b9819eacdcfbbaaf1a8e84911ddffcdc48888497afecf"},
-]
-aiohttp-cors = [
-    {file = "aiohttp-cors-0.7.0.tar.gz", hash = "sha256:4d39c6d7100fd9764ed1caf8cebf0eb01bf5e3f24e2e073fda6234bc48b19f5d"},
-    {file = "aiohttp_cors-0.7.0-py3-none-any.whl", hash = "sha256:0451ba59fdf6909d0e2cd21e4c0a43752bc0703d33fc78ae94d9d9321710193e"},
 ]
 aioitertools = [
     {file = "aioitertools-0.7.1-py3-none-any.whl", hash = "sha256:8972308474c41ed5e0636819f948ebff32f2318e70f7e7d23cd208c4357cc773"},
