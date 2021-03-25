@@ -105,6 +105,7 @@ def array_epsg(
 
 
 def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
+    # TODO this if off-by-one (missing the uppermost row and right-most column of pixels)
     bounds = (
         arr.x.min().item(),
         arr.y.min().item(),
