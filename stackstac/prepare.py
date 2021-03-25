@@ -57,11 +57,6 @@ class Mimetype(NamedTuple):
         )
 
 
-def mimetype_matches(mimetype: str, target: str, target_parts: Set[str]) -> bool:
-    parts = [p.strip() for p in mimetype.split(";")]
-    return parts[0] == target and target_parts.issubset(parts)
-
-
 def prepare_items(
     items: ItemSequence,
     assets: Optional[Union[List[str], AbstractSet[str]]] = frozenset(
