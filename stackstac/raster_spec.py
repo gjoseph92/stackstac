@@ -1,8 +1,6 @@
-from typing import (
-    Tuple,
-    NamedTuple,
-    Union,
-)
+from dataclasses import dataclass
+from functools import cached_property
+from typing import Tuple, Union
 
 import affine
 
@@ -11,7 +9,8 @@ Bbox = Tuple[IntFloat, IntFloat, IntFloat, IntFloat]
 Resolutions = Tuple[IntFloat, IntFloat]
 
 
-class RasterSpec(NamedTuple):
+@dataclass
+class RasterSpec:
     """
     Spatial parameters defining the grid for a raster.
     """
@@ -20,7 +19,7 @@ class RasterSpec(NamedTuple):
     bounds: Bbox
     resolutions_xy: Resolutions
 
-    @property  # TODO cache (`functools.cached_property` understandably doesn't work on a namedtuple)
+    @cached_property
     def transform(self) -> affine.Affine:
         return affine.Affine(
             self.resolutions_xy[0],  # xscale
@@ -31,7 +30,7 @@ class RasterSpec(NamedTuple):
             self.bounds[3],  # yoff
         )
 
-    @property
+    @cached_property
     def shape(self) -> Tuple[int, int]:
         minx, miny, maxx, maxy = self.bounds
         xres, yres = self.resolutions_xy
@@ -44,7 +43,7 @@ class RasterSpec(NamedTuple):
 
         return (height, width)
 
-    @property  # TODO cache
+    @cached_property
     def vrt_params(self) -> dict:
         height, width = self.shape
         return {
