@@ -131,7 +131,7 @@ def stack(
 
     bounds:
         Output spatial bounding-box, as a tuple of ``(min_x, min_y, max_x, max_y)``.
-        This defines the ``(west, south, east, north)`` rectange the output array will cover.
+        This defines the ``(west, south, east, north)`` rectangle the output array will cover.
         Values must be in the same coordinate reference system as ``epsg``.
 
         If None (default), the bounding box of all the input items is automatically used.
