@@ -1,4 +1,4 @@
-``stackstac``: easier coud-native geoprocessing
+``stackstac``: easier cloud-native geoprocessing
 ================================================
 
 `stackstac.stack` turns a `STAC <http://stacspec.org/>`_ collection into a lazy `xarray.DataArray`, backed by :doc:`dask <dask:array>`.
