@@ -37,6 +37,9 @@ Contents
    api/main
    api/internal
 
+   GitHub <https://github.com/gjoseph92/stackstac>
+   Changelog <https://github.com/gjoseph92/stackstac/blob/main/CHANGELOG.md>
+
 
 Indices and tables
 ------------------
