@@ -283,7 +283,7 @@ def prepare_items(
                             f"- The `proj:transform` and `proj:epsg` fields set on the asset, or on the item\n"
                             f"- The `proj:shape` and one of `proj:bbox` or `bbox` fields set on the asset, "
                             "or on the item\n\n"
-                            "Please specify the `resolution=` argument to set the output resolution manually."
+                            "Please specify the `resolution=` argument to set the output resolution manually. "
                             f"(Remember that resolution must be in the units of your CRS (http://epsg.io/{out_epsg})"
                             "---not necessarily meters."
                         )
