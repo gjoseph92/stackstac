@@ -46,6 +46,14 @@ except ImportError:
             ...
 
 
+try:
+    from pystac_client import ItemCollection as PystacClientItemCollection
+except ImportError:
+
+    class PystacClientItemCollection:
+        features: List[PystacItem]
+
+
 class EOBand(TypedDict, total=False):
     name: str
     common_name: str
@@ -104,7 +112,9 @@ class ItemDict(TypedDict):
 ItemSequence = Sequence[ItemDict]
 
 ItemIsh = Union[SatstacItem, PystacItem, ItemDict]
-ItemCollectionIsh = Union[SatstacItemCollection, PystacCatalog, ItemSequence]
+ItemCollectionIsh = Union[
+    SatstacItemCollection, PystacCatalog, PystacClientItemCollection, ItemSequence
+]
 
 
 def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
@@ -112,7 +122,7 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     Convert something like a collection/Catalog of STAC items into a list of plain dicts
 
     Currently works on ``satstac.ItemCollection``, ``pystac.Catalog`` (inefficiently),
-    and plain Python lists-of-dicts.
+    ``pystac_client.ItemCollection`` (inefficiently), and plain Python lists-of-dicts.
     """
 
     if isinstance(items, dict):
@@ -137,10 +147,13 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     if isinstance(items, SatstacItemCollection):
         return [item._data for item in items]
 
+    # TODO all our `to_dict()` with pystac is wasteful. Instead of this `items_to_plain` function,
+    # switch to `get_items`, `get_properties`, `get_assets`, etc. style functions
+    # which can handle each object type, preventing the need for this sort of copying.
     if isinstance(items, PystacCatalog):
-        # TODO this is wasteful. Instead of this `items_to_plain` function,
-        # switch to `get_items`, `get_properties`, `get_assets`, etc. style functions
-        # which can handle each object type, preventing the need for this sort of copying.
         return [item.to_dict() for item in items.get_all_items()]
+
+    if isinstance(items, PystacClientItemCollection):
+        return [item.to_dict() for item in items.features]
 
     raise TypeError(f"Unrecognized STAC collection type {type(items)}: {items!r}")
