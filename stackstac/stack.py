@@ -86,8 +86,10 @@ def stack(
     items:
         The STAC items to stack. Can be a plain Python list of dicts
         following the STAC JSON specification, or objects from
-        the `satstac <https://github.com/sat-utils/sat-stac>`_ (preferred) or
-        `pystac <https://github.com/stac-utils/pystac>`_ libraries.
+        the `satstac <https://github.com/sat-utils/sat-stac>`_ (preferred),
+        `pystac <https://github.com/stac-utils/pystac>`_, or
+        `pystac-client <https://github.com/stac-utils/pystac-client>`_
+         libraries.
     assets:
         Which asset IDs to use. Any Items missing a particular Asset will return an array
         of ``fill_value`` for that Asset. By default, returns all assets with a GeoTIFF

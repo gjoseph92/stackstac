@@ -283,7 +283,7 @@ def prepare_items(
                             f"- The `proj:transform` and `proj:epsg` fields set on the asset, or on the item\n"
                             f"- The `proj:shape` and one of `proj:bbox` or `bbox` fields set on the asset, "
                             "or on the item\n\n"
-                            "Please specify the `resolution=` argument to set the output resolution manually."
+                            "Please specify the `resolution=` argument to set the output resolution manually. "
                             f"(Remember that resolution must be in the units of your CRS (http://epsg.io/{out_epsg})"
                             "---not necessarily meters."
                         )
@@ -379,6 +379,21 @@ def to_coords(
                     maxx + half_xpixel,
                     maxy + half_ypixel,
                 )
+
+            # NumPy arange produces `ceil((stop - start)/step)` elements, whereas GDAL rounds (more or less).
+            # This, combined with floating-point error, can make our coordinates off-by-one in length,
+            # so we add/remove pixels to `maxx`, `maxy` as necessary to ensure the coordinates end up the same
+            # size as the array.
+            height, width = spec.shape
+            coord_width = np.ceil((maxx - minx) / xres)
+            extra_width = coord_width - width
+            if extra_width:
+                maxx -= xres * extra_width
+
+            coord_height = np.ceil((maxy - miny) / yres)
+            extra_height = coord_height - height
+            if extra_height:
+                maxy -= yres * extra_height
 
             # Wish pandas had an RangeIndex that supported floats...
             xs = pd.Float64Index(np.arange(minx, maxx, xres))
