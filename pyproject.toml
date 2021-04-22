@@ -9,7 +9,7 @@ homepage = "https://stackstac.readthedocs.io/en/latest/index.html"
 version = "0.1.1"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 dask = {extras = ["array"], version = "^2021.3.1"}
 numpy = "^1.20.0"
 pyproj = "^3.0.0"
