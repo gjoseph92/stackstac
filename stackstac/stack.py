@@ -253,8 +253,9 @@ def stack(
         xarray DataArray, backed by a Dask array. No IO will happen until calling ``.compute()``,
         or accessing ``.values``. The dimensions will be ``("time", "band", "y", "x")``.
 
-        ``time`` will be equal in length to the number of items you pass in, and indexed by date. Note that this means
-        multiple entries could have the same index.
+        ``time`` will be equal in length to the number of items you pass in, and indexed by STAC Item datetime. 
+        Note that this means multiple entries could have the same index. Note also datetime strings are cast to 
+        'UTC' but passed to xarray without timezone information (dtype='datetime64[ns]').
 
         ``band`` will be equal in length to the number of asset IDs used (see the ``assets`` parameter for more).
 

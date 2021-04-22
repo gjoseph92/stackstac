@@ -350,7 +350,7 @@ def to_coords(
             [item["properties"]["datetime"] for item in items],
             infer_datetime_format=True,
             errors="coerce",
-        ),
+        ).tz_convert('UTC').tz_localize(None),
         "id": xr.Variable("time", [item["id"] for item in items]),
         "band": asset_ids,
     }
