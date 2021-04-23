@@ -344,13 +344,22 @@ def to_coords(
     band_coords: bool = True,
 ) -> Tuple[Dict[str, Union[pd.Index, np.ndarray, list]], List[str]]:
 
+    times = pd.to_datetime(
+        [item["properties"]["datetime"] for item in items],
+        infer_datetime_format=True,
+        errors="coerce",
+    )
+    if times.tz is not None:
+        # xarray can't handle tz-aware DatetimeIndexes, so we convert to UTC and drop the timezone
+        # https://github.com/pydata/xarray/issues/3291.
+        # The `tz is None` case is typically a manifestation of https://github.com/pandas-dev/pandas/issues/41047.
+        # Since all STAC timestamps should be UTC (https://github.com/radiantearth/stac-spec/issues/1095),
+        # we feel safe assuming that any tz-naive datetimes are already in UTC.
+        times = times.tz_convert(None)
+
     dims = ["time", "band", "y", "x"]
     coords = {
-        "time": pd.to_datetime(
-            [item["properties"]["datetime"] for item in items],
-            infer_datetime_format=True,
-            errors="coerce",
-        ).tz_convert('UTC').tz_localize(None),
+        "time": times,
         "id": xr.Variable("time", [item["id"] for item in items]),
         "band": asset_ids,
     }
