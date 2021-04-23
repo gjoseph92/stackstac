@@ -389,24 +389,10 @@ def to_coords(
                     maxy + half_ypixel,
                 )
 
-            # NumPy arange produces `ceil((stop - start)/step)` elements, whereas GDAL rounds (more or less).
-            # This, combined with floating-point error, can make our coordinates off-by-one in length,
-            # so we add/remove pixels to `maxx`, `maxy` as necessary to ensure the coordinates end up the same
-            # size as the array.
             height, width = spec.shape
-            coord_width = np.ceil((maxx - minx) / xres)
-            extra_width = coord_width - width
-            if extra_width:
-                maxx -= xres * extra_width
-
-            coord_height = np.ceil((maxy - miny) / yres)
-            extra_height = coord_height - height
-            if extra_height:
-                maxy -= yres * extra_height
-
             # Wish pandas had an RangeIndex that supported floats...
-            xs = pd.Float64Index(np.arange(minx, maxx, xres))
-            ys = pd.Float64Index(np.arange(maxy, miny, -yres))
+            xs = pd.Float64Index(np.linspace(minx, maxx, width, endpoint=False))
+            ys = pd.Float64Index(np.linspace(maxy, miny, height, endpoint=False))
         else:
             height, width = spec.shape
             if pixel_center:
