@@ -1,7 +1,7 @@
 from __future__ import annotations
 import functools
 
-from typing import Awaitable, Dict, NamedTuple, Optional, Tuple, Union, cast
+from typing import Awaitable, Dict, Literal, NamedTuple, Optional, Tuple, Union, cast
 import math
 import io
 import asyncio
@@ -46,6 +46,7 @@ class Displayable(NamedTuple):
     colormap: Optional[matplotlib.colors.Colormap]
     checkerboard: bool
     tilesize: int
+    interpolation: Literal["linear", "nearest"]
 
 
 TOKEN_TO_ARRAY: Dict[str, Displayable] = {}
@@ -58,6 +59,7 @@ def show(
     range: Optional[Range] = None,
     colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
+    interpolation: Literal["linear", "nearest"] = "linear",
     **map_kwargs,
 ) -> ipyleaflet.Map:
     """
@@ -94,6 +96,10 @@ def show(
 
         Note that only NaN is considered a missing value; any custom fill value should be converted
         to NaN before visualizing.
+    interpolation:
+        Interpolation method to use while reprojecting: ``"linear"`` or ``"nearest"`` (default ``"linear"``).
+        Use ``"linear"`` for continuous data, such as imagery, SAR, DEMs, weather data, etc. Use ``"nearest"``
+        for discrete/categorical data, such as classification maps.
 
     Note
     ----
@@ -122,7 +128,14 @@ def show(
     if zoom is not None:
         map_.zoom = zoom
 
-    add_to_map(arr, map_, range=range, colormap=colormap, checkerboard=checkerboard)
+    add_to_map(
+        arr,
+        map_,
+        range=range,
+        colormap=colormap,
+        checkerboard=checkerboard,
+        interpolation=interpolation,
+    )
     return map_
 
 
@@ -133,6 +146,7 @@ def add_to_map(
     range: Optional[Range] = None,
     colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
+    interpolation: Literal["linear", "nearest"] = "linear",
 ) -> ipyleaflet.Layer:
     """
     Add the `~xarray.DataArray` to a `~ipyleaflet.Map`, as a new layer or replacing an existing one with the same name.
@@ -174,6 +188,11 @@ def add_to_map(
 
         Note that only NaN is considered a missing value; any custom fill value should be converted
         to NaN before visualizing.
+    interpolation:
+        Interpolation method to use while reprojecting: ``"linear"`` or ``"nearest"`` (default ``"linear"``).
+        Use ``"linear"`` for continuous data, such as imagery, SAR, DEMs, weather data, etc. Use ``"nearest"``
+        for discrete/categorical data, such as classification maps.
+
 
     Note
     ----
@@ -191,7 +210,13 @@ def add_to_map(
     ipyleaflet.Layer:
         The new or existing layer for visualizing this array.
     """
-    url = register(arr, range=range, colormap=colormap, checkerboard=checkerboard)
+    url = register(
+        arr,
+        range=range,
+        colormap=colormap,
+        checkerboard=checkerboard,
+        interpolation=interpolation,
+    )
     if name is not None:
         for lyr in map.layers:
             if lyr.name == name:
@@ -212,6 +237,7 @@ def register(
     colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
     tilesize: int = 256,
+    interpolation: Literal["linear", "nearest"] = "linear",
 ) -> str:
     """
     Low-level method to register a `DataArray` for display on a web map, and spin up the HTTP server if necessary.
@@ -281,7 +307,7 @@ def register(
 
     assert tilesize > 1, f"Tilesize must be greater than zero, not {tilesize}"
 
-    disp = Displayable(arr, range, colormap, checkerboard, tilesize)
+    disp = Displayable(arr, range, colormap, checkerboard, tilesize, interpolation)
     token = dask.base.tokenize(disp)
     TOKEN_TO_ARRAY[token] = disp
 
@@ -382,6 +408,7 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
                 (maxy - miny) / disp.tilesize,
             ),
         ),
+        method=disp.interpolation,
     )
     assert tile.shape[1:] == (
         disp.tilesize,

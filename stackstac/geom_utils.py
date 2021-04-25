@@ -151,7 +151,8 @@ def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
 def reproject_array(
     arr: xr.DataArray,
     spec: RasterSpec,
-    method: Union[Literal["linear"], Literal["nearest"]] = "linear",
+    method: Literal["linear", "nearest"] = "nearest",
+    fill_value: Optional[Union[int, float]] = np.nan,
 ) -> xr.DataArray:
     # TODO this scipy/`interp`-based approach still isn't block-parallel
     # (seems like xarray just rechunks to fuse all the spatial chunks first),
@@ -186,7 +187,7 @@ def reproject_array(
 
     if from_epsg == spec.epsg:
         # Simpler case: just interpolate within the same CRS
-        result = arr.interp(x=x, y=y, method=method)
+        result = arr.interp(x=x, y=y, method=method, fill_value=fill_value)
         return result.astype(bool) if as_bool else result
 
     # Different CRSs: need to do a 2D interpolation.
@@ -208,6 +209,8 @@ def reproject_array(
     old_ydim = f"y_{from_epsg}"
 
     result = arr.rename(x=old_xdim, y=old_ydim).interp(
-        {old_xdim: xs_indexer, old_ydim: ys_indexer}, method=method
+        {old_xdim: xs_indexer, old_ydim: ys_indexer},
+        method=method,
+        fill_value=fill_value,
     )
     return result.astype(bool) if as_bool else result
