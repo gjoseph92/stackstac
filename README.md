@@ -58,6 +58,12 @@ weekly_ndvi = ndvi.resample(time="1w").mean(dim=("time", "x", "y")).rename("NDVI
 
 ```
 pip install stackstac
+
+Windows notes
+
+It is a good idea to use anaconda to handle installing rasterio in windows.  There is considerably more pain involved with GDAL type installations using pip.  Then pip install stackstac.
+
+
 ```
 
 ## Things `stackstac` does for you:
