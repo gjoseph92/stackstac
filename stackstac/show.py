@@ -7,8 +7,6 @@ import asyncio
 import logging
 import warnings
 
-# import urllib.parse
-
 from aiohttp import web
 import mercantile
 import dask
@@ -199,7 +197,7 @@ def register(
 
     A `distributed.Client` must already be created (and set as default) before calling this.
 
-    Once registered, an array cannot currrently be un-registered. Beware of this when visualizing
+    Once registered, an array cannot currently be un-registered. Beware of this when visualizing
     things you've called `~distributed.Client.persist` on: even if you try to release a persisted
     object from your own code, if you've ever registered it for visualization, it won't be freed
     from distributed memory.
