@@ -1,6 +1,7 @@
 import functools
 import math
 from typing import Literal, Optional, Union
+import pandas as pd
 
 import pyproj
 import affine
@@ -105,13 +106,42 @@ def array_epsg(
 
 
 def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
-    # TODO this if off-by-one (missing the uppermost row and right-most column of pixels)
-    bounds = (
-        arr.x.min().item(),
-        arr.y.min().item(),
-        arr.x.max().item(),
-        arr.y.max().item(),
-    )
+    try:
+        bounds = arr.spec.bounds
+    except AttributeError:
+        try:
+            x: pd.Index = arr.indexes["x"]
+            y: pd.Index = arr.indexes["y"]
+        except KeyError:
+            raise ValueError(
+                "Cannot determine bounds of the array, since it has no `x` and `y` coordinates, nor a `spec` attribute."
+            ) from None
+
+        # Check for monotonicity. There should be no way to produce non-monotonic indexes from stackstac,
+        # but it's still good to check our assumptions, just in case you've messed with the indices in a strange way.
+        # Note that `is_monotonic_*` is cached on `pd.Index`, so this check should be cheap.
+        for index in (x, y):
+            if not (index.is_monotonic_increasing or index.is_monotonic_decreasing):
+                raise ValueError(
+                    f"Cannot determine bounds of the DataArray, since the {index.name} coordinate is non-monotonic. "
+                    f"Consider `arr.sortby({index.name!r})`, or add a `stackstac.RasterSpec` as the `spec` attribute."
+                )
+
+        # Bounds go from the top _left_ pixel corner to the top _right_ pixel corner, so we need to account
+        # for that one extra pixel's worth of width/height.
+        # Assume the interval between xs/ys is constant to calculate this.
+        xstep = x[1] - x[0]
+        ystep = y[1] - y[0]
+        xs = (x[0], x[-1] + xstep)
+        ys = (y[0], y[-1] + ystep)
+        # Don't assume coordinates are north-up, east-right.
+        bounds = (
+            min(xs),
+            min(ys),
+            max(xs),
+            max(ys),
+        )
+
     if to_epsg is None:
         return bounds
 
