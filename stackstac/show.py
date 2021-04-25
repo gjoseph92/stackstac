@@ -1,4 +1,5 @@
 from __future__ import annotations
+import functools
 
 from typing import Awaitable, Dict, NamedTuple, Optional, Tuple, Union, cast
 import math
@@ -24,7 +25,6 @@ from .raster_spec import RasterSpec
 
 Range = Tuple[float, float]
 
-TILESIZE = 256
 PORT = 8000
 routes = web.RouteTableDef()
 
@@ -45,6 +45,7 @@ class Displayable(NamedTuple):
     range: Range
     colormap: Optional[matplotlib.colors.Colormap]
     checkerboard: bool
+    tilesize: int
 
 
 TOKEN_TO_ARRAY: Dict[str, Displayable] = {}
@@ -93,6 +94,17 @@ def show(
 
         Note that only NaN is considered a missing value; any custom fill value should be converted
         to NaN before visualizing.
+
+    Note
+    ----
+    Why do the tiles seem to show up in batches, and why does it take along time for all the batches to load?
+
+    Unfortunately, this is a web browser limitation, and there's not much stackstac can do about it.
+    Each 256x256 tile visible on the map consumes one connection, and Web browsers only allow
+    a fixed number of connections to be open at once (for example, 6 per host in Chrome).
+    It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
+    only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles,
+    and causes the "bunching" effect.
 
     Returns
     -------
@@ -163,6 +175,17 @@ def add_to_map(
         Note that only NaN is considered a missing value; any custom fill value should be converted
         to NaN before visualizing.
 
+    Note
+    ----
+    Why do the tiles seem to show up in batches, and why does it take along time for all the batches to load?
+
+    Unfortunately, this is a web browser limitation, and there's not much stackstac can do about it.
+    Each 256x256 tile visible on the map consumes one connection, and Web browsers only allow
+    a fixed number of connections to be open at once (for example, 6 per host in Chrome).
+    It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
+    only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles,
+    and causes the "bunching" effect.
+
     Returns
     -------
     ipyleaflet.Layer:
@@ -188,6 +211,7 @@ def register(
     range: Optional[Range] = None,
     colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
+    tilesize: int = 256,
 ) -> str:
     """
     Low-level method to register a `DataArray` for display on a web map, and spin up the HTTP server if necessary.
@@ -255,7 +279,9 @@ def register(
         if vmin > vmax:
             raise ValueError(f"Invalid range: min value {vmin} > max value {vmax}")
 
-    disp = Displayable(arr, range, colormap, checkerboard)
+    assert tilesize > 1, f"Tilesize must be greater than zero, not {tilesize}"
+
+    disp = Displayable(arr, range, colormap, checkerboard, tilesize)
     token = dask.base.tokenize(disp)
     TOKEN_TO_ARRAY[token] = disp
 
@@ -339,7 +365,7 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
     if not geom_utils.bounds_overlap(
         bounds, geom_utils.array_bounds(disp.arr, to_epsg=3857)
     ):
-        return EMPTY_TILE_CHECKERBOARD if disp.checkerboard else EMPTY_TILE
+        return empty_tile(disp.tilesize, disp.checkerboard)
 
     minx, miny, maxx, maxy = bounds
     # FIXME: `reproject_array` is really, really slow for large arrays
@@ -351,12 +377,15 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
         RasterSpec(
             epsg=3857,
             bounds=bounds,
-            resolutions_xy=((maxx - minx) / TILESIZE, (maxy - miny) / TILESIZE),
+            resolutions_xy=(
+                (maxx - minx) / disp.tilesize,
+                (maxy - miny) / disp.tilesize,
+            ),
         ),
     )
     assert tile.shape[1:] == (
-        TILESIZE,
-        TILESIZE,
+        disp.tilesize,
+        disp.tilesize,
     ), f"Wrong shape after interpolation: {tile.shape}"
 
     delayed_png = delayed_arr_to_png(
@@ -439,10 +468,7 @@ def make_checkerboard(arr_size: int, checker_size: int):
     return board
 
 
-# TODO don't do at import
-EMPTY_TILE_CHECKERBOARD = arr_to_png(
-    np.full((1, TILESIZE, TILESIZE), np.nan), range=(0, 1), checkerboard=True
-)
-EMPTY_TILE = arr_to_png(
-    np.full((1, TILESIZE, TILESIZE), np.nan), range=(0, 1), checkerboard=False
-)
+@functools.lru_cache(maxsize=64)
+def empty_tile(tilesize: int, checkerboard: bool) -> bytes:
+    empty = np.full((1, tilesize, tilesize), np.nan)
+    return arr_to_png(empty, range=(0, 1), checkerboard=checkerboard)
