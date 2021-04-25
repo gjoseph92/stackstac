@@ -87,6 +87,28 @@ def snapped_bounds(bounds: Bbox, resolutions_xy: Resolutions) -> Bbox:
 def array_epsg(
     arr: xr.DataArray, default: Union[int, NO_DEFAULT_LITERAL] = NO_DEFAULT
 ) -> int:
+    """
+    Get the coordinate reference system of a `DataArray` as an EPSG code.
+
+    Parameters
+    ----------
+    arr:
+        The `DataArray` to get the CRS of.
+    default:
+        If the CRS cannot be determined and this is given, return this instead.
+        Otherwise, raise an error.
+
+    Returns
+    -------
+    int:
+        EPSG code
+
+    Raises
+    ------
+    ValueError:
+        If the `DataArray` has no ``epsg`` coordinate, and ``default`` is not given.
+    """
+
     # TODO look at `crs` in attrs; more compatibility with rioxarray data model
     try:
         epsg = arr.epsg
@@ -106,6 +128,38 @@ def array_epsg(
 
 
 def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
+    """
+    Get the bounds of a `DataArray`, either from its ``spec`` attribute or its ``x, y`` coordinates.
+
+    Parameters
+    ----------
+    arr:
+        The `DataArray` must either have a `RasterSpec` as the ``spec`` attribute (preferred),
+        or the coordinates ``x`` and ``y``.
+
+        The ``x`` and ``y`` coordinates are assumed to indicate the top-left corner
+        of each pixel, not the center. They're also assumed to be evenly spaced
+        (constant resolution), and must be monotonic.
+    to_epsg:
+        CRS to reproject the bounds to, as an EPSG code. If None (default),
+        the bounds are not reprojected. If not None, the `DataArray` must have
+        an ``epsg`` coordinate.
+
+    Returns
+    -------
+    Bbox:
+        Bounds of the `DataArray`, as a 4-tuple.
+
+    Raises
+    ------
+    ValueError:
+
+        * If the `DataArray` has no ``spec`` attribute.
+        * If the `DataArray` is missing the ``x`` or ``y`` coordinates.
+        * If ``x`` or ``y`` coordinates are not monotonic.
+        * If ``to_epsg`` is given, and the CRS of the ``DataArray`` cannot be determined by `array_epsg`.
+
+    """
     try:
         bounds = arr.spec.bounds
     except AttributeError:
@@ -154,6 +208,34 @@ def reproject_array(
     method: Literal["linear", "nearest"] = "nearest",
     fill_value: Optional[Union[int, float]] = np.nan,
 ) -> xr.DataArray:
+    """
+    Reproject and clip a `DataArray` to a new `RasterSpec` (CRS, resolution, bounds).
+
+    This interpolates using `xarray.DataArray.interp`, which uses `scipy.interpolate.interpn` internally (no GDAL).
+    It is somewhat dask-friendly, in that it at least doesn't trigger immediate computation on the array,
+    but it's sub-optimal: the ``x`` and ``y`` dimensions are just merged into a single chunk, then interpolated.
+
+    Since this both eliminates spatial parallelism, and potentially requires significant amounts of memory,
+    `reproject_array` is only recommended on arrays with a relatively small number spatial chunks.
+
+    Parameters
+    ----------
+    arr:
+        Array to reproject. It must have ``epsg``, ``x``, and ``y`` coordinates.
+        The ``x`` and ``y`` coordinates are assumed to indicate the top-left corner
+        of each pixel, not the center.
+    spec:
+        The `RasterSpec` to reproject to.
+    method:
+        Interpolation method: ``"linear"`` or ``"nearest"``, default ``"nearest"``.
+    fill_value:
+        Fill output pixels that fall outside the bounds of ``arr`` with this value (default NaN).
+
+    Returns
+    -------
+    xarray.DataArray:
+        The clipped and reprojected array.
+    """
     # TODO this scipy/`interp`-based approach still isn't block-parallel
     # (seems like xarray just rechunks to fuse all the spatial chunks first),
     # so this both won't scale, and can be crazy slow in dask graph construction
@@ -176,7 +258,7 @@ def reproject_array(
     # TODO fastpath when there's no overlap? (graph shouldn't have any IO in it.)
     # Or does that already happen?
 
-    # TODO pixel centers vs topleft? `spec` assumes topleft;
+    # TODO support `xy_coords="center"`? `spec` assumes topleft;
     # if the x/y coords on the array are center, this will be a half
     # pixel off.
     minx, miny, maxx, maxy = spec.bounds
