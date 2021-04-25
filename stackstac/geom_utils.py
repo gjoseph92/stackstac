@@ -179,10 +179,10 @@ def reproject_array(
     # if the x/y coords on the array are center, this will be a half
     # pixel off.
     minx, miny, maxx, maxy = spec.bounds
-    xres, yres = spec.resolutions_xy
+    height, width = spec.shape
 
-    x = np.arange(minx, maxx, xres)
-    y = np.arange(maxy, miny, -yres)
+    x = np.linspace(minx, maxx, width, endpoint=False)
+    y = np.linspace(maxy, miny, height, endpoint=False)
 
     if from_epsg == spec.epsg:
         # Simpler case: just interpolate within the same CRS
