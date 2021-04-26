@@ -210,7 +210,7 @@ def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
 def reproject_array(
     arr: xr.DataArray,
     spec: RasterSpec,
-    method: Literal["linear", "nearest"] = "nearest",
+    interpolation: Literal["linear", "nearest"] = "nearest",
     fill_value: Optional[Union[int, float]] = np.nan,
 ) -> xr.DataArray:
     """
@@ -231,7 +231,7 @@ def reproject_array(
         of each pixel, not the center.
     spec:
         The `~.RasterSpec` to reproject to.
-    method:
+    interpolation:
         Interpolation method: ``"linear"`` or ``"nearest"``, default ``"nearest"``.
     fill_value:
         Fill output pixels that fall outside the bounds of ``arr`` with this value (default NaN).
@@ -274,7 +274,9 @@ def reproject_array(
 
     if from_epsg == spec.epsg:
         # Simpler case: just interpolate within the same CRS
-        result = arr.interp(x=x, y=y, method=method, fill_value=fill_value)
+        result = arr.interp(
+            x=x, y=y, method=interpolation, kwargs=dict(fill_value=fill_value)
+        )
         return result.astype(bool) if as_bool else result
 
     # Different CRSs: need to do a 2D interpolation.
@@ -297,7 +299,7 @@ def reproject_array(
 
     result = arr.rename(x=old_xdim, y=old_ydim).interp(
         {old_xdim: xs_indexer, old_ydim: ys_indexer},
-        method=method,
-        fill_value=fill_value,
+        method=interpolation,
+        kwargs=dict(fill_value=fill_value),
     )
     return result.astype(bool) if as_bool else result

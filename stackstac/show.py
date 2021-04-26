@@ -416,7 +416,7 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
                 (maxy - miny) / disp.tilesize,
             ),
         ),
-        method=disp.interpolation,
+        interpolation=disp.interpolation,
     )
     assert tile.shape[1:] == (
         disp.tilesize,
