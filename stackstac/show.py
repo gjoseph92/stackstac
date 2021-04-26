@@ -1,5 +1,4 @@
 from __future__ import annotations
-import functools
 
 from typing import Awaitable, Dict, Literal, NamedTuple, Optional, Tuple, Union, cast
 import math
@@ -7,6 +6,8 @@ import io
 import asyncio
 import logging
 import warnings
+import functools
+from contextlib import contextmanager
 
 from aiohttp import web
 import mercantile
@@ -19,6 +20,8 @@ import ipyleaflet
 import dask.array as da
 import matplotlib.cm
 import matplotlib.colors
+import ipywidgets
+import traitlets
 
 from . import geom_utils
 from .raster_spec import RasterSpec
@@ -50,6 +53,72 @@ class Displayable(NamedTuple):
 
 
 TOKEN_TO_ARRAY: Dict[str, Displayable] = {}
+
+
+class ServerStats(ipywidgets.VBox):
+    active = traitlets.Int(default_value=0)
+    computing = traitlets.Int(default_value=0)
+    completed = traitlets.Int(default_value=0)
+    cancelled = traitlets.Int(default_value=0)
+
+    def __init__(self) -> None:
+        self.output = ipywidgets.Output()
+        self._active_progress = ipywidgets.IntProgress(
+            value=0, min=0, max=20, description="0 active"
+        )
+        self._computing_progress = ipywidgets.IntProgress(
+            value=0, min=0, max=20, description="0 awaiting"
+        )
+        completed = ipywidgets.Label(value="0 completed")
+        traitlets.dlink(
+            (self, "completed"), (completed, "value"), lambda c: f"{c} completed"
+        )
+        cancelled = ipywidgets.Label(value="0 cancelled")
+        traitlets.dlink(
+            (self, "cancelled"), (cancelled, "value"), lambda c: f"{c} cancelled"
+        )
+        super().__init__(
+            children=[
+                self._active_progress,
+                self._computing_progress,
+                completed,
+                cancelled,
+                self.output,
+            ]
+        )
+
+    @contextmanager
+    def request(self, trait="active"):
+        self.active += 1
+        with self.output:
+            try:
+                yield
+            except Exception:
+                import traceback
+
+                print(traceback.format_exc())
+                raise
+            else:
+                self.completed += 1
+            finally:
+                self.active -= 1
+
+    @traitlets.observe("active")
+    def _active_change(self, event):
+        with self._active_progress.hold_trait_notifications():
+            active = self.active
+            self._active_progress.value = active
+            self._active_progress.description = f"{active} active"
+
+    @traitlets.observe("computing")
+    def _computing_change(self, event):
+        with self._computing_progress.hold_trait_notifications():
+            computing = self.computing
+            self._computing_progress.value = computing
+            self._computing_progress.description = f"{computing} computing"
+
+
+server_stats = ServerStats()
 
 
 def show(
@@ -379,13 +448,14 @@ async def handler(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(reason="z, y, and z parameters must be ints")
 
     # TODO request cancellation
-    png = await compute_tile(disp, z, y, x)
-    return web.Response(
-        body=png,
-        status=200,
-        content_type="image/png",
-        headers={"Access-Control-Allow-Origin": "*"},
-    )
+    with server_stats.request():
+        png = await compute_tile(disp, z, y, x)
+        return web.Response(
+            body=png,
+            status=200,
+            content_type="image/png",
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
 
 
 async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
@@ -429,12 +499,35 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
         colormap=disp.colormap,
         checkerboard=disp.checkerboard,
     )
+    server_stats.computing += 1
     future = cast(distributed.Future, client.compute(delayed_png, sync=False))
 
     awaitable = future if client.asynchronous else future._result()
     # ^ sneak into the async api if the client isn't set up to be async.
     # this _should_ be okay, since we're running within the client's own event loop.
-    return await cast(Awaitable[bytes], awaitable)
+    awaitable = cast(Awaitable[bytes], awaitable)
+    try:
+        return await awaitable
+    except Exception:
+        # Typically an `asyncio.CancelledError` from the request being cancelled,
+        # but no matter what it is, we want to ensure we drop the future.
+        with server_stats.output:
+            # There may be some state issues in `distributed.Client` around handling `CancelledError`s;
+            # occasionally there are still references to them held within frames/tracebacks (this may also
+            # have to do with aiohttp's error handing, our ours, or ipython).
+            # So we very aggressively try to cancel and release references to the future.
+            await future.cancel(asynchronous=True)
+            future.release()
+            # ^ We can still hold a reference to a Future after it's cancelled?
+            # And occasionally data will stay in distributed memory in that case?
+            del awaitable, future
+            # ^ Very overkill: delete our references to the future, so that the frame of the exception
+            # we re-raise doesn't keep a reference. This is pointless, since the exception we just
+            # caught came from within `Client._gather`, so its frame already has a reference to the same future.
+            server_stats.cancelled += 1
+            raise
+    finally:
+        server_stats.computing -= 1
 
 
 def arr_to_png(
