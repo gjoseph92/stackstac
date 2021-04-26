@@ -1,3 +1,4 @@
+from typing import Hashable, Sequence, Union
 import numpy as np
 import xarray as xr
 
@@ -17,7 +18,12 @@ def _mosaic(arr, axis, reverse: bool = False):
     return out
 
 
-def mosaic(arr: xr.DataArray, dim: str = "time", reverse: bool = False):
+def mosaic(
+    arr: xr.DataArray,
+    dim: Union[None, Hashable, Sequence[Hashable]] = None,
+    axis: Union[None, int, Sequence[int]] = 0,
+    reverse: bool = False,
+):
     """
     Flatten a dimension of a `~xarray.DataArray` by picking the first non-NaN pixel.
 
@@ -28,7 +34,10 @@ def mosaic(arr: xr.DataArray, dim: str = "time", reverse: bool = False):
     arr:
         The `DataArray` to mosaic.
     dim:
-        The dimension name to mosaic. Defaults to ``"time"``.
+        The dimension name to mosaic. Default: None.
+    axis:
+        The axis number to mosaic. Default: 0. Only one of
+        ``dim`` and ``axis`` can be given.
     reverse:
         If False (default), the last item along the dimension is on top.
         If True, the first item in the dimension is on top.
@@ -38,4 +47,4 @@ def mosaic(arr: xr.DataArray, dim: str = "time", reverse: bool = False):
     xarray.DataArray:
         The mosaicked `~xarray.DataArray`.
     """
-    return arr.reduce(_mosaic, dim=dim, keep_attrs=True, reverse=reverse)
+    return arr.reduce(_mosaic, dim=dim, axis=axis, keep_attrs=True, reverse=reverse)
