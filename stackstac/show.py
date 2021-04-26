@@ -272,7 +272,7 @@ def register(
         assert 1 <= nbands <= 3, f"Array must have 1-3 bands, not {nbands}."
     else:
         raise ValueError(
-            f"Array must have the dimensions 'x', 'y', and optionally 'band', not {arr.dims!r}"
+            f"Array must only have the dimensions 'x', 'y', and optionally 'band', not {arr.dims!r}"
         )
 
     arr = arr.transpose("band", "y", "x")
