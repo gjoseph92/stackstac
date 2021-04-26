@@ -3,16 +3,39 @@ import xarray as xr
 
 
 # TODO `fill_value`s besides NaN
-def _mosaic(chunk, axis):
-    ax_length = chunk.shape[axis]
-    if ax_length <= 1:
-        return chunk
-    out = np.take(chunk, 0, axis=axis)
-    for i in range(1, ax_length):
-        layer = np.take(chunk, i, axis=axis)
+def _mosaic(arr, axis, reverse: bool = False):
+    ax_length = arr.shape[axis]
+
+    # "normal" means last -> first, "reversed" means first -> last,
+    # so we apply `reversed` in the opposite case you'd expect
+    indices = iter(range(ax_length) if reverse else reversed(range(ax_length)))
+    out = np.take(arr, next(indices), axis=axis)
+
+    for i in indices:
+        layer = np.take(arr, i, axis=axis)
         out = np.where(np.isnan(out), layer, out)
     return out
 
 
-def mosaic(arr: xr.DataArray, axis: int = 0):
-    return arr.reduce(_mosaic, axis=axis)
+def mosaic(arr: xr.DataArray, dim: str = "time", reverse: bool = False):
+    """
+    Flatten a dimension of a `~xarray.DataArray` by picking the first non-NaN pixel.
+
+    The order of mosaicing is from last to first, meaning the last item is on top.
+
+    Parameters
+    ----------
+    arr:
+        The `DataArray` to mosaic.
+    dim:
+        The dimension name to mosaic. Defaults to ``"time"``.
+    reverse:
+        If False (default), the last item along the dimension is on top.
+        If True, the first item in the dimension is on top.
+
+    Returns
+    -------
+    xarray.DataArray:
+        The mosaicked `~xarray.DataArray`.
+    """
+    return arr.reduce(_mosaic, dim=dim, keep_attrs=True, reverse=reverse)

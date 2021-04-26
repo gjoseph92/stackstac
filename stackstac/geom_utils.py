@@ -88,12 +88,12 @@ def array_epsg(
     arr: xr.DataArray, default: Union[int, NO_DEFAULT_LITERAL] = NO_DEFAULT
 ) -> int:
     """
-    Get the coordinate reference system of a `DataArray` as an EPSG code.
+    Get the coordinate reference system of a `~xarray.DataArray` as an EPSG code.
 
     Parameters
     ----------
     arr:
-        The `DataArray` to get the CRS of.
+        The `~xarray.DataArray` to get the CRS of.
     default:
         If the CRS cannot be determined and this is given, return this instead.
         Otherwise, raise an error.
@@ -106,7 +106,7 @@ def array_epsg(
     Raises
     ------
     ValueError:
-        If the `DataArray` has no ``epsg`` coordinate, and ``default`` is not given.
+        If the `~xarray.DataArray` has no ``epsg`` coordinate, and ``default`` is not given.
     """
 
     # TODO look at `crs` in attrs; more compatibility with rioxarray data model
@@ -129,12 +129,14 @@ def array_epsg(
 
 def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
     """
-    Get the bounds of a `DataArray`, either from its ``spec`` attribute or its ``x, y`` coordinates.
+    Get the bounds of a `~xarray.DataArray`.
+
+    The bounds are either taken from the ``spec`` attribute, or computed from the ``x`` and ``y`` coordinates.
 
     Parameters
     ----------
     arr:
-        The `DataArray` must either have a `RasterSpec` as the ``spec`` attribute (preferred),
+        The `~xarray.DataArray` must either have a `~.RasterSpec` as the ``spec`` attribute (preferred),
         or the coordinates ``x`` and ``y``.
 
         The ``x`` and ``y`` coordinates are assumed to indicate the top-left corner
@@ -142,22 +144,25 @@ def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
         (constant resolution), and must be monotonic.
     to_epsg:
         CRS to reproject the bounds to, as an EPSG code. If None (default),
-        the bounds are not reprojected. If not None, the `DataArray` must have
+        the bounds are not reprojected. If not None, the `~xarray.DataArray` must have
         an ``epsg`` coordinate.
 
     Returns
     -------
     Bbox:
-        Bounds of the `DataArray`, as a 4-tuple.
+        Bounds of the `~xarray.DataArray`, as a 4-tuple.
 
     Raises
     ------
     ValueError:
+        If the `~xarray.DataArray` has no ``spec`` attribute.
+    ValueError:
+        If the `~xarray.DataArray` is missing the ``x`` or ``y`` coordinates.
+    ValueError:
+        If ``x`` or ``y`` coordinates are not monotonic.
+    ValueError:
+        If ``to_epsg`` is given, and the CRS of the ``~xarray.DataArray`` cannot be determined by `array_epsg`.
 
-        * If the `DataArray` has no ``spec`` attribute.
-        * If the `DataArray` is missing the ``x`` or ``y`` coordinates.
-        * If ``x`` or ``y`` coordinates are not monotonic.
-        * If ``to_epsg`` is given, and the CRS of the ``DataArray`` cannot be determined by `array_epsg`.
 
     """
     try:
@@ -209,7 +214,7 @@ def reproject_array(
     fill_value: Optional[Union[int, float]] = np.nan,
 ) -> xr.DataArray:
     """
-    Reproject and clip a `DataArray` to a new `RasterSpec` (CRS, resolution, bounds).
+    Reproject and clip a `~xarray.DataArray` to a new `~.RasterSpec` (CRS, resolution, bounds).
 
     This interpolates using `xarray.DataArray.interp`, which uses `scipy.interpolate.interpn` internally (no GDAL).
     It is somewhat dask-friendly, in that it at least doesn't trigger immediate computation on the array,
@@ -225,7 +230,7 @@ def reproject_array(
         The ``x`` and ``y`` coordinates are assumed to indicate the top-left corner
         of each pixel, not the center.
     spec:
-        The `RasterSpec` to reproject to.
+        The `~.RasterSpec` to reproject to.
     method:
         Interpolation method: ``"linear"`` or ``"nearest"``, default ``"nearest"``.
     fill_value:
