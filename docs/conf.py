@@ -55,6 +55,9 @@ default_role = "py:obj"
 # a list of builtin themes.
 #
 html_theme = 'insipid'
+html_theme_options = {
+    "globaltoc_maxdepth": -1,
+}
 
 html_context = {
     'display_github': True,
@@ -68,7 +71,7 @@ html_copy_source = False
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+# html_static_path = ['_static']
 
 intersphinx_mapping = {
     "rasterio": ("https://rasterio.readthedocs.io/en/latest/", None),
@@ -76,4 +79,8 @@ intersphinx_mapping = {
     "pystac": ("https://pystac.readthedocs.io/en/latest/", None),
     "xarray": ("http://xarray.pydata.org/en/stable/", None),
     "dask": ("https://docs.dask.org/en/latest/", None),
+    "distributed": ("https://distributed.dask.org/en/latest/", None),
+    "matplotlib": ("https://matplotlib.org/stable", None),
+    "ipyleaflet": ("https://ipyleaflet.readthedocs.io/en/latest/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
 }

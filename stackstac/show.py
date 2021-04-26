@@ -63,7 +63,10 @@ def show(
     **map_kwargs,
 ) -> ipyleaflet.Map:
     """
-    Quickly create a `~ipyleaflet.Map` displaying a `~xarray.DataArray`.
+    Quickly create an ipyleaflet :doc:`api_reference/map` displaying a `~xarray.DataArray`.
+
+    As you pan around the map, the part of the array that's in view is computed on the fly by dask.
+    This requires using a :doc:`dask distributed <distributed:index>` cluster.
 
     Parameters
     ----------
@@ -86,8 +89,9 @@ def show(
         For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
         passing an explicit range is usually a good idea.
     colormap:
-        Colormap to use for single-band data. Can be a :doc:`matplotlib colormap name <matplotlib:colormap-reference>`
-        as a string, or a `~matplotlib.colors.Colormap` object for custom colormapping.
+        Colormap to use for single-band data. Can be a
+        :doc:`matplotlib colormap name <gallery/color/colormap_reference>` as a string,
+        or a `~matplotlib.colors.Colormap` object for custom colormapping.
 
         If None (default), the default matplotlib colormap (usually ``viridis``) will automatically
         be used for 1-band data. Setting a colormap for multi-band data is an error.
@@ -149,10 +153,13 @@ def add_to_map(
     interpolation: Literal["linear", "nearest"] = "linear",
 ) -> ipyleaflet.Layer:
     """
-    Add the `~xarray.DataArray` to a `~ipyleaflet.Map`, as a new layer or replacing an existing one with the same name.
+    Add the `~xarray.DataArray` to an ipyleaflet :doc:`api_reference/map` as a new layer or replacing an existing one.
 
     By giving a name, you can change and re-run notebook cells without piling up extraneous layers on
     your map.
+
+    As you pan around the map, the part of the array that's in view is computed on the fly by dask.
+    This requires using a :doc:`dask distributed <distributed:index>` cluster.
 
     Parameters
     ----------
@@ -164,7 +171,7 @@ def add_to_map(
         displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
         then shown as RGB.
     map:
-        `~ipyleaflet.Map` to show the array on.
+        ipyleaflet :doc:`api_reference/map` to show the array on.
     name: str
         Name of the layer. If there's already a layer with this name on the map, its URL will be updated.
         Otherwise, a new layer is added.
@@ -178,8 +185,9 @@ def add_to_map(
         For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
         passing an explicit range is usually a good idea.
     colormap:
-        Colormap to use for single-band data. Can be a :doc:`matplotlib colormap name <matplotlib:colormap-reference>`
-        as a string, or a `~matplotlib.colors.Colormap` object for custom colormapping.
+        Colormap to use for single-band data. Can be a
+        :doc:`matplotlib colormap name <gallery/color/colormap_reference>` as a string,
+        or a `~matplotlib.colors.Colormap` object for custom colormapping.
 
         If None (default), the default matplotlib colormap (usually ``viridis``) will automatically
         be used for 1-band data. Setting a colormap for multi-band data is an error.

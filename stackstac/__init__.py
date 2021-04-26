@@ -2,6 +2,7 @@ from .rio_env import LayeredEnv
 from .rio_reader import DEFAULT_GDAL_ENV, MULTITHREADED_DRIVER_ALLOWLIST
 from .stack import stack
 from .ops import mosaic
+from .geom_utils import reproject_array, array_bounds, array_epsg
 
 try:
     from .show import show, add_to_map
@@ -30,4 +31,7 @@ __all__ = [
     "show",
     "add_to_map",
     "mosaic",
+    "reproject_array",
+    "array_bounds",
+    "array_epsg",
 ]
