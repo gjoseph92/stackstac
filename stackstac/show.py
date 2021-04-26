@@ -464,34 +464,12 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
     # TODO assert the client's loop is the same as our current event loop.
     # If not... tell the server to shut down and restart on the new event loop?
     # (could also do this within a watch loop in `_launch_server`.)
-    bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
 
-    if not geom_utils.bounds_overlap(
-        bounds, geom_utils.array_bounds(disp.arr, to_epsg=3857)
-    ):
-        return empty_tile(disp.tilesize, disp.checkerboard)
-
-    minx, miny, maxx, maxy = bounds
-    # FIXME: `reproject_array` is really, really slow for large arrays
-    # because of all the dask-graph-munging. Having a blocking, GIL-bound
-    # function within an async handler like this also means we're basically
-    # sending requests out serially per tile
-    tile = geom_utils.reproject_array(
-        disp.arr,
-        RasterSpec(
-            epsg=3857,
-            bounds=bounds,
-            resolutions_xy=(
-                (maxx - minx) / disp.tilesize,
-                (maxy - miny) / disp.tilesize,
-            ),
-        ),
-        interpolation=disp.interpolation,
+    tile = xyztile_of_array(
+        disp.arr, disp.tilesize, x, y, z, interpolation=disp.interpolation
     )
-    assert tile.shape[1:] == (
-        disp.tilesize,
-        disp.tilesize,
-    ), f"Wrong shape after interpolation: {tile.shape}"
+    if tile is None:
+        return empty_tile(disp.tilesize, disp.checkerboard)
 
     delayed_png = delayed_arr_to_png(
         tile.data,
@@ -528,6 +506,46 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
             raise
     finally:
         server_stats.computing -= 1
+
+
+def xyztile_of_array(
+    arr: xr.DataArray,
+    tilesize: int,
+    x: int,
+    y: int,
+    z: int,
+    interpolation: Literal["linear", "nearest"],
+) -> Optional[xr.DataArray]:
+    "Slice an XYZ tile out of a DataArray. Returns None if the tile does not overlap."
+    bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
+
+    if not geom_utils.bounds_overlap(
+        bounds, geom_utils.array_bounds(arr, to_epsg=3857)
+    ):
+        return None
+
+    minx, miny, maxx, maxy = bounds
+    # FIXME: `reproject_array` is really, really slow for large arrays
+    # because of all the dask-graph-munging. Having a blocking, GIL-bound
+    # function within an async handler like this also means we're basically
+    # sending requests out serially per tile
+    tile = geom_utils.reproject_array(
+        arr,
+        RasterSpec(
+            epsg=3857,
+            bounds=bounds,
+            resolutions_xy=(
+                (maxx - minx) / tilesize,
+                (maxy - miny) / tilesize,
+            ),
+        ),
+        interpolation=interpolation,
+    )
+    assert tile.shape[1:] == (
+        tilesize,
+        tilesize,
+    ), f"Wrong shape after interpolation: {tile.shape}"
+    return tile
 
 
 def arr_to_png(
