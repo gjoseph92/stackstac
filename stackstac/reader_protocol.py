@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Protocol, Type, TYPE_CHECKING, TypeVar, Union
+from typing import Optional, Protocol, Tuple, Type, TYPE_CHECKING, TypeVar, Union
 
 import numpy as np
 
@@ -28,6 +28,7 @@ class Reader(Pickleable, Protocol):
 
     def __init__(
         self,
+        *,
         url: str,
         spec: RasterSpec,
         resampling: Resampling,
@@ -35,6 +36,7 @@ class Reader(Pickleable, Protocol):
         fill_value: Optional[Union[int, float]] = np.nan,
         rescale: bool = True,
         gdal_env: Optional[LayeredEnv] = None,
+        errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
         """
         Construct the Dataset *without* fetching any data.
@@ -58,6 +60,14 @@ class Reader(Pickleable, Protocol):
         gdal_env:
             A `~.LayeredEnv` of GDAL configuration options to use while opening
             and reading datasets. If None (default), `~.DEFAULT_GDAL_ENV` is used.
+        errors_as_nodata:
+            Exception patterns to ignore when opening datasets or reading data.
+            Exceptions matching the pattern will be logged as warnings, and just
+            produce nodata (``fill_value``).
+
+            The exception patterns should be instances of an Exception type to catch,
+            where ``str(exception_pattern)`` is a regex pattern to match against
+            ``str(raised_exception)``.
         """
         # TODO colormaps?
 
@@ -103,7 +113,7 @@ class FakeReader:
     or inherent to the dask graph.
     """
 
-    def __init__(self, url: str, spec: RasterSpec, *args, **kwargs) -> None:
+    def __init__(self, *, url: str, spec: RasterSpec, **kwargs) -> None:
         pass
         # self.url = url
         # self.spec = spec

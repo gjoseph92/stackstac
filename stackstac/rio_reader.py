@@ -3,8 +3,9 @@ from __future__ import annotations
 import functools
 import logging
 import threading
+import warnings
 import weakref
-from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, Union
+from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, TypedDict, Union
 
 import numpy as np
 import rasterio as rio
@@ -14,6 +15,7 @@ from .rio_env import LayeredEnv
 from .timer import time
 from .reader_protocol import Reader
 from .raster_spec import RasterSpec
+from .nodata_reader import NodataReader, exception_matches, nodata_for_window
 
 if TYPE_CHECKING:
     from rasterio.enums import Resampling
@@ -81,7 +83,7 @@ MULTITHREADED_DRIVER_ALLOWLIST = {"GTiff"}
 class ThreadsafeRioDataset(Protocol):
     scale_offset: Tuple[float, float]
 
-    def read(self, *args, **kwargs) -> np.ndarray:
+    def read(self, window: Window, **kwargs) -> np.ndarray:
         ...
 
     def close(self) -> None:
@@ -110,11 +112,11 @@ class SingleThreadedRioDataset:
 
         self._lock = threading.Lock()
 
-    def read(self, *args, **kwargs) -> np.ndarray:
+    def read(self, window: Window, **kwargs) -> np.ndarray:
         "Acquire the lock, then read from the dataset"
         reader = self.vrt or self.ds
         with self._lock, self.env.read:
-            return reader.read(*args, **kwargs)
+            return reader.read(1, window=window, **kwargs)
 
     def close(self) -> None:
         "Acquire the lock, then close the dataset"
@@ -240,11 +242,11 @@ class ThreadLocalRioDataset:
         except AttributeError:
             return self._open()
 
-    def read(self, *args, **kwargs) -> np.ndarray:
+    def read(self, window: Window, **kwargs) -> np.ndarray:
         "Read from the current thread's dataset, opening a new copy of the dataset on first access from each thread."
         with time(f"Read {self._url!r} in {_curthread()}: {{t}}"):
             with self._env.read:
-                return self.dataset.read(*args, **kwargs)
+                return self.dataset.read(1, window=window, **kwargs)
 
     def close(self) -> None:
         """
@@ -289,6 +291,17 @@ class SelfCleaningDatasetReader(rio.DatasetReader):
         self.close()
 
 
+class PickleState(TypedDict):
+    url: str
+    spec: RasterSpec
+    resampling: Resampling
+    dtype: np.dtype
+    fill_value: Optional[Union[int, float]]
+    rescale: bool
+    gdal_env: Optional[LayeredEnv]
+    errors_as_nodata: Tuple[Exception, ...]
+
+
 class AutoParallelRioReader:
     """
     rasterio-based Reader that picks the appropriate concurrency mechanism after opening the file.
@@ -301,6 +314,7 @@ class AutoParallelRioReader:
 
     def __init__(
         self,
+        *,
         url: str,
         spec: RasterSpec,
         resampling: Resampling,
@@ -308,6 +322,7 @@ class AutoParallelRioReader:
         fill_value: Optional[Union[int, float]],
         rescale: bool,
         gdal_env: Optional[LayeredEnv] = None,
+        errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
         if fill_value is not None and not np.can_cast(fill_value, dtype):
             raise ValueError(
@@ -322,6 +337,7 @@ class AutoParallelRioReader:
         self.rescale = rescale
         self.fill_value = fill_value
         self.gdal_env = gdal_env or DEFAULT_GDAL_ENV
+        self.errors_as_nodata = errors_as_nodata
 
         self._dataset: Optional[ThreadsafeRioDataset] = None
         self._dataset_lock = threading.Lock()
@@ -329,7 +345,19 @@ class AutoParallelRioReader:
     def _open(self) -> ThreadsafeRioDataset:
         with self.gdal_env.open:
             with time(f"Initial read for {self.url!r} on {_curthread()}: {{t}}"):
-                ds = SelfCleaningDatasetReader(rio.parse_path(self.url), sharing=False)
+                try:
+                    ds = SelfCleaningDatasetReader(
+                        rio.parse_path(self.url), sharing=False
+                    )
+                except Exception as e:
+                    msg = f"Error opening {self.url!r}: {e!r}"
+                    if exception_matches(e, self.errors_as_nodata):
+                        warnings.warn(msg)
+                        return NodataReader(
+                            dtype=self.dtype, fill_value=self.fill_value
+                        )
+
+                    raise RuntimeError(msg) from e
             if ds.count != 1:
                 ds.close()
                 raise RuntimeError(
@@ -393,14 +421,22 @@ class AutoParallelRioReader:
 
     def read(self, window: Window, **kwargs) -> np.ndarray:
         reader = self.dataset
-        result = reader.read(
-            1,
-            window=window,
-            masked=True,
-            # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
-            # without potentially altering pixels that should have been the ``fill_value``
-            **kwargs,
-        )
+        try:
+            result = reader.read(
+                window=window,
+                masked=True,
+                # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
+                # without potentially altering pixels that should have been the ``fill_value``
+                **kwargs,
+            )
+        except Exception as e:
+            msg = f"Error reading {window} from {self.url!r}: {e!r}"
+            if exception_matches(e, self.errors_as_nodata):
+                warnings.warn(msg)
+                return nodata_for_window(window, self.fill_value, self.dtype)
+
+            raise RuntimeError(msg) from e
+
         if self.rescale:
             scale, offset = reader.scale_offset
             if scale != 1 and offset != 0:
@@ -431,38 +467,24 @@ class AutoParallelRioReader:
 
     def __getstate__(
         self,
-    ) -> Tuple[
-        str,
-        RasterSpec,
-        Resampling,
-        np.dtype,
-        Optional[Union[int, float]],
-        bool,
-        Optional[LayeredEnv],
-    ]:
-        return (
-            self.url,
-            self.spec,
-            self.resampling,
-            self.dtype,
-            self.fill_value,
-            self.rescale,
-            self.gdal_env,
-        )
+    ) -> PickleState:
+        return {
+            "url": self.url,
+            "spec": self.spec,
+            "resampling": self.resampling,
+            "dtype": self.dtype,
+            "fill_value": self.fill_value,
+            "rescale": self.rescale,
+            "gdal_env": self.gdal_env,
+            "errors_as_nodata": self.errors_as_nodata,
+        }
 
     def __setstate__(
         self,
-        state: Tuple[
-            str,
-            RasterSpec,
-            Resampling,
-            np.dtype,
-            Optional[Union[int, float]],
-            bool,
-            Optional[LayeredEnv],
-        ],
+        state: PickleState,
     ):
-        self.__init__(*state)
+        self.__init__(**state)
+        # NOTE: typechecking may not catch errors here https://github.com/microsoft/pylance-release/issues/374
 
 
 # Type assertion
