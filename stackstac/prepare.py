@@ -462,7 +462,10 @@ def to_coords(
             accumulate_metadata.accumulate_metadata(
                 (item["assets"].get(asset_id, {}) for item in items),
                 skip_fields={"href", "type", "roles"},
-                only_allsame=True,
+                only_allsame="ignore-missing",
+                # ^ NOTE: we `ignore-missing` because I've observed some STAC collections
+                # missing `eo:bands` on some items.
+                # xref https://github.com/sat-utils/sat-api/issues/229
             )
             for asset_id in asset_ids
         ]

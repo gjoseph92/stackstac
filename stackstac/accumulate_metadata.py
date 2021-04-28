@@ -25,7 +25,7 @@ def metadata_to_coords(
     dim_name: str,
     fields: Union[str, Sequence[str], Literal[True]] = True,
     skip_fields: Container[str] = (),
-    only_allsame: bool = False,
+    only_allsame: Union[bool, Literal["ignore-missing"]] = False,
 ):
     return dict_to_coords(
         accumulate_metadata(
@@ -39,7 +39,7 @@ def accumulate_metadata(
     items: Iterable[Mapping[str, Any]],
     fields: Union[str, Sequence[str], Literal[True]] = True,
     skip_fields: Container[str] = (),
-    only_allsame: bool = False,
+    only_allsame: Union[bool, Literal["ignore-missing"]] = False,
 ) -> Dict[str, Any]:
     """
     Accumulate a sequence of multiple similar dicts into a single dict of lists.
@@ -57,6 +57,9 @@ def accumulate_metadata(
         Only use these fields. If True, use all fields.
     skip_fields:
         Skip these fields when ``fields`` is True.
+    only_allsame:
+        Only return fields that have the same value in every item.
+        If ``"ignore-missing"``, ignores this check on items that were missing that field.
     """
     if isinstance(fields, str):
         fields = (fields,)
@@ -66,6 +69,8 @@ def accumulate_metadata(
     for i, item in enumerate(items):
         for existing_field in all_fields.keys():
             value = item.get(existing_field, None)
+            if value is None and only_allsame == "ignore-missing":
+                continue
             existing_value = all_fields[existing_field]
             if existing_value == value:
                 # leave fields that are the same for every item as singletons
@@ -76,6 +81,8 @@ def accumulate_metadata(
                 existing_value.append(value)
             else:
                 if only_allsame:
+                    # Either `only_allsame is True`, or `only_allsame == "ignore-missing"`
+                    # and the value wasn't missing
                     all_fields[existing_field] = None
                 else:
                     # all prior values for this field were the same (or missing).
