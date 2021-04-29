@@ -28,7 +28,16 @@ def items_to_dask(
     rescale: bool = True,
     reader: Type[Reader] = AutoParallelRioReader,
     gdal_env: Optional[LayeredEnv] = None,
+    errors_as_nodata: Tuple[Exception, ...] = (),
 ) -> da.Array:
+    if fill_value is None and errors_as_nodata:
+        raise ValueError(
+            "A non-None `fill_value` is required when using `errors_as_nodata`. "
+            "If an exception occurs, we need to know what to use as the nodata value, "
+            "since there may not be an open dataset to infer it from."
+        )
+    errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
+
     # The overall strategy in this function is to materialize the outer two dimensions (items, assets)
     # as one dask array, then the chunks of the inner two dimensions (y, x) as another dask array, then use
     # Blockwise to represent the cartesian product between them, to avoid materializing that entire graph.
@@ -56,6 +65,7 @@ def items_to_dask(
         fill_value,
         rescale,
         gdal_env,
+        errors_as_nodata,
         reader,
         meta=asset_table_dask._meta,
     )
@@ -101,6 +111,7 @@ def asset_entry_to_reader_and_window(
     fill_value: Optional[Union[int, float]],
     rescale: bool,
     gdal_env: Optional[LayeredEnv],
+    errors_as_nodata: Tuple[Exception, ...],
     reader: Type[ReaderT],
 ) -> Optional[Tuple[ReaderT, windows.Window]]:
     asset_entry = asset_entry[0, 0]
@@ -125,13 +136,14 @@ def asset_entry_to_reader_and_window(
         # ),
         # NOTE: skip the `CachingFileManager` for now to be sure datasets aren't leaked
         reader(
-            url,
-            spec,
-            resampling,
-            dtype,
-            fill_value,
-            rescale,
+            url=url,
+            spec=spec,
+            resampling=resampling,
+            dtype=dtype,
+            fill_value=fill_value,
+            rescale=rescale,
             gdal_env=gdal_env,
+            errors_as_nodata=errors_as_nodata,
         ),
         asset_window,
     )

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import AbstractSet, List, Literal, Optional, Sequence, Type, Union
+from typing import AbstractSet, List, Literal, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 import xarray as xr
 import dask
+from rasterio import RasterioIOError
 from rasterio.enums import Resampling
 
 from .prepare import prepare_items, to_attrs, to_coords
@@ -36,6 +37,9 @@ def stack(
     properties: Union[bool, str, Sequence[str]] = True,
     band_coords: bool = True,
     gdal_env: Optional[LayeredEnv] = None,
+    errors_as_nodata: Tuple[Exception, ...] = (
+        RasterioIOError("HTTP response code: 404"),
+    ),
     reader: Type[Reader] = AutoParallelRioReader,
 ) -> xr.DataArray:
     """
@@ -89,7 +93,7 @@ def stack(
         the `satstac <https://github.com/sat-utils/sat-stac>`_ (preferred),
         `pystac <https://github.com/stac-utils/pystac>`_, or
         `pystac-client <https://github.com/stac-utils/pystac-client>`_
-         libraries.
+        libraries.
     assets:
         Which asset IDs to use. Any Items missing a particular Asset will return an array
         of ``fill_value`` for that Asset. By default, returns all assets with a GeoTIFF
@@ -241,6 +245,16 @@ def stack(
         Advanced use: a `~.LayeredEnv` of GDAL configuration options to use while opening
         and reading datasets. If None (default), `~.DEFAULT_GDAL_ENV` is used.
         See ``rio_reader.py`` for notes on why these default options were chosen.
+    errors_as_nodata:
+        Exception patterns to ignore when opening datasets or reading data.
+        Exceptions matching the pattern will be logged as warnings, and just
+        produce nodata (``fill_value``). A non-None ``fill_value`` is required when using this.
+
+        The exception patterns should be instances of an Exception type to catch,
+        where ``str(exception_pattern)`` is a regex pattern to match against
+        ``str(raised_exception)``. For example, ``RasterioIOError("HTTP response code: 404")``
+        (the default). Or ``IOError(r"HTTP response code: 4\\d\\d")``, to catch any 4xx HTTP error.
+        Or ``Exception(".*")`` to catch absolutely anything (that one's probably a bad idea).
     reader:
         Advanced use: the `~.Reader` type to use. Currently there is only one real reader type:
         `~.AutoParallelRioReader`. However, there's also `~.FakeReader` (which doesn't read data at all,
@@ -253,8 +267,8 @@ def stack(
         xarray DataArray, backed by a Dask array. No IO will happen until calling ``.compute()``,
         or accessing ``.values``. The dimensions will be ``("time", "band", "y", "x")``.
 
-        ``time`` will be equal in length to the number of items you pass in, and indexed by STAC Item datetime. 
-        Note that this means multiple entries could have the same index. Note also datetime strings are cast to 
+        ``time`` will be equal in length to the number of items you pass in, and indexed by STAC Item datetime.
+        Note that this means multiple entries could have the same index. Note also datetime strings are cast to
         'UTC' but passed to xarray without timezone information (dtype='datetime64[ns]').
 
         ``band`` will be equal in length to the number of asset IDs used (see the ``assets`` parameter for more).
@@ -290,6 +304,7 @@ def stack(
         rescale=rescale,
         reader=reader,
         gdal_env=gdal_env,
+        errors_as_nodata=errors_as_nodata,
     )
 
     return xr.DataArray(
