@@ -22,6 +22,15 @@ insipid-sphinx-theme = {version = "^0.2.3", optional = true}
 nbsphinx = {version = "^0.8.2", optional = true}
 sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
 ipython = {version = "^7.20.0", optional = true}
+coiled = {version = "^0.0.38", optional = true}
+distributed = {version = "^2021.4.1", optional = true}
+matplotlib = {version = "^3.4.1", optional = true}
+sat-search = {version = "^0.3.0", optional = true}
+pystac-client = {version = "^0.1.1", optional = true}
+planetary-computer = {version = "^0.1.0", optional = true}
+ipyleaflet = {version = "^0.13.6", optional = true}
+jupyterlab-geojson = {version = "^3.1.2", optional = true}
+dask-labextension = {version = "^5.0.1", optional = true}
 
 [tool.poetry.dev-dependencies]
 Pympler = "^0.9"
@@ -54,6 +63,17 @@ docs = [
   "nbsphinx",
   "insipid-sphinx-theme",
   "ipython",
+]
+binder = [
+  "coiled",
+  "distributed",
+  "matplotlib",
+  "sat-search",
+  "pystac-client",
+  "planetary-computer",
+  "ipyleaflet",
+  "jupyterlab-geojson",
+  "dask-labextension",
 ]
 
 [build-system]
