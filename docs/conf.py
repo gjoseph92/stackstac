@@ -49,6 +49,14 @@ napoleon_use_param = True
 # set_type_checking_flag = True
 default_role = "py:obj"
 
+nbsphinx_prolog = """
+{% set docname = env.doc2path(env.docname, base=None) %}
+
+.. note::
+    View the original notebook `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{ docname }}>`_.
+"""
+
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -56,6 +64,9 @@ default_role = "py:obj"
 #
 html_theme = 'insipid'
 
+html_theme_options = {
+    "globaltoc_maxdepth": -1,
+}
 html_context = {
     'display_github': True,
     'github_user': 'gjoseph92',
