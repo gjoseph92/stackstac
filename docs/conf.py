@@ -34,6 +34,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "nbsphinx",
+    "jupyter_sphinx",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

@@ -6,3 +6,4 @@ More examples
     :maxdepth: 1
 
     cluster
+    capecod
