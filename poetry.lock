@@ -361,11 +361,11 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "coiled"
-version = "0.0.38"
+version = "0.0.39.1"
 description = ""
 category = "main"
 optional = true
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 aiobotocore = ">=1.1.1"
@@ -378,6 +378,7 @@ ipython = "*"
 pandas = ">=1.1.0"
 rich = ">=9.4.0"
 s3fs = "*"
+typing-extensions = "*"
 
 [[package]]
 name = "colorama"
@@ -2319,7 +2320,7 @@ docs = ["Sphinx", "numpydoc", "sphinx-autodoc-typehints", "pandoc", "nbsphinx", 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "a1ef97fd47e9b3dfe5bb19ec62a69f25ce2bc8aa1ed6e08994d2460d1c092f2a"
+content-hash = "8a98e535d7f0ad34d22911ddaea4478d2f4868e881441cb9a7b0fe0140352e03"
 
 [metadata.files]
 affine = [
@@ -2556,8 +2557,8 @@ cloudpickle = [
     {file = "cloudpickle-1.6.0.tar.gz", hash = "sha256:9bc994f9e9447593bd0a45371f0e7ac7333710fcf64a4eb9834bf149f4ef2f32"},
 ]
 coiled = [
-    {file = "coiled-0.0.38-py3-none-any.whl", hash = "sha256:5dc4a4b582e6a136df9c39e58a1a90279dd05bf032fa7771e2356b4421f7e0b2"},
-    {file = "coiled-0.0.38.tar.gz", hash = "sha256:a21b6073f13f60555e317d65755d5ceefaacf9edf288b2eb6b17c330183835a3"},
+    {file = "coiled-0.0.39.1-py3-none-any.whl", hash = "sha256:254b387f4466d696fe2dc6c8a42852750db2c699342cc8828d729ac68dc83ba2"},
+    {file = "coiled-0.0.39.1.tar.gz", hash = "sha256:1b9192cac37feee6e7ec14ddea68f01fe5628e68a7b1047a39a4a0b03d5d5b78"},
 ]
 colorama = [
     {file = "colorama-0.4.4-py2.py3-none-any.whl", hash = "sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2"},

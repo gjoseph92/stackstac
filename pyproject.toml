@@ -22,7 +22,7 @@ insipid-sphinx-theme = {version = "^0.2.3", optional = true}
 nbsphinx = {version = "^0.8.2", optional = true}
 sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
 ipython = {version = "^7.20.0", optional = true}
-coiled = {version = "^0.0.38", optional = true}
+coiled = {version = "^0.0.39.1", optional = true}
 distributed = {version = "^2021.4.1", optional = true}
 matplotlib = {version = "^3.4.1", optional = true}
 sat-search = {version = "^0.3.0", optional = true}
