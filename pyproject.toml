@@ -35,7 +35,7 @@ cachetools = {version = "^4.2.2", optional = true}
 Pympler = "^0.9"
 awkward = {version = "^1.1.2", allow-prereleases = true}
 black = "^20.8b1"
-coiled = "^0.0.38"
+coiled = "^0.0.39"
 dask-labextension = "^5.0.1"
 debugpy = "^1.2.1"
 distributed = "^2021.3.1"
