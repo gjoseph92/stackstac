@@ -78,11 +78,12 @@ class ServerStats(ipywidgets.VBox):
     requested = traitlets.Int(default_value=0)
     completed = traitlets.Int(default_value=0)
     cancelled = traitlets.Int(default_value=0)
+    errored = traitlets.Int(default_value=0)
 
     def __init__(self, name: str = "", **kwargs) -> None:
         self.output = ipywidgets.Output()
         self._computing_progress = ipywidgets.IntProgress(
-            value=0, min=0, max=10, description="0 computing"
+            value=0, min=0, max=6, description="0 computing"
         )
         self._requested_progress = ipywidgets.IntProgress(
             value=0, min=0, max=6, description="0 requested"
@@ -95,6 +96,8 @@ class ServerStats(ipywidgets.VBox):
         traitlets.dlink(
             (self, "cancelled"), (cancelled, "value"), lambda c: f"{c} cancelled"
         )
+        errored = ipywidgets.Label(value="0 errored")
+        traitlets.dlink((self, "errored"), (errored, "value"), lambda c: f"{c} errored")
         super().__init__(
             children=[
                 ipywidgets.HTML(value=f"<b>{name}</b>"),
@@ -102,6 +105,7 @@ class ServerStats(ipywidgets.VBox):
                 self._computing_progress,
                 completed,
                 cancelled,
+                errored,
                 self.output,
             ],
             **kwargs,
@@ -128,8 +132,12 @@ class TileManager:
         task: Task[bytes]
         done_callback: Callable[[], Any]
         refcount: int = 0
+        released: bool = False
 
         def incref(self):
+            assert (
+                not self.released
+            ), f"Incref on a released task. {self.task.cancelled()=} {self.refcount=}"
             assert (
                 not self.task.cancelled()
             ), f"Incref on a cancelled task, {self.refcount=}"
@@ -140,7 +148,13 @@ class TileManager:
                 self.refcount -= 1
                 if self.refcount == 0:
                     self.task.cancel()
+                    self.released = True
                     self.done_callback()
+
+        def cancel(self):
+            if self.refcount or not self.released:
+                self.refcount = 1
+                self.decref()
 
         def __enter__(self) -> None:
             self.incref()
@@ -149,11 +163,12 @@ class TileManager:
             self.decref()
 
         def __del__(self):
-            self.task.cancel()
-            self.done_callback()
+            if not self.released:
+                self.task.cancel()
+                self.done_callback()
             assert (
                 self.refcount == 0
-            ), f"__del__ on TileRef with nonzero refcount: {self.refcount=}"
+            ), f"__del__ on TileRef with nonzero refcount: {self.refcount=} {self.released=}"
 
     def __init__(
         self, disp: Displayable, token: str, name: str, loop: asyncio.AbstractEventLoop
@@ -189,7 +204,7 @@ class TileManager:
             self.loop.call_soon_threadsafe(release_ref.decref)
 
         for new_xyz in viewport - current:
-            self.loop.call_soon_threadsafe(self._submit, new_xyz)
+            self.loop.call_soon_threadsafe(self.fire_and_forget, new_xyz)
 
     async def fetch(self, x: int, y: int, z: int) -> bytes:
         """
@@ -199,10 +214,7 @@ class TileManager:
         Otherwise, a new computation is started.
         """
         xyz = (x, y, z)
-        if xyz in self.tiles:
-            tile_ref = self.tiles[xyz]
-        else:
-            tile_ref = self._submit(xyz)
+        tile_ref = self.submit(xyz)
 
         with tile_ref:
             self.stats.requested += 1
@@ -214,22 +226,43 @@ class TileManager:
     def stop(self) -> None:
         "Stop all active computations, even if others hold references to them"
         for ref in self.tiles.values():
-            self.loop.call_soon_threadsafe(ref.task.cancel)
-        self.tiles.clear()
+            self.loop.call_soon_threadsafe(ref.cancel)
+        # NOTE: no need for `self.tiles.clear()`; the `done_callback` on `ref` should do that thread-safely
 
-    def _submit(self, xyz: Tuple[int, int, int]) -> TileManager.TileRef:
-        "Internal: start computation for an xyz, and store its TileRef"
+    def submit(self, xyz: Tuple[int, int, int]) -> TileManager.TileRef:
+        "Get the TileRef for a tile, starting a new computation if necessary"
+        tile_ref = self.tiles.get(xyz, None)
+        if tile_ref is not None:
+            return tile_ref
+
         task = asyncio.create_task(self._compute_tile(*xyz))
         task.add_done_callback(self._finalize)
 
         tile_ref = self.tiles[xyz] = self.TileRef(
-            task, lambda: self.tiles.pop(xyz, None), refcount=1
+            task, lambda: self.tiles.pop(xyz, None)
         )
         self.stats.computing += 1
         return tile_ref
 
+    def fire_and_forget(self, xyz: Tuple[int, int, int]) -> None:
+        "Submit, then immediately `incref()`"
+        self.submit(xyz).incref()
+
     def _finalize(self, future: asyncio.Future) -> None:
+        "Internal: update stats when a computation task finishes"
         self.stats.computing -= 1
+
+        try:
+            exc = future.exception()
+        except asyncio.CancelledError as e:
+            exc = e
+
+        if exc is None:
+            self.stats.completed += 1
+        elif isinstance(exc, asyncio.CancelledError):
+            self.stats.cancelled += 1
+        else:
+            self.stats.errored += 1
 
     async def _compute_tile(self, x: int, y: int, z: int) -> bytes:
         "Send an XYZ tile to be computed by the distributed client, and wait for it."
@@ -260,9 +293,7 @@ class TileManager:
         # this _should_ be okay, since we're running within the client's own event loop.
         awaitable = cast(Awaitable[bytes], awaitable)
         try:
-            result = await awaitable
-            self.stats.completed += 1
-            return result
+            return await awaitable
         except Exception:
             # Typically an `asyncio.CancelledError` from the request being cancelled,
             # but no matter what it is, we want to ensure we drop the distributed Future.
@@ -271,7 +302,6 @@ class TileManager:
             # occasionally there are still references to them held within frames/tracebacks (this may also
             # have to do with aiohttp's error handing, our ours, or ipython).
             # So we very aggressively try to cancel and release references to the future.
-            self.stats.cancelled += 1
             try:
                 await future.cancel(asynchronous=True)
             except asyncio.CancelledError:
@@ -372,11 +402,11 @@ def register(
 
     disp = Displayable(arr, range, colormap, checkerboard, tilesize, interpolation)
     token = dask.base.tokenize(disp)
-    if token not in TOKEN_TO_TILE_MANAGER:
-        manager = TileManager(disp, token, layer.name, loop)
-        TOKEN_TO_TILE_MANAGER[token] = manager
-    else:
-        manager = TOKEN_TO_TILE_MANAGER[token]
+    manager = TOKEN_TO_TILE_MANAGER.get(token, None)
+    if manager is None:
+        manager = TOKEN_TO_TILE_MANAGER[token] = TileManager(
+            disp, token, layer.name, loop
+        )
 
     MapObserver.set_up_for_map(map, layer, manager)
     server_stats.children = [
@@ -393,8 +423,11 @@ class MapObserver:
     ) -> None:
         "Create a new or set up an existing `MapObserver` for an `ipyleaflet.Map`"
         if base_url := cls.base_url_from_window_location(map.window_url):
-            layer.url = manager.url(base_url)
-            layer.redraw()
+            new_url = manager.url(base_url)
+            if new_url != layer.url:
+                # TODO cancel the manager for the old URL
+                layer.url = new_url
+                layer.redraw()
 
         try:
             notifiers = map._trait_notifiers["window_url"]["change"]
@@ -429,8 +462,12 @@ class MapObserver:
             name = change["name"]
         except KeyError:
             return
-        if name == "bounds":
+        if name == "window_url":
+            self.window_url_changed(change)
+        elif name == "bounds":
             self.bounds_changed(change)
+        elif name == "layers":
+            self.layers_changed(change)
 
     def window_url_changed(self, change: dict):
         try:
