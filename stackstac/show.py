@@ -21,7 +21,7 @@ import dask.array as da
 import matplotlib.cm
 import matplotlib.colors
 import ipywidgets
-import traitlets
+from traitlets import traitlets  # pylance prefers this
 
 from . import geom_utils
 from .raster_spec import RasterSpec
@@ -56,18 +56,20 @@ TOKEN_TO_ARRAY: Dict[str, Displayable] = {}
 
 
 class ServerStats(ipywidgets.VBox):
+    """
+    ipywidget for monitoring the local webserver's progress rendering map tiles with Dask
+
+    Do not instantiate directly; use `stackstac.server_stats` instead.
+    """
+
     active = traitlets.Int(default_value=0)
-    computing = traitlets.Int(default_value=0)
     completed = traitlets.Int(default_value=0)
     cancelled = traitlets.Int(default_value=0)
 
     def __init__(self) -> None:
         self.output = ipywidgets.Output()
         self._active_progress = ipywidgets.IntProgress(
-            value=0, min=0, max=20, description="0 active"
-        )
-        self._computing_progress = ipywidgets.IntProgress(
-            value=0, min=0, max=20, description="0 awaiting"
+            value=0, min=0, max=6, description="0 active"
         )
         completed = ipywidgets.Label(value="0 completed")
         traitlets.dlink(
@@ -80,7 +82,6 @@ class ServerStats(ipywidgets.VBox):
         super().__init__(
             children=[
                 self._active_progress,
-                self._computing_progress,
                 completed,
                 cancelled,
                 self.output,
@@ -88,16 +89,15 @@ class ServerStats(ipywidgets.VBox):
         )
 
     @contextmanager
-    def request(self, trait="active"):
+    def request(self):
         self.active += 1
         with self.output:
             try:
                 yield
-            except Exception:
-                import traceback
-
-                print(traceback.format_exc())
-                raise
+            except asyncio.CancelledError:
+                # NOTE: `compute_tile` is responsible for incrementing `cancelled`,
+                # we just don't want to log these
+                pass
             else:
                 self.completed += 1
             finally:
@@ -109,16 +109,12 @@ class ServerStats(ipywidgets.VBox):
             active = self.active
             self._active_progress.value = active
             self._active_progress.description = f"{active} active"
-
-    @traitlets.observe("computing")
-    def _computing_change(self, event):
-        with self._computing_progress.hold_trait_notifications():
-            computing = self.computing
-            self._computing_progress.value = computing
-            self._computing_progress.description = f"{computing} computing"
+            if active > self._active_progress.max:
+                self._active_progress.max = active
 
 
 server_stats = ServerStats()
+"ipywidget for monitoring the local webserver's progress rendering map tiles with Dask"
 
 
 def show(
@@ -477,8 +473,9 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
         colormap=disp.colormap,
         checkerboard=disp.checkerboard,
     )
-    server_stats.computing += 1
-    future = cast(distributed.Future, client.compute(delayed_png, sync=False))
+
+    future = client.compute(delayed_png, sync=False)
+    future = cast(distributed.Future, future)
 
     awaitable = future if client.asynchronous else future._result()
     # ^ sneak into the async api if the client isn't set up to be async.
@@ -488,24 +485,25 @@ async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
         return await awaitable
     except Exception:
         # Typically an `asyncio.CancelledError` from the request being cancelled,
-        # but no matter what it is, we want to ensure we drop the future.
-        with server_stats.output:
-            # There may be some state issues in `distributed.Client` around handling `CancelledError`s;
-            # occasionally there are still references to them held within frames/tracebacks (this may also
-            # have to do with aiohttp's error handing, our ours, or ipython).
-            # So we very aggressively try to cancel and release references to the future.
+        # but no matter what it is, we want to ensure we drop the distributed Future.
+
+        # There may be some state issues in `distributed.Client` around handling `CancelledError`s;
+        # occasionally there are still references to them held within frames/tracebacks (this may also
+        # have to do with aiohttp's error handing, our ours, or ipython).
+        # So we very aggressively try to cancel and release references to the future.
+        try:
             await future.cancel(asynchronous=True)
-            future.release()
-            # ^ We can still hold a reference to a Future after it's cancelled?
-            # And occasionally data will stay in distributed memory in that case?
-            del awaitable, future
-            # ^ Very overkill: delete our references to the future, so that the frame of the exception
-            # we re-raise doesn't keep a reference. This is pointless, since the exception we just
-            # caught came from within `Client._gather`, so its frame already has a reference to the same future.
-            server_stats.cancelled += 1
-            raise
-    finally:
-        server_stats.computing -= 1
+        except asyncio.CancelledError:
+            # Unlikely, but anytime we `await`, we could get cancelled.
+            # We're already cleaning up, so ignore cancellation here.
+            pass
+
+        future.release()
+        # ^ We can still hold a reference to a Future after it's cancelled?
+        # And occasionally data will stay in distributed memory in that case?
+
+        server_stats.cancelled += 1
+        raise
 
 
 def xyztile_of_array(
