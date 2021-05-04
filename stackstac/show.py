@@ -8,7 +8,6 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
-    List,
     Literal,
     NamedTuple,
     Optional,
@@ -86,15 +85,15 @@ class ServerStats(ipywidgets.VBox):
             value=0, min=0, max=6, description="0 computing"
         )
         self._requested_progress = ipywidgets.IntProgress(
-            value=0, min=0, max=6, description="0 requested"
+            value=0, min=0, max=6, description="0 HTTP requests"
         )
-        completed = ipywidgets.Label(value="0 completed")
+        completed = ipywidgets.Label(value="0 completed,")
         traitlets.dlink(
-            (self, "completed"), (completed, "value"), lambda c: f"{c} completed"
+            (self, "completed"), (completed, "value"), lambda c: f"{c} completed,"
         )
-        cancelled = ipywidgets.Label(value="0 cancelled")
+        cancelled = ipywidgets.Label(value="0 cancelled,")
         traitlets.dlink(
-            (self, "cancelled"), (cancelled, "value"), lambda c: f"{c} cancelled"
+            (self, "cancelled"), (cancelled, "value"), lambda c: f"{c} cancelled,"
         )
         errored = ipywidgets.Label(value="0 errored")
         traitlets.dlink((self, "errored"), (errored, "value"), lambda c: f"{c} errored")
@@ -103,9 +102,13 @@ class ServerStats(ipywidgets.VBox):
                 ipywidgets.HTML(value=f"<b>{name}</b>"),
                 self._requested_progress,
                 self._computing_progress,
-                completed,
-                cancelled,
-                errored,
+                ipywidgets.HBox(
+                    children=[
+                        completed,
+                        cancelled,
+                        errored,
+                    ]
+                ),
                 self.output,
             ],
             **kwargs,
@@ -124,6 +127,12 @@ class ServerStats(ipywidgets.VBox):
 
 
 server_stats = ipywidgets.VBox(children=[])
+
+
+def _update_server_stats_children() -> None:
+    server_stats.children = [
+        manager.stats for manager in TOKEN_TO_TILE_MANAGER.values()
+    ]
 
 
 class TileManager:
@@ -225,7 +234,7 @@ class TileManager:
 
     def stop(self) -> None:
         "Stop all active computations, even if others hold references to them"
-        for ref in self.tiles.values():
+        for ref in list(self.tiles.values()):
             self.loop.call_soon_threadsafe(ref.cancel)
         # NOTE: no need for `self.tiles.clear()`; the `done_callback` on `ref` should do that thread-safely
 
@@ -314,6 +323,12 @@ class TileManager:
             # And occasionally data will stay in distributed memory in that case?
 
             raise
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__} token={self.token!r} {len(self.tiles)} active tiles>"
+
+    def __hash__(self):
+        return hash(self.token)
 
     def __del__(self):
         self.stop()
@@ -409,10 +424,7 @@ def register(
         )
 
     MapObserver.set_up_for_map(map, layer, manager)
-    server_stats.children = [
-        manager.stats for manager in TOKEN_TO_TILE_MANAGER.values()
-    ]
-
+    _update_server_stats_children()
     # TODO some way to unregister (this is hard because we may have modified `arr` in `register`)
 
 
@@ -422,40 +434,43 @@ class MapObserver:
         cls, map: ipyleaflet.Map, layer: ipyleaflet.TileLayer, manager: TileManager
     ) -> None:
         "Create a new or set up an existing `MapObserver` for an `ipyleaflet.Map`"
-        if base_url := cls.base_url_from_window_location(map.window_url):
-            new_url = manager.url(base_url)
-            if new_url != layer.url:
-                # TODO cancel the manager for the old URL
-                layer.url = new_url
-                layer.redraw()
-
         try:
             notifiers = map._trait_notifiers["window_url"]["change"]
         except KeyError:
-            pass
+            map_observer = None
         else:
             for map_observer in notifiers:
                 if isinstance(map_observer, cls):
-                    if manager not in map_observer.managers:
-                        map_observer.managers.append(manager)
-                        map_observer.layers.append(layer)
-                        map_observer.bounds_changed(dict(map=map, bounds=map.bounds))
-                    return
+                    break
+            else:
+                map_observer = None
 
-        map_observer = cls()
-        map_observer.managers.append(manager)
-        map_observer.layers.append(layer)
+        if map_observer is None:
+            map_observer = cls(map)
 
-        map.observe(map_observer, names="window_url")
-        map.observe(map_observer, names="bounds")
-        map.observe(map_observer, names="layers")
+        # If we're swapping a new manager into an existing Layer instance, stop the old one
+        old_manager = map_observer.layers.setdefault(layer, manager)
+        if old_manager is not manager:
+            assert old_manager.token != manager.token
+            old_manager.stop()
+            TOKEN_TO_TILE_MANAGER.pop(old_manager.token, None)
+            map_observer.layers[layer] = manager
+            _update_server_stats_children()
+
+        # Update the layer URL if necessary
+        if base_url := cls.base_url_from_window_location(map.window_url):
+            new_url = manager.url(base_url)
+            if new_url != layer.url:
+                layer.url = new_url
+                layer.redraw()
 
         # Trigger initial viewport to load
-        map_observer.bounds_changed(dict(map=map, bounds=map.bounds))
+        map_observer.bounds_changed(dict(bounds=map.bounds))
 
-    def __init__(self) -> None:
-        self.managers: List[TileManager] = []
-        self.layers: List[ipyleaflet.TileLayer] = []
+    def __init__(self, map: ipyleaflet.Map) -> None:
+        self.layers: Dict[ipyleaflet.TileLayer, TileManager] = {}
+        self.map = map
+        map.observe(self, names=["window_url", "bounds", "layers"])
 
     def __call__(self, change: dict):
         try:
@@ -477,27 +492,21 @@ class MapObserver:
 
         base_url = self.base_url_from_window_location(url)
         if base_url:
-            for lyr, manager in zip(self.layers, self.managers):
+            for lyr, manager in self.layers.items():
                 lyr.url = manager.url(base_url)
                 lyr.redraw()
 
     def bounds_changed(self, change: dict):
         "When the map moves, update all our managers' viewports"
-        try:
-            map: ipyleaflet.Map = change["owner"]
-            bounds: Tuple[Tuple[float, float], Tuple[float, float]] = change["new"]
-        except KeyError:
-            return
-
-        (south, west), (north, east) = bounds
+        (south, west), (north, east) = self.map.bounds
         if south == west == north == east == 0:
             return
         tiles = set(
             (t.x, t.y, t.z)  # unnecessary copy, makes typechecker happy
-            for t in mercantile.tiles(west, south, east, north, int(map.zoom))
+            for t in mercantile.tiles(west, south, east, north, int(self.map.zoom))
         )
 
-        for manager in self.managers:
+        for manager in self.layers.values():
             manager.update_viewport(tiles)
 
     def layers_changed(self, change: dict):
@@ -508,21 +517,13 @@ class MapObserver:
         except KeyError:
             return
 
-        drop_is = []
-        for i, (lyr, manager) in enumerate(zip(self.layers, self.managers)):
+        for lyr, manager in list(self.layers.items()):
             if lyr not in new:
                 manager.stop()
-                drop_is.append(i)
+                self.layers.pop(lyr, None)
                 TOKEN_TO_TILE_MANAGER.pop(manager.token, None)
 
-        for i in drop_is:
-            del self.layers[i]
-            del self.managers[i]
-
-        if drop_is:
-            server_stats.children = [
-                manager.stats for manager in TOKEN_TO_TILE_MANAGER.values()
-            ]
+        _update_server_stats_children()
 
     @staticmethod
     def base_url_from_window_location(url: str) -> Optional[str]:
