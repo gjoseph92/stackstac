@@ -4,9 +4,7 @@ from dataclasses import dataclass
 import re
 
 from typing import (
-    Any,
     Awaitable,
-    Callable,
     Dict,
     Literal,
     NamedTuple,
@@ -24,6 +22,7 @@ import warnings
 import functools
 
 from aiohttp import web
+import cachetools
 import mercantile
 import dask
 import distributed
@@ -85,7 +84,7 @@ class ServerStats(ipywidgets.VBox):
             value=0, min=0, max=6, description="0 computing"
         )
         self._requested_progress = ipywidgets.IntProgress(
-            value=0, min=0, max=6, description="0 HTTP requests"
+            value=0, min=0, max=6, description="0 HTTP rqs"
         )
         completed = ipywidgets.Label(value="0 completed,")
         traitlets.dlink(
@@ -121,7 +120,9 @@ class ServerStats(ipywidgets.VBox):
         value = event["new"]
         with progbar.hold_trait_notifications():
             progbar.value = value
-            progbar.description = f"{value} {progbar.description.split(' ')[1]}"
+            progbar.description = (
+                f"{value} {progbar.description.split(' ', maxsplit=1)[1]}"
+            )
             if value > progbar.max:
                 progbar.max = value
 
@@ -136,56 +137,68 @@ def _update_server_stats_children() -> None:
 
 
 class TileManager:
+    """
+    Manage the async Dask computation of XYZ tiles for a single layer.
+
+    The `TileManager` interface exists primarily to support prefetching,
+    or "speculative execution". The "simple" way to render tiles in a
+    web map would be to have the web server wait for the browser to make a
+    HTTP request for tile, then submit the tile to Dask, ``await`` it, and send
+    it back. The problem with this is that most browsers limit the number of active
+    connections/requests per host. In Chrome, the limit is 6. So if Leaflet has
+    64 tiles to load, Chrome will only tell our server about 6 of them, and not
+    ask for more until one completes. This severely bottlenecks the parallelism
+    we can get out of Dask (not to mention, computing two neighboring tiles at once
+    may be more efficient), and makes tile loading feel slow and weirdly "bunchy".
+
+    To work around that, we can also observe the ipyleaflet map, and when it pans/zooms,
+    preemptively submit compute requests for tiles that the browser hasn't actually
+    asked for yet. When those HTTP requests do eventually come, then we check if there's
+    already a computation going (or completed) for it, and ``await`` that instead of
+    launching a new one.
+
+    One tricky case is when the ipyleaflet map pans, we launch requests, and then
+    it immediately pans somewhere else, before HTTP requests even start for
+    those tiles. We don't get the signal of an HTTP request cancellation (via
+    an `asyncio.CancelledError`) to cancel the compute, since no request was made.
+
+    To avoid this, we label each active request as *speculative* or not (via the
+    `TileManager.TileRef` class). When an HTTP request comes in, we promote any
+    existing `TileRef` for it to non-speculative. And whenever the map moves,
+    we cancel any speculative-only TileRefs that now fall outside the viewport.
+
+    Through all this, caching also emerges naturally. The lookup used to match
+    requests to the same tile *is* the cache. By default, it stores the 512
+    most-recently-accessed tiles.
+    """
+
     @dataclass
     class TileRef:
         task: Task[bytes]
-        done_callback: Callable[[], Any]
-        refcount: int = 0
-        released: bool = False
-
-        def incref(self):
-            assert (
-                not self.released
-            ), f"Incref on a released task. {self.task.cancelled()=} {self.refcount=}"
-            assert (
-                not self.task.cancelled()
-            ), f"Incref on a cancelled task, {self.refcount=}"
-            self.refcount += 1
-
-        def decref(self):
-            if self.refcount > 0:
-                self.refcount -= 1
-                if self.refcount == 0:
-                    self.task.cancel()
-                    self.released = True
-                    self.done_callback()
-
-        def cancel(self):
-            if self.refcount or not self.released:
-                self.refcount = 1
-                self.decref()
-
-        def __enter__(self) -> None:
-            self.incref()
-
-        def __exit__(self, *args) -> None:
-            self.decref()
+        speculative: bool = False
 
         def __del__(self):
-            if not self.released:
-                self.task.cancel()
-                self.done_callback()
-            assert (
-                self.refcount == 0
-            ), f"__del__ on TileRef with nonzero refcount: {self.refcount=} {self.released=}"
+            if not self.speculative and not self.task.done():
+                logging.warn(
+                    "An actively-computing tile was cancelled due to cache eviction. "
+                    "Consider increasing the tile cache size."
+                )
+            self.task.cancel()
 
     def __init__(
-        self, disp: Displayable, token: str, name: str, loop: asyncio.AbstractEventLoop
+        self,
+        disp: Displayable,
+        token: str,
+        name: str,
+        loop: asyncio.AbstractEventLoop,
+        cache_size=512,
     ):
         self.disp = disp
         self.token = token
         self.loop = loop
-        self.tiles: Dict[Tuple[int, int, int], TileManager.TileRef] = {}
+        self.tiles: cachetools.LRUCache[
+            Tuple[int, int, int], TileManager.TileRef
+        ] = cachetools.LRUCache(maxsize=cache_size)
         self.stats = ServerStats(name=name)
 
     def url(self, base_url: str) -> str:
@@ -201,19 +214,18 @@ class TileManager:
         """
         Update the set of currently-visible tiles.
 
-        Tiles that are not already computing will be started.
-        Tiles that were computing and had no other requests waiting for them will be cancelled.
+        Tiles that are not already computing will be speculatively started.
+        Tiles that were only computing speculatively and now aren't needed them will be cancelled.
 
-        Safe to call from other threads.
+        Safe to call from other threads (though not concurrently).
         """
         viewport = set(tiles)
         current = self.tiles.keys()
         for release_xyz in current - viewport:
-            release_ref = self.tiles[release_xyz]
-            self.loop.call_soon_threadsafe(release_ref.decref)
+            self.loop.call_soon_threadsafe(self.cancel, release_xyz, True)
 
         for new_xyz in viewport - current:
-            self.loop.call_soon_threadsafe(self.fire_and_forget, new_xyz)
+            self.loop.call_soon_threadsafe(self.submit, new_xyz, True)
 
     async def fetch(self, x: int, y: int, z: int) -> bytes:
         """
@@ -223,43 +235,68 @@ class TileManager:
         Otherwise, a new computation is started.
         """
         xyz = (x, y, z)
-        tile_ref = self.submit(xyz)
+        tile_ref = self.submit(xyz, speculative=False)
+        tile_ref.speculative = False
 
-        with tile_ref:
-            self.stats.requested += 1
-            try:
-                return await tile_ref.task
-            finally:
-                self.stats.requested -= 1
+        self.stats.requested += 1
+        try:
+            return await tile_ref.task
+        finally:
+            self.stats.requested -= 1
 
-    def stop(self) -> None:
-        "Stop all active computations, even if others hold references to them"
-        for ref in list(self.tiles.values()):
-            self.loop.call_soon_threadsafe(ref.cancel)
-        # NOTE: no need for `self.tiles.clear()`; the `done_callback` on `ref` should do that thread-safely
+    def submit(
+        self, xyz: Tuple[int, int, int], speculative: bool = False
+    ) -> TileManager.TileRef:
+        """
+        Get the TileRef for a tile, starting a new computation if necessary.
+        If ``speculative=False`` and a previous speculative computation was already running,
+        it's marked as non-speculative and returned.
 
-    def submit(self, xyz: Tuple[int, int, int]) -> TileManager.TileRef:
-        "Get the TileRef for a tile, starting a new computation if necessary"
+        NOT safe to call from other threads.
+        """
         tile_ref = self.tiles.get(xyz, None)
         if tile_ref is not None:
+            if not speculative:
+                tile_ref.speculative = False
             return tile_ref
 
-        task = asyncio.create_task(self._compute_tile(*xyz))
+        task = self.loop.create_task(self._compute_tile(*xyz))
         task.add_done_callback(self._finalize)
 
-        tile_ref = self.tiles[xyz] = self.TileRef(
-            task, lambda: self.tiles.pop(xyz, None)
-        )
-        self.stats.computing += 1
+        tile_ref = self.tiles[xyz] = self.TileRef(task, speculative=speculative)
         return tile_ref
 
-    def fire_and_forget(self, xyz: Tuple[int, int, int]) -> None:
-        "Submit, then immediately `incref()`"
-        self.submit(xyz).incref()
+    def cancel(self, xyz: Tuple[int, int, int], only_speculative=False) -> None:
+        """
+        Cancel a tile, if it exists.
+
+        If ``only_speculative=True``, it'll also only be cancelled if it's speculative.
+
+        NOT safe to call from other threads.
+        """
+        try:
+            ref = self.tiles[xyz]
+        except KeyError:
+            return
+
+        if only_speculative and not ref.speculative:
+            return
+
+        ref.task.cancel()
+        self.tiles.pop(xyz, None)
+
+    def cancel_all(self) -> None:
+        """
+        Cancel all active computations.
+
+        Safe to call from other threads (though not concurrently).
+        """
+        for tile in list(self.tiles):
+            self.loop.call_soon_threadsafe(self.cancel, tile)
 
     def _finalize(self, future: asyncio.Future) -> None:
         "Internal: update stats when a computation task finishes"
-        self.stats.computing -= 1
+        # self.stats.computing -= 1
 
         try:
             exc = future.exception()
@@ -267,7 +304,8 @@ class TileManager:
             exc = e
 
         if exc is None:
-            self.stats.completed += 1
+            # self.stats.completed += 1
+            pass
         elif isinstance(exc, asyncio.CancelledError):
             self.stats.cancelled += 1
         else:
@@ -294,6 +332,7 @@ class TileManager:
             checkerboard=disp.checkerboard,
         )
 
+        self.stats.computing += 1
         future = client.compute(delayed_png, sync=False)
         future = cast(distributed.Future, future)
 
@@ -302,7 +341,9 @@ class TileManager:
         # this _should_ be okay, since we're running within the client's own event loop.
         awaitable = cast(Awaitable[bytes], awaitable)
         try:
-            return await awaitable
+            result = await awaitable
+            self.stats.completed += 1
+            return result
         except Exception:
             # Typically an `asyncio.CancelledError` from the request being cancelled,
             # but no matter what it is, we want to ensure we drop the distributed Future.
@@ -323,6 +364,8 @@ class TileManager:
             # And occasionally data will stay in distributed memory in that case?
 
             raise
+        finally:
+            self.stats.computing -= 1
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__} token={self.token!r} {len(self.tiles)} active tiles>"
@@ -331,7 +374,7 @@ class TileManager:
         return hash(self.token)
 
     def __del__(self):
-        self.stop()
+        self.cancel_all()
 
 
 TOKEN_TO_TILE_MANAGER: Dict[str, TileManager] = {}
@@ -417,6 +460,8 @@ def register(
 
     disp = Displayable(arr, range, colormap, checkerboard, tilesize, interpolation)
     token = dask.base.tokenize(disp)
+    # TODO somehow check for duplicating the same thing as multiple layers.
+    # For now, this should just be an error, since it breaks a lot of state.
     manager = TOKEN_TO_TILE_MANAGER.get(token, None)
     if manager is None:
         manager = TOKEN_TO_TILE_MANAGER[token] = TileManager(
@@ -452,7 +497,7 @@ class MapObserver:
         old_manager = map_observer.layers.setdefault(layer, manager)
         if old_manager is not manager:
             assert old_manager.token != manager.token
-            old_manager.stop()
+            old_manager.cancel_all()
             TOKEN_TO_TILE_MANAGER.pop(old_manager.token, None)
             map_observer.layers[layer] = manager
             _update_server_stats_children()
@@ -498,13 +543,21 @@ class MapObserver:
 
     def bounds_changed(self, change: dict):
         "When the map moves, update all our managers' viewports"
-        (south, west), (north, east) = self.map.bounds
+        try:
+            (south, west), (north, east) = self.map.bounds
+        except ValueError:
+            # not enough values to unpack
+            return
         if south == west == north == east == 0:
             return
-        tiles = set(
-            (t.x, t.y, t.z)  # unnecessary copy, makes typechecker happy
-            for t in mercantile.tiles(west, south, east, north, int(self.map.zoom))
-        )
+        try:
+            tiles = set(
+                (t.x, t.y, t.z)  # unnecessary copy, makes typechecker happy
+                for t in mercantile.tiles(west, south, east, north, int(self.map.zoom))
+            )
+        except mercantile.InvalidLatitudeError:
+            # sometimes leaflet decides the map goes to -90.0 degrees
+            return
 
         for manager in self.layers.values():
             manager.update_viewport(tiles)
@@ -519,7 +572,7 @@ class MapObserver:
 
         for lyr, manager in list(self.layers.items()):
             if lyr not in new:
-                manager.stop()
+                manager.cancel_all()
                 self.layers.pop(lyr, None)
                 TOKEN_TO_TILE_MANAGER.pop(manager.token, None)
 

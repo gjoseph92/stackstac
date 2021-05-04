@@ -29,6 +29,7 @@ rasterio = "^1.2.0"
 scipy = "^1.6.1"
 sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
 xarray = "^0.17.0"
+cachetools = {version = "^4.2.2", optional = true}
 
 [tool.poetry.dev-dependencies]
 Pympler = "^0.9"
@@ -72,6 +73,7 @@ viz = [
   "ipyleaflet",
   "matplotlib",
   "mercantile",
+  "cachetools",
 ]
 
 [build-system]
