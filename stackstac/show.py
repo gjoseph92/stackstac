@@ -1,13 +1,26 @@
 from __future__ import annotations
+from asyncio.tasks import Task
+from dataclasses import dataclass
+import re
 
-from typing import Awaitable, Dict, Literal, NamedTuple, Optional, Tuple, Union, cast
+from typing import (
+    Awaitable,
+    Dict,
+    List,
+    Literal,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 import math
 import io
 import asyncio
 import logging
 import warnings
 import functools
-from contextlib import contextmanager
 
 from aiohttp import web
 import mercantile
@@ -52,9 +65,6 @@ class Displayable(NamedTuple):
     interpolation: Literal["linear", "nearest"]
 
 
-TOKEN_TO_ARRAY: Dict[str, Displayable] = {}
-
-
 class ServerStats(ipywidgets.VBox):
     """
     ipywidget for monitoring the local webserver's progress rendering map tiles with Dask
@@ -62,14 +72,18 @@ class ServerStats(ipywidgets.VBox):
     Do not instantiate directly; use `stackstac.server_stats` instead.
     """
 
-    active = traitlets.Int(default_value=0)
+    computing = traitlets.Int(default_value=0)
+    requested = traitlets.Int(default_value=0)
     completed = traitlets.Int(default_value=0)
     cancelled = traitlets.Int(default_value=0)
 
-    def __init__(self) -> None:
+    def __init__(self, name: str = "", **kwargs) -> None:
         self.output = ipywidgets.Output()
-        self._active_progress = ipywidgets.IntProgress(
-            value=0, min=0, max=6, description="0 active"
+        self._computing_progress = ipywidgets.IntProgress(
+            value=0, min=0, max=10, description="0 computing"
+        )
+        self._requested_progress = ipywidgets.IntProgress(
+            value=0, min=0, max=6, description="0 requested"
         )
         completed = ipywidgets.Label(value="0 completed")
         traitlets.dlink(
@@ -81,40 +95,482 @@ class ServerStats(ipywidgets.VBox):
         )
         super().__init__(
             children=[
-                self._active_progress,
+                ipywidgets.HTML(value=f"<b>{name}</b>"),
+                self._requested_progress,
+                self._computing_progress,
                 completed,
                 cancelled,
                 self.output,
-            ]
+            ],
+            **kwargs,
         )
 
-    @contextmanager
-    def request(self):
-        self.active += 1
-        with self.output:
+    @traitlets.observe("computing", "requested")
+    def _progbar_change(self, event):
+        attr = event["name"]
+        progbar = getattr(self, f"_{attr}_progress")
+        value = event["new"]
+        with progbar.hold_trait_notifications():
+            progbar.value = value
+            progbar.description = f"{value} {progbar.description.split(' ')[1]}"
+            if value > progbar.max:
+                progbar.max = value
+
+
+server_stats = ipywidgets.VBox(children=[])
+
+
+class TileManager:
+    @dataclass
+    class TileRef:
+        task: Task[bytes]
+        refcount: int = 0
+
+        def incref(self):
+            assert (
+                not self.task.cancelled()
+            ), f"Incref on a cancelled task, {self.refcount=}"
+            self.refcount += 1
+
+        def decref(self):
+            if self.refcount > 0:
+                self.refcount -= 1
+                if self.refcount == 0:
+                    self.task.cancel()
+
+        def __enter__(self) -> None:
+            self.incref()
+
+        def __exit__(self, *args) -> None:
+            self.decref()
+
+        def __del__(self):
+            self.task.cancel()
+            assert (
+                self.refcount == 0
+            ), f"__del__ on TileRef with nonzero refcount: {self.refcount=}"
+
+    def __init__(
+        self, disp: Displayable, token: str, name: str, loop: asyncio.AbstractEventLoop
+    ):
+        self.disp = disp
+        self.token = token
+        self.loop = loop
+        self.tiles: Dict[Tuple[int, int, int], TileManager.TileRef] = {}
+        self.stats = ServerStats(name=name)
+
+    def url(self, base_url: str) -> str:
+        """
+        URL template for tiles for this layer (routed through jupyter-server-proxy)
+
+        Base URL should be the notebook base URL as described at
+        https://jupyter-server-proxy.readthedocs.io/en/latest/arbitrary-ports-hosts.html
+        """
+        return f"{base_url}/proxy/{PORT}/{self.token}/{{z}}/{{y}}/{{x}}.png"
+
+    def update_viewport(self, tiles: Set[Tuple[int, int, int]]) -> None:
+        """
+        Update the set of currently-visible tiles.
+
+        Tiles that are not already computing will be started.
+        Tiles that were computing and had no other requests waiting for them will be cancelled.
+
+        Safe to call from other threads.
+        """
+        viewport = set(tiles)
+        current = self.tiles.keys()
+        for release_xyz in current - viewport:
+            release_ref = self.tiles[release_xyz]
+            self.loop.call_soon_threadsafe(release_ref.decref)
+
+        for new_xyz in viewport - current:
+            self.loop.call_soon_threadsafe(self._submit, new_xyz)
+
+    async def fetch(self, x: int, y: int, z: int) -> bytes:
+        """
+        Wait for a tile to compute.
+
+        If a computation is already running for this tile, it will be reused.
+        Otherwise, a new computation is started.
+        """
+        xyz = (x, y, z)
+        if xyz in self.tiles:
+            tile_ref = self.tiles[xyz]
+        else:
+            task = asyncio.create_task(self._compute_tile(*xyz))
+            tile_ref = self.tiles[xyz] = self.TileRef(task)
+
+        with tile_ref:
+            return await tile_ref.task
+
+    def stop(self) -> None:
+        "Stop all active computations, even if others hold references to them"
+        for ref in self.tiles.values():
+            self.loop.call_soon_threadsafe(ref.task.cancel)
+        self.tiles.clear()
+
+    def _submit(self, xyz: Tuple[int, int, int]) -> TileManager.TileRef:
+        "Internal: start computation for an xyz, and store its TileRef"
+        task = asyncio.create_task(self._compute_tile(*xyz))
+        task.add_done_callback(functools.partial(self._finalize, xyz=xyz))
+
+        tile_ref = self.tiles[xyz] = self.TileRef(task, refcount=1)
+        self.stats.computing += 1
+        return tile_ref
+
+    def _finalize(self, xyz: Tuple[int, int, int], future: asyncio.Future) -> None:
+        "Internal: when computation for an xyz finishes, remove the TileRef"
+        self.tiles.pop(xyz, None)
+        self.stats.computing -= 1
+
+    async def _compute_tile(self, z: int, y: int, x: int) -> bytes:
+        "Send an XYZ tile to be computed by the distributed client, and wait for it."
+        disp = self.disp
+        client = distributed.get_client()
+        # TODO assert the client's loop is the same as our current event loop.
+        # If not... tell the server to shut down and restart on the new event loop?
+        # (could also do this within a watch loop in `_launch_server`.)
+
+        tile = xyztile_of_array(
+            disp.arr, disp.tilesize, x, y, z, interpolation=disp.interpolation
+        )
+        if tile is None:
+            return empty_tile(disp.tilesize, disp.checkerboard)
+
+        delayed_png = delayed_arr_to_png(
+            tile.data,
+            range=disp.range,
+            colormap=disp.colormap,
+            checkerboard=disp.checkerboard,
+        )
+
+        future = client.compute(delayed_png, sync=False)
+        future = cast(distributed.Future, future)
+
+        awaitable = future if client.asynchronous else future._result()
+        # ^ sneak into the async api if the client isn't set up to be async.
+        # this _should_ be okay, since we're running within the client's own event loop.
+        awaitable = cast(Awaitable[bytes], awaitable)
+        try:
+            result = await awaitable
+            self.stats.completed += 1
+            return result
+        except Exception:
+            # Typically an `asyncio.CancelledError` from the request being cancelled,
+            # but no matter what it is, we want to ensure we drop the distributed Future.
+
+            # There may be some state issues in `distributed.Client` around handling `CancelledError`s;
+            # occasionally there are still references to them held within frames/tracebacks (this may also
+            # have to do with aiohttp's error handing, our ours, or ipython).
+            # So we very aggressively try to cancel and release references to the future.
             try:
-                yield
+                await future.cancel(asynchronous=True)
             except asyncio.CancelledError:
-                # NOTE: `compute_tile` is responsible for incrementing `cancelled`,
-                # we just don't want to log these
+                # Unlikely, but anytime we `await`, we could get cancelled.
+                # We're already cleaning up, so ignore cancellation here.
                 pass
-            else:
-                self.completed += 1
-            finally:
-                self.active -= 1
 
-    @traitlets.observe("active")
-    def _active_change(self, event):
-        with self._active_progress.hold_trait_notifications():
-            active = self.active
-            self._active_progress.value = active
-            self._active_progress.description = f"{active} active"
-            if active > self._active_progress.max:
-                self._active_progress.max = active
+            future.release()
+            # ^ We can still hold a reference to a Future after it's cancelled?
+            # And occasionally data will stay in distributed memory in that case?
+
+            self.stats.cancelled += 1
+            raise
+
+    def __del__(self):
+        self.stop()
 
 
-server_stats = ServerStats()
-"ipywidget for monitoring the local webserver's progress rendering map tiles with Dask"
+TOKEN_TO_TILE_MANAGER: Dict[str, TileManager] = {}
+
+
+def register(
+    arr: xr.DataArray,
+    map: ipyleaflet.Map,
+    layer: ipyleaflet.TileLayer,
+    range: Optional[Range] = None,
+    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
+    checkerboard: bool = True,
+    tilesize: int = 256,
+    interpolation: Literal["linear", "nearest"] = "linear",
+):
+    """
+    Low-level method to register a `DataArray` for display on a web map, and spin up the HTTP server if necessary.
+
+    Registration is necessary so that the local web server can look up the right
+    `~xarray.DataArray` object to render based on the URL requested.
+
+    A `distributed.Client` must already be created (and set as default) before calling this.
+
+    Once registered, an array cannot currently be un-registered. Beware of this when visualizing
+    things you've called `~distributed.Client.persist` on: even if you try to release a persisted
+    object from your own code, if you've ever registered it for visualization, it won't be freed
+    from distributed memory.
+    """
+    loop = ensure_server()
+
+    geom_utils.array_epsg(arr)  # just for the error
+    if arr.ndim == 2:
+        assert set(arr.dims) == {"x", "y"}
+        arr = arr.expand_dims("band")
+    elif arr.ndim == 3:
+        assert set(arr.dims) == {"band", "x", "y"}
+        nbands = arr.sizes["band"]
+        assert 1 <= nbands <= 3, f"Array must have 1-3 bands, not {nbands}."
+    else:
+        raise ValueError(
+            f"Array must only have the dimensions 'x', 'y', and optionally 'band', not {arr.dims!r}"
+        )
+
+    arr = arr.transpose("band", "y", "x")
+
+    if arr.shape[0] == 1:
+        if colormap is None:
+            # use the default colormap for 1-band data (usually viridis)
+            colormap = matplotlib.cm.get_cmap()
+    elif colormap is not None:
+        raise ValueError(
+            f"Colormaps are only possible on single-band data; this array has {arr.shape[0]} bands: "
+            f"{arr.bands.data.tolist()}"
+        )
+
+    if isinstance(colormap, str):
+        colormap = matplotlib.cm.get_cmap(colormap)
+
+    if range is None:
+        if arr.dtype.kind == "b":
+            range = (0, 1)
+        else:
+            warnings.warn(
+                "Calculating 2nd and 98th percentile of the entire array, since no range was given. "
+                "This could be expensive!"
+            )
+
+            flat = arr.data.flatten()
+            mins, maxes = (
+                # TODO auto-use tdigest if available
+                # NOTE: we persist the percentiles to be sure they aren't recomputed when you pan/zoom
+                da.percentile(flat, 2).persist(),
+                da.percentile(flat, 98).persist(),
+            )
+            arr = (arr - mins) / (maxes - mins)
+            range = (0, 1)
+    else:
+        vmin, vmax = range
+        if vmin > vmax:
+            raise ValueError(f"Invalid range: min value {vmin} > max value {vmax}")
+
+    assert tilesize > 1, f"Tilesize must be greater than zero, not {tilesize}"
+
+    disp = Displayable(arr, range, colormap, checkerboard, tilesize, interpolation)
+    token = dask.base.tokenize(disp)
+    if token not in TOKEN_TO_TILE_MANAGER:
+        manager = TileManager(disp, token, layer.name, loop)
+        TOKEN_TO_TILE_MANAGER[token] = manager
+    else:
+        manager = TOKEN_TO_TILE_MANAGER[token]
+
+    MapObserver.set_up_for_map(map, layer, manager)
+    server_stats.children = [
+        manager.stats for manager in TOKEN_TO_TILE_MANAGER.values()
+    ]
+
+    # TODO some way to unregister (this is hard because we may have modified `arr` in `register`)
+
+
+class MapObserver:
+    @classmethod
+    def set_up_for_map(
+        cls, map: ipyleaflet.Map, layer: ipyleaflet.TileLayer, manager: TileManager
+    ) -> None:
+        "Create a new or set up an existing `MapObserver` for an `ipyleaflet.Map`"
+        try:
+            notifiers = map._trait_notifiers["window_url"]["change"]
+        except KeyError:
+            pass
+        else:
+            for notifier in notifiers:
+                if isinstance(notifier, cls):
+                    if manager not in notifier.managers:
+                        notifier.managers.append(manager)
+                        notifier.layers.append(layer)
+                    return
+
+        notifier = cls()
+        notifier.managers.append(manager)
+        notifier.layers.append(layer)
+
+        map.observe(notifier, names="window_url")
+        map.observe(notifier, names="bounds")
+        map.observe(notifier, names="layers")
+
+    def __init__(self) -> None:
+        self.managers: List[TileManager] = []
+        self.layers: List[ipyleaflet.TileLayer] = []
+
+    def __call__(self, change: dict):
+        try:
+            name = change["name"]
+        except KeyError:
+            return
+        if name == "bounds":
+            self.bounds_changed(change)
+
+    def window_url_changed(self, change: dict):
+        try:
+            url = change["new"]
+        except KeyError:
+            return
+
+        base_url = self.base_url_from_window_location(url)
+        if base_url:
+            for lyr, manager in zip(self.layers, self.managers):
+                lyr.url = manager.url(base_url)
+
+    def bounds_changed(self, change: dict):
+        "When the map moves, update all our managers' viewports"
+        try:
+            map: ipyleaflet.Map = change["owner"]
+            bounds: Tuple[Tuple[float, float], Tuple[float, float]] = change["new"]
+        except KeyError:
+            return
+
+        (south, west), (north, east) = bounds
+        tiles = set(
+            (t.x, t.y, t.z)  # unnecessary copy, makes typechecker happy
+            for t in mercantile.tiles(west, south, east, north, int(map.zoom))
+        )
+
+        for manager in self.managers:
+            manager.update_viewport(tiles)
+
+    def layers_changed(self, change: dict):
+        "If one of our layers is removed from the map, forget about it, and stop its manager"
+        # NOTE: this assumes a layer is only on at most one map at a time
+        try:
+            new = change["new"]
+        except KeyError:
+            return
+
+        drop_is = []
+        for i, (lyr, manager) in enumerate(zip(self.layers, self.managers)):
+            if lyr not in new:
+                manager.stop()
+                drop_is.append(i)
+                TOKEN_TO_TILE_MANAGER.pop(manager.token, None)
+
+        for i in drop_is:
+            del self.layers[i]
+            del self.managers[i]
+
+        if drop_is:
+            server_stats.children = [
+                manager.stats for manager in TOKEN_TO_TILE_MANAGER.values()
+            ]
+
+    @staticmethod
+    def base_url_from_window_location(url: str) -> Optional[str]:
+        path_re = re.match(r"(^.+)\/(?:lab|notebook|voila)", url)
+        if path_re:
+            return path_re.group(1)
+        return None
+
+
+def add_to_map(
+    arr: xr.DataArray,
+    map: ipyleaflet.Map,
+    name: Optional[str] = None,
+    range: Optional[Range] = None,
+    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
+    checkerboard: bool = True,
+    interpolation: Literal["linear", "nearest"] = "linear",
+) -> ipyleaflet.Layer:
+    """
+    Add the `~xarray.DataArray` to an ipyleaflet :doc:`api_reference/map` as a new layer or replacing an existing one.
+
+    By giving a name, you can change and re-run notebook cells without piling up extraneous layers on
+    your map.
+
+    As you pan around the map, the part of the array that's in view is computed on the fly by dask.
+    This requires using a :doc:`dask distributed <distributed:index>` cluster.
+
+    Parameters
+    ----------
+    arr:
+        `~xarray.DataArray` to visualize. Must have ``x`` and ``y``, and optionally ``band`` dims,
+        and the ``epsg`` coordinate set.
+
+        ``arr`` must have 1-3 bands. Single-band data can be colormapped; multi-band data will be
+        displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
+        then shown as RGB.
+    map:
+        ipyleaflet :doc:`api_reference/map` to show the array on.
+    name: str
+        Name of the layer. If there's already a layer with this name on the map, its URL will be updated.
+        Otherwise, a new layer is added.
+
+        If None (default), ``arr.name`` is used as the name. If a layer with this name already exists,
+        it will be replaced.
+    range:
+        Min and max values in ``arr`` which will become black (0) and white (255) in the visualization.
+
+        If None (default), it will automatically use the 2nd/98th percentile values of the *entire array*
+        (unless it's a boolean array; then we just use 0-1).
+        For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
+        passing an explicit range is usually a good idea.
+    colormap:
+        Colormap to use for single-band data. Can be a
+        :doc:`matplotlib colormap name <gallery/color/colormap_reference>` as a string,
+        or a `~matplotlib.colors.Colormap` object for custom colormapping.
+
+        If None (default), the default matplotlib colormap (usually ``viridis``) will automatically
+        be used for 1-band data. Setting a colormap for multi-band data is an error.
+    checkerboard:
+        Whether to show a checkerboard pattern for missing data (default), or leave it fully transparent.
+
+        Note that only NaN is considered a missing value; any custom fill value should be converted
+        to NaN before visualizing.
+    interpolation:
+        Interpolation method to use while reprojecting: ``"linear"`` or ``"nearest"`` (default ``"linear"``).
+        Use ``"linear"`` for continuous data, such as imagery, SAR, DEMs, weather data, etc. Use ``"nearest"``
+        for discrete/categorical data, such as classification maps.
+
+
+    Note
+    ----
+    Why do the tiles seem to show up in batches, and why does it take along time for all the batches to load?
+
+    Unfortunately, this is a web browser limitation, and there's not much stackstac can do about it.
+    Each 256x256 tile visible on the map consumes one connection, and Web browsers only allow
+    a fixed number of connections to be open at once (for example, 6 per host in Chrome).
+    It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
+    only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles,
+    and causes the "bunching" effect.
+
+    Returns
+    -------
+    ipyleaflet.Layer:
+        The new or existing layer for visualizing this array.
+    """
+    if name is None:
+        name = str(arr.name)
+    for lyr in map.layers:
+        if lyr.name == name:
+            break
+    else:
+        lyr = ipyleaflet.TileLayer(name=name)
+        map.add_layer(lyr)
+
+    register(
+        arr,
+        map=map,
+        layer=lyr,
+        range=range,
+        colormap=colormap,
+        checkerboard=checkerboard,
+        interpolation=interpolation,
+    )
+    return lyr
 
 
 def show(
@@ -208,197 +664,17 @@ def show(
     return map_
 
 
-def add_to_map(
-    arr: xr.DataArray,
-    map: ipyleaflet.Map,
-    name: Optional[str] = None,
-    range: Optional[Range] = None,
-    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
-    checkerboard: bool = True,
-    interpolation: Literal["linear", "nearest"] = "linear",
-) -> ipyleaflet.Layer:
-    """
-    Add the `~xarray.DataArray` to an ipyleaflet :doc:`api_reference/map` as a new layer or replacing an existing one.
-
-    By giving a name, you can change and re-run notebook cells without piling up extraneous layers on
-    your map.
-
-    As you pan around the map, the part of the array that's in view is computed on the fly by dask.
-    This requires using a :doc:`dask distributed <distributed:index>` cluster.
-
-    Parameters
-    ----------
-    arr:
-        `~xarray.DataArray` to visualize. Must have ``x`` and ``y``, and optionally ``band`` dims,
-        and the ``epsg`` coordinate set.
-
-        ``arr`` must have 1-3 bands. Single-band data can be colormapped; multi-band data will be
-        displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
-        then shown as RGB.
-    map:
-        ipyleaflet :doc:`api_reference/map` to show the array on.
-    name: str
-        Name of the layer. If there's already a layer with this name on the map, its URL will be updated.
-        Otherwise, a new layer is added.
-
-        If None (default), a new layer is always added, which will have the name ``arr.name``.
-    range:
-        Min and max values in ``arr`` which will become black (0) and white (255) in the visualization.
-
-        If None (default), it will automatically use the 2nd/98th percentile values of the *entire array*
-        (unless it's a boolean array; then we just use 0-1).
-        For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
-        passing an explicit range is usually a good idea.
-    colormap:
-        Colormap to use for single-band data. Can be a
-        :doc:`matplotlib colormap name <gallery/color/colormap_reference>` as a string,
-        or a `~matplotlib.colors.Colormap` object for custom colormapping.
-
-        If None (default), the default matplotlib colormap (usually ``viridis``) will automatically
-        be used for 1-band data. Setting a colormap for multi-band data is an error.
-    checkerboard:
-        Whether to show a checkerboard pattern for missing data (default), or leave it fully transparent.
-
-        Note that only NaN is considered a missing value; any custom fill value should be converted
-        to NaN before visualizing.
-    interpolation:
-        Interpolation method to use while reprojecting: ``"linear"`` or ``"nearest"`` (default ``"linear"``).
-        Use ``"linear"`` for continuous data, such as imagery, SAR, DEMs, weather data, etc. Use ``"nearest"``
-        for discrete/categorical data, such as classification maps.
+def ensure_server() -> asyncio.AbstractEventLoop:
+    "Ensure the webserver is running, and return the event loop for it"
+    if ensure_server._loop is None:
+        ensure_server._loop = _launch_server()
+    return ensure_server._loop
 
 
-    Note
-    ----
-    Why do the tiles seem to show up in batches, and why does it take along time for all the batches to load?
-
-    Unfortunately, this is a web browser limitation, and there's not much stackstac can do about it.
-    Each 256x256 tile visible on the map consumes one connection, and Web browsers only allow
-    a fixed number of connections to be open at once (for example, 6 per host in Chrome).
-    It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
-    only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles,
-    and causes the "bunching" effect.
-
-    Returns
-    -------
-    ipyleaflet.Layer:
-        The new or existing layer for visualizing this array.
-    """
-    url = register(
-        arr,
-        range=range,
-        colormap=colormap,
-        checkerboard=checkerboard,
-        interpolation=interpolation,
-    )
-    if name is not None:
-        for lyr in map.layers:
-            if lyr.name == name:
-                lyr.url = url
-                break
-        else:
-            lyr = ipyleaflet.TileLayer(name=name, url=url)
-            map.add_layer(lyr)
-    else:
-        lyr = ipyleaflet.TileLayer(name=arr.name, url=url)
-        map.add_layer(lyr)
-    return lyr
+ensure_server._loop = None
 
 
-def register(
-    arr: xr.DataArray,
-    range: Optional[Range] = None,
-    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
-    checkerboard: bool = True,
-    tilesize: int = 256,
-    interpolation: Literal["linear", "nearest"] = "linear",
-) -> str:
-    """
-    Low-level method to register a `DataArray` for display on a web map, and spin up the HTTP server if necessary.
-
-    Registration is necessary so that the local web server can look up the right
-    `~xarray.DataArray` object to render based on the URL requested.
-
-    A `distributed.Client` must already be created (and set as default) before calling this.
-
-    Once registered, an array cannot currently be un-registered. Beware of this when visualizing
-    things you've called `~distributed.Client.persist` on: even if you try to release a persisted
-    object from your own code, if you've ever registered it for visualization, it won't be freed
-    from distributed memory.
-    """
-    ensure_server()
-
-    geom_utils.array_epsg(arr)  # just for the error
-    if arr.ndim == 2:
-        assert set(arr.dims) == {"x", "y"}
-        arr = arr.expand_dims("band")
-    elif arr.ndim == 3:
-        assert set(arr.dims) == {"band", "x", "y"}
-        nbands = arr.sizes["band"]
-        assert 1 <= nbands <= 3, f"Array must have 1-3 bands, not {nbands}."
-    else:
-        raise ValueError(
-            f"Array must only have the dimensions 'x', 'y', and optionally 'band', not {arr.dims!r}"
-        )
-
-    arr = arr.transpose("band", "y", "x")
-
-    if arr.shape[0] == 1:
-        if colormap is None:
-            # use the default colormap for 1-band data (usually viridis)
-            colormap = matplotlib.cm.get_cmap()
-    elif colormap is not None:
-        raise ValueError(
-            f"Colormaps are only possible on single-band data; this array has {arr.shape[0]} bands: "
-            f"{arr.bands.data.tolist()}"
-        )
-
-    if isinstance(colormap, str):
-        colormap = matplotlib.cm.get_cmap(colormap)
-
-    if range is None:
-        if arr.dtype.kind == "b":
-            range = (0, 1)
-        else:
-            warnings.warn(
-                "Calculating 2nd and 98th percentile of the entire array, since no range was given. "
-                "This could be expensive!"
-            )
-
-            flat = arr.data.flatten()
-            mins, maxes = (
-                # TODO auto-use tdigest if available
-                # NOTE: we persist the percentiles to be sure they aren't recomputed when you pan/zoom
-                da.percentile(flat, 2).persist(),
-                da.percentile(flat, 98).persist(),
-            )
-            arr = (arr - mins) / (maxes - mins)
-            range = (0, 1)
-    else:
-        vmin, vmax = range
-        if vmin > vmax:
-            raise ValueError(f"Invalid range: min value {vmin} > max value {vmax}")
-
-    assert tilesize > 1, f"Tilesize must be greater than zero, not {tilesize}"
-
-    disp = Displayable(arr, range, colormap, checkerboard, tilesize, interpolation)
-    token = dask.base.tokenize(disp)
-    TOKEN_TO_ARRAY[token] = disp
-
-    # TODO proxy through jupyter so another port doesn't have to be open to the internet
-    return f"http://localhost:{PORT}/{token}/{{z}}/{{y}}/{{x}}.png"
-    # TODO some way to unregister (this is hard because we may have modified `arr` in `register`)
-
-
-def ensure_server():
-    if not ensure_server._started:
-        _launch_server()
-        ensure_server._started = True
-
-
-ensure_server._started = False
-
-
-def _launch_server():
+def _launch_server() -> asyncio.AbstractEventLoop:
     client = distributed.get_client()  # if there isn't one yet, this will error
 
     app = web.Application()
@@ -424,16 +700,21 @@ def _launch_server():
     # ^ NOTE: tornado equivalent of `asyncio.create_task(run())`
     # (note that it takes the function itself, not the coroutine object)
 
+    return client.loop.asyncio_loop  # type: ignore
+    # Cannot access member "asyncio_loop" for type "IOLoop"
+    # Member "asyncio_loop" is unknownPylancereportGeneralTypeIssues
+    # This is entirely correct---we'll fail if the Tornado loop isn't aio-backed
+
 
 @routes.get("/{hash}/{z}/{y}/{x}.png")
 async def handler(request: web.Request) -> web.Response:
     "Handle a HTTP GET request for an XYZ tile"
     hash = request.match_info["hash"]
     try:
-        disp = TOKEN_TO_ARRAY[hash]
+        manager = TOKEN_TO_TILE_MANAGER[hash]
     except KeyError:
         raise web.HTTPNotFound(
-            reason=f"{hash} not found. Have {list(TOKEN_TO_ARRAY)}."
+            reason=f"{hash} not found. Have {list(TOKEN_TO_TILE_MANAGER)}."
         ) from None
 
     try:
@@ -443,67 +724,13 @@ async def handler(request: web.Request) -> web.Response:
     except TypeError:
         raise web.HTTPBadRequest(reason="z, y, and z parameters must be ints")
 
-    # TODO request cancellation
-    with server_stats.request():
-        png = await compute_tile(disp, z, y, x)
-        return web.Response(
-            body=png,
-            status=200,
-            content_type="image/png",
-            headers={"Access-Control-Allow-Origin": "*"},
-        )
-
-
-async def compute_tile(disp: Displayable, z: int, y: int, x: int) -> bytes:
-    "Send an XYZ tile to be computed by the distributed client, and wait for it."
-    client = distributed.get_client()
-    # TODO assert the client's loop is the same as our current event loop.
-    # If not... tell the server to shut down and restart on the new event loop?
-    # (could also do this within a watch loop in `_launch_server`.)
-
-    tile = xyztile_of_array(
-        disp.arr, disp.tilesize, x, y, z, interpolation=disp.interpolation
+    png = await manager.fetch(x, y, z)
+    return web.Response(
+        body=png,
+        status=200,
+        content_type="image/png",
+        headers={"Access-Control-Allow-Origin": "*"},
     )
-    if tile is None:
-        return empty_tile(disp.tilesize, disp.checkerboard)
-
-    delayed_png = delayed_arr_to_png(
-        tile.data,
-        range=disp.range,
-        colormap=disp.colormap,
-        checkerboard=disp.checkerboard,
-    )
-
-    future = client.compute(delayed_png, sync=False)
-    future = cast(distributed.Future, future)
-
-    awaitable = future if client.asynchronous else future._result()
-    # ^ sneak into the async api if the client isn't set up to be async.
-    # this _should_ be okay, since we're running within the client's own event loop.
-    awaitable = cast(Awaitable[bytes], awaitable)
-    try:
-        return await awaitable
-    except Exception:
-        # Typically an `asyncio.CancelledError` from the request being cancelled,
-        # but no matter what it is, we want to ensure we drop the distributed Future.
-
-        # There may be some state issues in `distributed.Client` around handling `CancelledError`s;
-        # occasionally there are still references to them held within frames/tracebacks (this may also
-        # have to do with aiohttp's error handing, our ours, or ipython).
-        # So we very aggressively try to cancel and release references to the future.
-        try:
-            await future.cancel(asynchronous=True)
-        except asyncio.CancelledError:
-            # Unlikely, but anytime we `await`, we could get cancelled.
-            # We're already cleaning up, so ignore cancellation here.
-            pass
-
-        future.release()
-        # ^ We can still hold a reference to a Future after it's cancelled?
-        # And occasionally data will stay in distributed memory in that case?
-
-        server_stats.cancelled += 1
-        raise
 
 
 def xyztile_of_array(
