@@ -58,7 +58,8 @@ docs = [
   "nbsphinx",
   "insipid-sphinx-theme",
   "ipython",
-  "jupyter-sphinx"
+  "jupyter-sphinx",
+  "ipyleaflet",
 ]
 binder = [
   "coiled",

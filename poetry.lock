@@ -2315,12 +2315,12 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 
 [extras]
 binder = ["coiled", "distributed", "matplotlib", "sat-search", "pystac-client", "planetary-computer", "ipyleaflet", "jupyterlab-geojson", "dask-labextension", "Bottleneck", "geogif"]
-docs = ["Sphinx", "numpydoc", "sphinx-autodoc-typehints", "pandoc", "nbsphinx", "insipid-sphinx-theme", "ipython", "jupyter-sphinx"]
+docs = ["Sphinx", "numpydoc", "sphinx-autodoc-typehints", "pandoc", "nbsphinx", "insipid-sphinx-theme", "ipython", "jupyter-sphinx", "ipyleaflet"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "8a98e535d7f0ad34d22911ddaea4478d2f4868e881441cb9a7b0fe0140352e03"
+content-hash = "fbdfc5ad9ff57e3cde29a82da926cd35223028668f1f38332fb72d1de6a410bc"
 
 [metadata.files]
 affine = [
