@@ -4,7 +4,9 @@ from dataclasses import dataclass
 import re
 
 from typing import (
+    Any,
     Awaitable,
+    Callable,
     Dict,
     List,
     Literal,
@@ -124,6 +126,7 @@ class TileManager:
     @dataclass
     class TileRef:
         task: Task[bytes]
+        done_callback: Callable[[], Any]
         refcount: int = 0
 
         def incref(self):
@@ -137,6 +140,7 @@ class TileManager:
                 self.refcount -= 1
                 if self.refcount == 0:
                     self.task.cancel()
+                    self.done_callback()
 
         def __enter__(self) -> None:
             self.incref()
@@ -146,6 +150,7 @@ class TileManager:
 
         def __del__(self):
             self.task.cancel()
+            self.done_callback()
             assert (
                 self.refcount == 0
             ), f"__del__ on TileRef with nonzero refcount: {self.refcount=}"
@@ -197,11 +202,14 @@ class TileManager:
         if xyz in self.tiles:
             tile_ref = self.tiles[xyz]
         else:
-            task = asyncio.create_task(self._compute_tile(*xyz))
-            tile_ref = self.tiles[xyz] = self.TileRef(task)
+            tile_ref = self._submit(xyz)
 
         with tile_ref:
-            return await tile_ref.task
+            self.stats.requested += 1
+            try:
+                return await tile_ref.task
+            finally:
+                self.stats.requested -= 1
 
     def stop(self) -> None:
         "Stop all active computations, even if others hold references to them"
@@ -212,18 +220,18 @@ class TileManager:
     def _submit(self, xyz: Tuple[int, int, int]) -> TileManager.TileRef:
         "Internal: start computation for an xyz, and store its TileRef"
         task = asyncio.create_task(self._compute_tile(*xyz))
-        task.add_done_callback(functools.partial(self._finalize, xyz=xyz))
+        task.add_done_callback(self._finalize)
 
-        tile_ref = self.tiles[xyz] = self.TileRef(task, refcount=1)
+        tile_ref = self.tiles[xyz] = self.TileRef(
+            task, lambda: self.tiles.pop(xyz, None), refcount=1
+        )
         self.stats.computing += 1
         return tile_ref
 
-    def _finalize(self, xyz: Tuple[int, int, int], future: asyncio.Future) -> None:
-        "Internal: when computation for an xyz finishes, remove the TileRef"
-        self.tiles.pop(xyz, None)
+    def _finalize(self, future: asyncio.Future) -> None:
         self.stats.computing -= 1
 
-    async def _compute_tile(self, z: int, y: int, x: int) -> bytes:
+    async def _compute_tile(self, x: int, y: int, z: int) -> bytes:
         "Send an XYZ tile to be computed by the distributed client, and wait for it."
         disp = self.disp
         client = distributed.get_client()
@@ -263,6 +271,7 @@ class TileManager:
             # occasionally there are still references to them held within frames/tracebacks (this may also
             # have to do with aiohttp's error handing, our ours, or ipython).
             # So we very aggressively try to cancel and release references to the future.
+            self.stats.cancelled += 1
             try:
                 await future.cancel(asynchronous=True)
             except asyncio.CancelledError:
@@ -274,7 +283,6 @@ class TileManager:
             # ^ We can still hold a reference to a Future after it's cancelled?
             # And occasionally data will stay in distributed memory in that case?
 
-            self.stats.cancelled += 1
             raise
 
     def __del__(self):
@@ -384,25 +392,33 @@ class MapObserver:
         cls, map: ipyleaflet.Map, layer: ipyleaflet.TileLayer, manager: TileManager
     ) -> None:
         "Create a new or set up an existing `MapObserver` for an `ipyleaflet.Map`"
+        if base_url := cls.base_url_from_window_location(map.window_url):
+            layer.url = manager.url(base_url)
+            layer.redraw()
+
         try:
             notifiers = map._trait_notifiers["window_url"]["change"]
         except KeyError:
             pass
         else:
-            for notifier in notifiers:
-                if isinstance(notifier, cls):
-                    if manager not in notifier.managers:
-                        notifier.managers.append(manager)
-                        notifier.layers.append(layer)
+            for map_observer in notifiers:
+                if isinstance(map_observer, cls):
+                    if manager not in map_observer.managers:
+                        map_observer.managers.append(manager)
+                        map_observer.layers.append(layer)
+                        map_observer.bounds_changed(dict(map=map, bounds=map.bounds))
                     return
 
-        notifier = cls()
-        notifier.managers.append(manager)
-        notifier.layers.append(layer)
+        map_observer = cls()
+        map_observer.managers.append(manager)
+        map_observer.layers.append(layer)
 
-        map.observe(notifier, names="window_url")
-        map.observe(notifier, names="bounds")
-        map.observe(notifier, names="layers")
+        map.observe(map_observer, names="window_url")
+        map.observe(map_observer, names="bounds")
+        map.observe(map_observer, names="layers")
+
+        # Trigger initial viewport to load
+        map_observer.bounds_changed(dict(map=map, bounds=map.bounds))
 
     def __init__(self) -> None:
         self.managers: List[TileManager] = []
@@ -426,6 +442,7 @@ class MapObserver:
         if base_url:
             for lyr, manager in zip(self.layers, self.managers):
                 lyr.url = manager.url(base_url)
+                lyr.redraw()
 
     def bounds_changed(self, change: dict):
         "When the map moves, update all our managers' viewports"
@@ -436,6 +453,8 @@ class MapObserver:
             return
 
         (south, west), (north, east) = bounds
+        if south == west == north == east == 0:
+            return
         tiles = set(
             (t.x, t.y, t.z)  # unnecessary copy, makes typechecker happy
             for t in mercantile.tiles(west, south, east, north, int(map.zoom))
@@ -470,8 +489,9 @@ class MapObserver:
 
     @staticmethod
     def base_url_from_window_location(url: str) -> Optional[str]:
-        path_re = re.match(r"(^.+)\/(?:lab|notebook|voila)", url)
-        if path_re:
+        if not url:
+            return None
+        if path_re := re.match(r"(^.+)\/(?:lab|notebook|voila)", url):
             return path_re.group(1)
         return None
 
@@ -558,7 +578,7 @@ def add_to_map(
         if lyr.name == name:
             break
     else:
-        lyr = ipyleaflet.TileLayer(name=name)
+        lyr = ipyleaflet.TileLayer(name=name, url="")
         map.add_layer(lyr)
 
     register(
@@ -721,7 +741,7 @@ async def handler(request: web.Request) -> web.Response:
         z = int(request.match_info["z"])
         y = int(request.match_info["y"])
         x = int(request.match_info["x"])
-    except TypeError:
+    except ValueError:
         raise web.HTTPBadRequest(reason="z, y, and z parameters must be ints")
 
     png = await manager.fetch(x, y, z)

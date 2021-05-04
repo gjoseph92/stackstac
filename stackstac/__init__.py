@@ -5,6 +5,7 @@ from .ops import mosaic
 from .geom_utils import reproject_array, array_bounds, array_epsg
 
 try:
+    from . import show as _show
     from .show import show, add_to_map, server_stats
 except ImportError:
     import traceback as _traceback
