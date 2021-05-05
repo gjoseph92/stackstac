@@ -761,9 +761,11 @@ def show(
         displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
         then shown as RGB.
     center:
-        Centerpoint for the map. If None (default), the map will automatically be centered on the array.
+        Centerpoint for the map, in (lat, lon) order.
+        If None (default), the map will automatically be centered on the array.
     zoom:
-        Initial zoom level for the map. If None (default), the map will automatically be zoomed to fit the entire array.
+        Initial zoom level for the map. If None (default), a zoom level to fit the array on a
+        reasonably-sized map is picked.
     range:
         Min and max values in ``arr`` which will become black (0) and white (255) in the visualization.
 
@@ -805,15 +807,31 @@ def show(
         The new map showing this array.
     """
     map_ = ipyleaflet.Map(**map_kwargs)
-    if center is None:
+    if center is None or zoom is None:
         west, south, east, north = geom_utils.array_bounds(arr, to_epsg=4326)
-        map_.fit_bounds([[south, east], [north, west]])
-        # TODO ipyleaflet `fit_bounds` doesn't do a very good job
-    else:
-        map_.center = center
 
-    if zoom is not None:
-        map_.zoom = zoom
+        if center is None:
+            center = south + (north - south) / 2, west + (east - west) / 2
+
+        if zoom is None:
+            west_m, south_m, east_m, north_m = geom_utils.reproject_bounds(
+                (west, south, east, north), from_epsg=4326, to_epsg=3857
+            )
+            size_m = max(east_m - west_m, north_m - south_m)
+            target_map_size_px = 800
+            tilesize_px = 256
+            earth_circumference_m = 40_075_016.686
+            lat = center[0]
+
+            # derived from https://wiki.openstreetmap.org/wiki/Zoom_levels
+            zoom = math.log2(
+                (earth_circumference_m * math.cos(math.radians(lat)) * target_map_size_px)
+                / (tilesize_px * size_m)
+            )
+            zoom = math.ceil(zoom)
+
+    map_.center = center
+    map_.zoom = zoom
 
     add_to_map(
         arr,
