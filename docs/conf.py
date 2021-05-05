@@ -93,6 +93,9 @@ nbsphinx_prolog = """
     `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{
         "../" + docname if docname.startswith("examples") else docname
     }}>`_.
+
+    Or, `click here <https://cloud.coiled.io/gjoseph92/jobs/stackstac>`_
+    to run these notebooks on Coiled with access to Dask clusters.
 """
 
 # TODO enable binder once Coiled supports websocket clusters over 443.
