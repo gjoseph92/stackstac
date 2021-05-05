@@ -50,7 +50,7 @@ DEBUG_INTERVAL = 0.5
 class Displayable(NamedTuple):
     arr: xr.DataArray
     range: Range
-    colormap: Optional[matplotlib.colors.Colormap]
+    cmap: Optional[matplotlib.colors.Colormap]
     checkerboard: bool
     tilesize: int
     interpolation: Literal["linear", "nearest"]
@@ -357,7 +357,7 @@ class TileManager:
         delayed_png = delayed_arr_to_png(
             tile.data,
             range=disp.range,
-            colormap=disp.colormap,
+            cmap=disp.cmap,
             checkerboard=disp.checkerboard,
         )
 
@@ -432,7 +432,7 @@ def register(
     map: ipyleaflet.Map,
     layer: ipyleaflet.TileLayer,
     range: Optional[Range] = None,
-    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
+    cmap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
     tilesize: int = 256,
     interpolation: Literal["linear", "nearest"] = "linear",
@@ -469,17 +469,17 @@ def register(
     arr = arr.transpose("band", "y", "x")
 
     if arr.shape[0] == 1:
-        if colormap is None:
+        if cmap is None:
             # use the default colormap for 1-band data (usually viridis)
-            colormap = matplotlib.cm.get_cmap()
-    elif colormap is not None:
+            cmap = matplotlib.cm.get_cmap()
+    elif cmap is not None:
         raise ValueError(
             f"Colormaps are only possible on single-band data; this array has {arr.shape[0]} bands: "
             f"{arr.bands.data.tolist()}"
         )
 
-    if isinstance(colormap, str):
-        colormap = matplotlib.cm.get_cmap(colormap)
+    if isinstance(cmap, str):
+        cmap = matplotlib.cm.get_cmap(cmap)
 
     if range is None:
         if arr.dtype.kind == "b":
@@ -507,7 +507,7 @@ def register(
 
     assert tilesize > 1, f"Tilesize must be greater than zero, not {tilesize}"
 
-    disp = Displayable(arr, range, colormap, checkerboard, tilesize, interpolation)
+    disp = Displayable(arr, range, cmap, checkerboard, tilesize, interpolation)
     token = dask.base.tokenize(disp)
     # TODO somehow check for duplicating the same thing as multiple layers.
     # For now, this should just be an error, since it breaks a lot of state.
@@ -643,7 +643,7 @@ def add_to_map(
     map: ipyleaflet.Map,
     name: Optional[str] = None,
     range: Optional[Range] = None,
-    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
+    cmap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
     interpolation: Literal["linear", "nearest"] = "linear",
 ) -> ipyleaflet.Layer:
@@ -680,7 +680,7 @@ def add_to_map(
         (unless it's a boolean array; then we just use 0-1).
         For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
         passing an explicit range is usually a good idea.
-    colormap:
+    cmap:
         Colormap to use for single-band data. Can be a
         :doc:`matplotlib colormap name <gallery/color/colormap_reference>` as a string,
         or a `~matplotlib.colors.Colormap` object for custom colormapping.
@@ -728,7 +728,7 @@ def add_to_map(
         map=map,
         layer=lyr,
         range=range,
-        colormap=colormap,
+        cmap=cmap,
         checkerboard=checkerboard,
         interpolation=interpolation,
     )
@@ -740,7 +740,7 @@ def show(
     center=None,
     zoom=None,
     range: Optional[Range] = None,
-    colormap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
+    cmap: Optional[Union[str, matplotlib.colors.Colormap]] = None,
     checkerboard: bool = True,
     interpolation: Literal["linear", "nearest"] = "linear",
     **map_kwargs,
@@ -771,7 +771,7 @@ def show(
         (unless it's a boolean array; then we just use 0-1).
         For large arrays, this can be very slow and expensive, and slow down tile rendering a lot, so
         passing an explicit range is usually a good idea.
-    colormap:
+    cmap:
         Colormap to use for single-band data. Can be a
         :doc:`matplotlib colormap name <gallery/color/colormap_reference>` as a string,
         or a `~matplotlib.colors.Colormap` object for custom colormapping.
@@ -819,7 +819,7 @@ def show(
         arr,
         map_,
         range=range,
-        colormap=colormap,
+        cmap=cmap,
         checkerboard=checkerboard,
         interpolation=interpolation,
     )
@@ -919,7 +919,7 @@ async def handler(request: web.Request) -> web.Response:
 def arr_to_png(
     arr: np.ndarray,
     range: Range,
-    colormap: Optional[matplotlib.colors.Colormap] = None,
+    cmap: Optional[matplotlib.colors.Colormap] = None,
     checkerboard: bool = True,
 ) -> bytes:
     "Convert an ndarray into a PNG"
@@ -941,9 +941,9 @@ def arr_to_png(
         norm_arr -= vmin
         norm_arr /= vmax - vmin
 
-    if colormap is not None:
+    if cmap is not None:
         # NOTE: `Colormap` automatically uses `np.isnan(x)` as the mask
-        cmapped = colormap(norm_arr, bytes=True)
+        cmapped = cmap(norm_arr, bytes=True)
         cmapped = np.moveaxis(np.squeeze(cmapped), -1, 0)
         u8_arr, alpha = cmapped[:-1], cmapped[-1]
     else:
