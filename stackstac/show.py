@@ -443,11 +443,12 @@ def register(
             )
 
             flat = arr.data.flatten()
+            valid = flat[~da.isnan(flat)]
             mins, maxes = (
                 # TODO auto-use tdigest if available
                 # NOTE: we persist the percentiles to be sure they aren't recomputed when you pan/zoom
-                da.percentile(flat, 2).persist(),
-                da.percentile(flat, 98).persist(),
+                da.percentile(valid, 2).persist(),
+                da.percentile(valid, 98).persist(),
             )
             arr = (arr - mins) / (maxes - mins)
             range = (0, 1)
