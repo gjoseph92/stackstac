@@ -37,7 +37,6 @@ import ipywidgets
 from traitlets import traitlets  # pylance prefers this
 
 from . import geom_utils
-from .raster_spec import RasterSpec
 
 Range = Tuple[float, float]
 
@@ -348,8 +347,8 @@ class TileManager:
         # If not... tell the server to shut down and restart on the new event loop?
         # (could also do this within a watch loop in `_launch_server`.)
 
-        tile = xyztile_of_array(
-            disp.arr, disp.tilesize, x, y, z, interpolation=disp.interpolation
+        tile = geom_utils.xyztile_of_array(
+            disp.arr, x, y, z, interpolation=disp.interpolation, tilesize=disp.tilesize
         )
         if tile is None:
             return empty_tile(disp.tilesize, disp.checkerboard)
@@ -899,46 +898,6 @@ async def handler(request: web.Request) -> web.Response:
 
 # Array to tile
 ###############
-
-
-def xyztile_of_array(
-    arr: xr.DataArray,
-    tilesize: int,
-    x: int,
-    y: int,
-    z: int,
-    interpolation: Literal["linear", "nearest"],
-) -> Optional[xr.DataArray]:
-    "Slice an XYZ tile out of a DataArray. Returns None if the tile does not overlap."
-    bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
-
-    if not geom_utils.bounds_overlap(
-        bounds, geom_utils.array_bounds(arr, to_epsg=3857)
-    ):
-        return None
-
-    minx, miny, maxx, maxy = bounds
-    # FIXME: `reproject_array` is really, really slow for large arrays
-    # because of all the dask-graph-munging. Having a blocking, GIL-bound
-    # function within an async handler like this also means we're basically
-    # sending requests out serially per tile
-    tile = geom_utils.reproject_array(
-        arr,
-        RasterSpec(
-            epsg=3857,
-            bounds=bounds,
-            resolutions_xy=(
-                (maxx - minx) / tilesize,
-                (maxy - miny) / tilesize,
-            ),
-        ),
-        interpolation=interpolation,
-    )
-    assert tile.shape[1:] == (
-        tilesize,
-        tilesize,
-    ), f"Wrong shape after interpolation: {tile.shape}"
-    return tile
 
 
 def arr_to_png(

@@ -44,5 +44,6 @@ Utilities to work with geospatial DataArrays produced by stackstac.
 
     mosaic
     reproject_array
+    xyztile_of_array
     array_bounds
     array_epsg

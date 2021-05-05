@@ -223,6 +223,11 @@ def reproject_array(
     Since this both eliminates spatial parallelism, and potentially requires significant amounts of memory,
     `reproject_array` is only recommended on arrays with a relatively small number spatial chunks.
 
+    Warning
+    -------
+    This method is very slow on large arrays due to inefficiencies in generating the dask graphs.
+    Additionally, all spatial chunking is lost.
+
     Parameters
     ----------
     arr:
@@ -303,3 +308,82 @@ def reproject_array(
         kwargs=dict(fill_value=fill_value),
     )
     return result.astype(bool) if as_bool else result
+
+
+def xyztile_of_array(
+    arr: xr.DataArray,
+    x: int,
+    y: int,
+    z: int,
+    interpolation: Literal["linear", "nearest"] = "linear",
+    tilesize: int = 256,
+) -> Optional[xr.DataArray]:
+    """
+    Slice an XYZ tile out of a DataArray. Returns None if the tile does not overlap.
+
+    ``x``, ``y``, and ``z`` should follow the "slippy map" tiling scheme used by
+    `OSM/Google <https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Zoom_levels>`_
+    (the standard scheme for most web maps).
+
+    Requires the ``mercantile`` package (installed automatically with ``'stackstac[viz]'``).
+
+    Warning
+    -------
+    This method is very slow on large arrays due to inefficiencies in generating the dask graphs.
+    (The graphs should compute quickly, but generating and optimizing them is very slow.)
+
+    Parameters
+    ----------
+    arr:
+        DataArray to extract a map tile from. Must have ``x`` and ``y``, and the ``epsg`` coordinate set.
+    x:
+        X index of the tile
+    y:
+        Y index of the tile
+    z:
+        Zoom level of the tile
+    interpolation:
+        Interpolation method to use while reprojecting: ``"linear"`` or ``"nearest"`` (default ``"linear"``).
+        Use ``"linear"`` for continuous data, such as imagery, SAR, DEMs, weather data, etc. Use ``"nearest"``
+        for discrete/categorical data, such as classification maps.
+    tilesize: int
+        The length of the edge of the tile, in pixels.
+
+    Returns
+    -------
+    xarray.DataArray or None:
+        Reprojected slice of ``arr`` corresponding to the tile, or None if ``arr`` didn't overlap the tile.
+    """
+    try:
+        import mercantile
+    except ImportError:
+        raise ImportError(
+            "The mercantile package is required for `xyztile_of_array`. Recommend installing 'stackstac[viz]'."
+        )
+    bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
+
+    if not bounds_overlap(bounds, array_bounds(arr, to_epsg=3857)):
+        return None
+
+    minx, miny, maxx, maxy = bounds
+    # FIXME: `reproject_array` is really, really slow for large arrays
+    # because of all the dask-graph-munging. Having a blocking, GIL-bound
+    # function within an async handler like this also means we're basically
+    # sending requests out serially per tile
+    tile = reproject_array(
+        arr,
+        RasterSpec(
+            epsg=3857,
+            bounds=bounds,
+            resolutions_xy=(
+                (maxx - minx) / tilesize,
+                (maxy - miny) / tilesize,
+            ),
+        ),
+        interpolation=interpolation,
+    )
+    assert tile.shape[1:] == (
+        tilesize,
+        tilesize,
+    ), f"Wrong shape after interpolation: {tile.shape}"
+    return tile

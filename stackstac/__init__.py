@@ -2,10 +2,10 @@ from .rio_env import LayeredEnv
 from .rio_reader import DEFAULT_GDAL_ENV, MULTITHREADED_DRIVER_ALLOWLIST
 from .stack import stack
 from .ops import mosaic
-from .geom_utils import reproject_array, array_bounds, array_epsg
+from .geom_utils import reproject_array, array_bounds, array_epsg, xyztile_of_array
 
 try:
-    from . import show as _show
+    from . import show as _show  # helpful for debugging
     from .show import show, add_to_map, server_stats
 except ImportError:
     import traceback as _traceback
@@ -21,7 +21,7 @@ except ImportError:
             f"The original error was:\n{msg}"
         )
 
-    show = add_to_map = _missing_imports
+    show = add_to_map = server_stats = _missing_imports
 
 
 __all__ = [
@@ -30,9 +30,11 @@ __all__ = [
     "MULTITHREADED_DRIVER_ALLOWLIST",
     "stack",
     "show",
+    "_show",
     "add_to_map",
     "mosaic",
     "reproject_array",
     "array_bounds",
     "array_epsg",
+    "xyztile_of_array",
 ]
