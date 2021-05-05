@@ -62,8 +62,7 @@ pip install stackstac
 
 Windows notes:
 
-It is a good idea to use anaconda to handle installing rasterio on Windows.  There is considerably more pain involved with GDAL-type installations using pip.  
-Then `pip install stackstac`.
+It's a good idea to use `conda` to handle installing rasterio on Windows. There's considerably more pain involved with GDAL-type installations using pip. Then `pip install stackstac`.
 
 ## Things `stackstac` does for you:
 
@@ -72,6 +71,7 @@ Then `pip install stackstac`.
 * Efficiently generate a Dask graph for loading the data in parallel.
 * Mediate between Dask's parallelism and GDAL's aversion to it, allowing for fast, multi-threaded reads when possible, and at least preventing segfaults when not.
 * Mask nodata and rescale by dataset-level scales/offsets.
+* Display data in interactive maps in a notebook, computed on the fly by Dask.
 
 ## Limitations:
 
