@@ -16,9 +16,8 @@ if __name__ == "__main__":
     # TODO single-source the version! this is annoying
     version = subprocess.run(
         "poetry version -s", shell=True, check=True, capture_output=True, text=True
-    ).stdout
-    # deps += [f"stackstac[binder,viz]=={version}"]
-    deps += ["git+https://github.com/gjoseph92/stackstac.git#egg=stackstac[binder,viz]"]
+    ).stdout.strip()
+    deps += [f"stackstac[binder,viz]=={version}"]
 
     examples = Path(__file__).parent.parent / "examples"
     docs = Path(__file__).parent.parent / "docs"
