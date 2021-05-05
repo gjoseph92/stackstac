@@ -75,7 +75,7 @@ nbsphinx_prolog = """
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "insipid"
+html_theme = "furo"
 html_theme_options = {
     "globaltoc_maxdepth": -1,
 }
@@ -87,6 +87,23 @@ html_context = {
 # If False, source links to Bitbucket/Github/GitLab are shown
 html_copy_source = False
 
+# Gotta fight fire with fire. nbsphinx injects their CSS directly into the page...
+# https://github.com/spatialaudio/nbsphinx/blob/master/src/nbsphinx.py#L437-L683
+# so we just inject after it to undo their settings that look bad in dark mode.
+nbsphinx_prolog = """
+.. raw:: html
+
+    <style>
+    @media (prefers-color-scheme: dark) {
+        /* input area */
+        div.nbinput.container div.input_area {
+            border: unset;
+            border-radius: unset;
+        }
+    }
+
+    </style>
+"""
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
