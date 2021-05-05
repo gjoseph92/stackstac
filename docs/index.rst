@@ -34,6 +34,7 @@ Contents
 
    basic
    cluster
+   show
    api/main
    api/internal
 
