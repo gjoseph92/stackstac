@@ -22,7 +22,7 @@ Installation
 
 ``stackstac`` is available on pip::
 
-   pip install stackstac
+   pip install 'stackstac[viz]'
 
 Its main dependencies are rasterio, pyproj, dask, and xarray, all of which should pose no problems to install—no need to build GDAL from source here.
 

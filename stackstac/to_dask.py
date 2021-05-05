@@ -38,6 +38,12 @@ def items_to_dask(
         )
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
 
+    if fill_value is not None and not np.can_cast(fill_value, dtype):
+        raise ValueError(
+            f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
+            f"Either use `dtype={np.array(fill_value).dtype.name!r}`, or pick a different `fill_value`."
+        )
+
     # The overall strategy in this function is to materialize the outer two dimensions (items, assets)
     # as one dask array, then the chunks of the inner two dimensions (y, x) as another dask array, then use
     # Blockwise to represent the cartesian product between them, to avoid materializing that entire graph.
@@ -134,7 +140,10 @@ def asset_entry_to_reader_and_window(
         #     # ^ NOTE: this lock only protects the file cache, not the file itself.
         #     # xarray's file cache is already thread-safe, so using a lock is pointless.
         # ),
-        # NOTE: skip the `CachingFileManager` for now to be sure datasets aren't leaked
+        # NOTE: skip the `CachingFileManager` for now to be sure datasets aren't leaked.
+        # There are a few issues with `CachingFileManager`: faulty ref-counting logic,
+        # and misleading `close` and `lock` interfaces. Either refactor that upstream,
+        # or implement our own caching logic.
         reader(
             url=url,
             spec=spec,

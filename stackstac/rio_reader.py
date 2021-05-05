@@ -282,6 +282,12 @@ class ThreadLocalRioDataset:
         with self._lock:
             self._threadlocal = threading.local()
 
+    def __getstate__(self):
+        raise RuntimeError("Don't pickle me bro!")
+
+    def __setstate__(self, state):
+        raise RuntimeError("Don't un-pickle me bro!")
+
 
 class SelfCleaningDatasetReader(rio.DatasetReader):
     # Unclear if this is even necessary, since `DatasetBase` implements `__dealloc__`,
@@ -324,12 +330,6 @@ class AutoParallelRioReader:
         gdal_env: Optional[LayeredEnv] = None,
         errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
-        if fill_value is not None and not np.can_cast(fill_value, dtype):
-            raise ValueError(
-                f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
-                f"Try using `dtype={np.array(fill_value).dtype.name!r}`."
-            )
-
         self.url = url
         self.spec = spec
         self.resampling = resampling

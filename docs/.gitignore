@@ -1,2 +1,3 @@
 _build/*
 api/internal/*.rst
+api/main/*.rst
