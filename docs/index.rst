@@ -33,8 +33,7 @@ Contents
    :maxdepth: 1
 
    basic
-   cluster
-   show
+   examples/index
    api/main
    api/internal
 

@@ -1,0 +1,2 @@
+.[binder]
+# ^ installs the project using poetry
