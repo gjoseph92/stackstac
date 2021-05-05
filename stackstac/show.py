@@ -42,18 +42,9 @@ from .raster_spec import RasterSpec
 Range = Tuple[float, float]
 
 PORT = 8000
-routes = web.RouteTableDef()
-
-# TODO figure out weakref situation.
-# We don't want to be the only ones holding onto a persisted Dask collection;
-# this would make it impossible for users to release a persisted collection from distributed memory.
-# However, just holding onto weakrefs can cause other issues: it's common to display an ephemeral
-# result like `.show(x + 1)`; if the value is dropped from our lookup dict immediately,
-# then the HTTP requests to render tiles will 404.
-# For now, we're calling future-leaking a future problem, and storing everything in a normal dict
-# until what we want from the visualization API is more fleshed out.
-
-# arrs: weakref.WeakValueDictionary[str, xr.DataArray] = weakref.WeakValueDictionary()
+CACHE_SIZE = 512
+DEBUG_SHOW = False
+DEBUG_INTERVAL = 0.5
 
 
 class Displayable(NamedTuple):
@@ -191,7 +182,8 @@ class TileManager:
         token: str,
         name: str,
         loop: asyncio.AbstractEventLoop,
-        cache_size=512,
+        cache_size=CACHE_SIZE,
+        debug: bool = DEBUG_SHOW,
     ):
         self.disp = disp
         self.token = token
@@ -200,6 +192,43 @@ class TileManager:
             Tuple[int, int, int], TileManager.TileRef
         ] = cachetools.LRUCache(maxsize=cache_size)
         self.stats = ServerStats(name=name)
+
+        if debug:
+            self.debug_layer = ipyleaflet.GeoJSON(
+                data=dict(type="FeatureCollection", features=[]),
+                style_callback=lambda feature: dict(
+                    color="yellow" if feature["properties"]["speculative"] else "blue",
+                    fillColor="black"
+                    if feature["properties"]["cancelled"]
+                    else "green"
+                    if feature["properties"]["done"]
+                    else "orange",
+                ),
+            )
+            self._debugger_handle = loop.call_soon_threadsafe(
+                loop.create_task, self._update_debug_layer()
+            )
+        else:
+            self._debugger_handle = None
+
+    async def _update_debug_layer(self, interval: float = DEBUG_INTERVAL) -> None:
+        "Update a GeoJSON layer showing all the tiles we know about and their status"
+        while True:
+            self.debug_layer.data = dict(
+                type="FeatureCollection",
+                features=[
+                    mercantile.feature(
+                        xyz,
+                        props=dict(
+                            speculative=ref.speculative,
+                            done=ref.task.done(),
+                            cancelled=ref.task.cancelled(),
+                        ),
+                    )
+                    for xyz, ref in self.tiles.items()
+                ],
+            )
+            await asyncio.sleep(interval)
 
     def url(self, base_url: str) -> str:
         """
@@ -332,9 +361,9 @@ class TileManager:
             checkerboard=disp.checkerboard,
         )
 
-        self.stats.computing += 1
         future = client.compute(delayed_png, sync=False)
         future = cast(distributed.Future, future)
+        self.stats.computing += 1
 
         awaitable = future if client.asynchronous else future._result()
         # ^ sneak into the async api if the client isn't set up to be async.
@@ -374,10 +403,24 @@ class TileManager:
         return hash(self.token)
 
     def __del__(self):
+        if self._debugger_handle:
+            self._debugger_handle.cancel()
         self.cancel_all()
 
 
+# Add-to-map functions
+######################
+
 TOKEN_TO_TILE_MANAGER: Dict[str, TileManager] = {}
+
+# TODO figure out weakref situation.
+# We don't want to be the only ones holding onto a persisted Dask collection;
+# this would make it impossible for users to release a persisted collection from distributed memory.
+# However, just holding onto weakrefs can cause other issues: it's common to display an ephemeral
+# result like `.show(x + 1)`; if the value is dropped from our lookup dict immediately,
+# then the HTTP requests to render tiles will 404.
+# For now, we're calling future-leaking a future problem, and storing everything in a normal dict
+# until what we want from the visualization API is more fleshed out.
 
 
 def register(
@@ -389,6 +432,7 @@ def register(
     checkerboard: bool = True,
     tilesize: int = 256,
     interpolation: Literal["linear", "nearest"] = "linear",
+    debug: bool = DEBUG_SHOW,
 ):
     """
     Low-level method to register a `DataArray` for display on a web map, and spin up the HTTP server if necessary.
@@ -466,12 +510,14 @@ def register(
     manager = TOKEN_TO_TILE_MANAGER.get(token, None)
     if manager is None:
         manager = TOKEN_TO_TILE_MANAGER[token] = TileManager(
-            disp, token, layer.name, loop
+            disp, token, layer.name, loop, debug=debug
         )
 
     MapObserver.set_up_for_map(map, layer, manager)
     _update_server_stats_children()
-    # TODO some way to unregister (this is hard because we may have modified `arr` in `register`)
+
+    if debug:
+        map.add_layer(manager.debug_layer)
 
 
 class MapObserver:
@@ -776,6 +822,12 @@ def show(
     return map_
 
 
+# HTTP Server
+#############
+
+routes = web.RouteTableDef()
+
+
 def ensure_server() -> asyncio.AbstractEventLoop:
     "Ensure the webserver is running, and return the event loop for it"
     if ensure_server._loop is None:
@@ -843,6 +895,10 @@ async def handler(request: web.Request) -> web.Response:
         content_type="image/png",
         headers={"Access-Control-Allow-Origin": "*"},
     )
+
+
+# Array to tile
+###############
 
 
 def xyztile_of_array(
