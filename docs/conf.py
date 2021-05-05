@@ -50,25 +50,6 @@ napoleon_use_param = True
 # set_type_checking_flag = True
 default_role = "py:obj"
 
-nbsphinx_prolog = """
-{% set docname = env.doc2path(env.docname, base=False) %}
-.. note::
-    You can view & download the original notebook
-    `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{ docname }}>`_.
-"""
-
-# TODO enable binder once Coiled supports websocket clusters over 443.
-# (Binder blocks outbound traffic on all ports besides 22, 80, and 443, so we can't connect to Coiled on 8786.)
-# nbsphinx_prolog = """
-# {% set docname = env.doc2path(env.docname, base=False) %}
-# .. note::
-#     You can run this notebook interactively here: |Binder|, or view & download the original
-#     `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{ docname }}>`_.
-
-# .. |Binder| image:: https://mybinder.org/badge_logo.svg
-#    :target: https://mybinder.org/v2/gh/gjoseph92/stackstac/main?urlpath=lab/tree/docs/{{ docname }}
-# """
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -86,6 +67,8 @@ html_context = {
 }
 # If False, source links to Bitbucket/Github/GitLab are shown
 html_copy_source = False
+# Don't suffix .ipynbs with .txt
+html_sourcelink_suffix = ""
 
 # Gotta fight fire with fire. nbsphinx injects their CSS directly into the page...
 # https://github.com/spatialaudio/nbsphinx/blob/master/src/nbsphinx.py#L437-L683
@@ -103,7 +86,27 @@ nbsphinx_prolog = """
     }
 
     </style>
+
+{% set docname = env.doc2path(env.docname, base=False) %}
+.. note::
+    You can view & download the original notebook
+    `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{
+        "../" + docname if docname.startswith("examples") else docname
+    }}>`_.
 """
+
+# TODO enable binder once Coiled supports websocket clusters over 443.
+# (Binder blocks outbound traffic on all ports besides 22, 80, and 443, so we can't connect to Coiled on 8786.)
+# nbsphinx_prolog = """
+# {% set docname = env.doc2path(env.docname, base=False) %}
+# .. note::
+#     You can run this notebook interactively here: |Binder|, or view & download the original
+#     `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{ docname }}>`_.
+
+# .. |Binder| image:: https://mybinder.org/badge_logo.svg
+#    :target: https://mybinder.org/v2/gh/gjoseph92/stackstac/main?urlpath=lab/tree/docs/{{ docname }}
+# """
+
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
