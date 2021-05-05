@@ -694,17 +694,6 @@ def add_to_map(
         for discrete/categorical data, such as classification maps.
 
 
-    Note
-    ----
-    Why do the tiles seem to show up in batches, and why does it take along time for all the batches to load?
-
-    Unfortunately, this is a web browser limitation, and there's not much stackstac can do about it.
-    Each 256x256 tile visible on the map consumes one connection, and Web browsers only allow
-    a fixed number of connections to be open at once (for example, 6 per host in Chrome).
-    It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
-    only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles,
-    and causes the "bunching" effect.
-
     Returns
     -------
     ipyleaflet.Layer:
@@ -786,17 +775,6 @@ def show(
         Use ``"linear"`` for continuous data, such as imagery, SAR, DEMs, weather data, etc. Use ``"nearest"``
         for discrete/categorical data, such as classification maps.
 
-    Note
-    ----
-    Why do the tiles seem to show up in batches, and why does it take along time for all the batches to load?
-
-    Unfortunately, this is a web browser limitation, and there's not much stackstac can do about it.
-    Each 256x256 tile visible on the map consumes one connection, and Web browsers only allow
-    a fixed number of connections to be open at once (for example, 6 per host in Chrome).
-    It's the browser requesting a tile that causes dask to start computing it, so in Chrome's case,
-    only 6 tiles can ever be computing at once. This limits dask's parallelism in computing tiles,
-    and causes the "bunching" effect.
-
     Returns
     -------
     ipyleaflet.Map:
@@ -821,7 +799,11 @@ def show(
 
             # derived from https://wiki.openstreetmap.org/wiki/Zoom_levels
             zoom = math.log2(
-                (earth_circumference_m * math.cos(math.radians(lat)) * target_map_size_px)
+                (
+                    earth_circumference_m
+                    * math.cos(math.radians(lat))
+                    * target_map_size_px
+                )
                 / (tilesize_px * size_m)
             )
             zoom = math.ceil(zoom)
