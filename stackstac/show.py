@@ -391,17 +391,13 @@ class TileManager:
                 # We're already cleaning up, so ignore cancellation here.
                 pass
 
-            # future.release()
-            # ^ We can still hold a reference to a Future after it's cancelled?
-            # And occasionally data will stay in distributed memory in that case?
-
             raise
         finally:
             future.release()
             self.stats.computing -= 1
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} token={self.token!r} {len(self.tiles)} active tiles>"
+        return f"<{type(self).__name__} token={self.token!r} {len(self.tiles)} cached tiles>"
 
     def __hash__(self):
         return hash(self.token)
