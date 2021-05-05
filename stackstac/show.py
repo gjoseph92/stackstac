@@ -2,6 +2,7 @@ from __future__ import annotations
 from asyncio.tasks import Task
 from dataclasses import dataclass
 import re
+import errno
 
 from typing import (
     Awaitable,
@@ -360,6 +361,9 @@ class TileManager:
             checkerboard=disp.checkerboard,
         )
 
+        # TODO `compute` returns before the message has actually been sent,
+        # which throws off our `stats.computing` metric. Would be nice to know
+        # when the scheduler has actually received the message.
         future = client.compute(delayed_png, sync=False)
         future = cast(distributed.Future, future)
         self.stats.computing += 1
@@ -387,12 +391,13 @@ class TileManager:
                 # We're already cleaning up, so ignore cancellation here.
                 pass
 
-            future.release()
+            # future.release()
             # ^ We can still hold a reference to a Future after it's cancelled?
             # And occasionally data will stay in distributed memory in that case?
 
             raise
         finally:
+            future.release()
             self.stats.computing -= 1
 
     def __repr__(self) -> str:
@@ -844,13 +849,24 @@ def _launch_server() -> asyncio.AbstractEventLoop:
     app.add_routes(routes)
 
     async def run():
+        global PORT
         runner = web.AppRunner(app, logger=logging.getLogger("root"))
         # ^ NOTE: logs only seem to show up in Jupyter if we use the root logger, AND
         # set the log level in the JupyterLab UI to `info` or `debug`. This makes no sense.
         try:
             await runner.setup()
-            site = web.TCPSite(runner, "localhost", PORT)
-            await site.start()
+
+            while True:
+                try:
+                    site = web.TCPSite(runner, "localhost", PORT)
+                    await site.start()
+                except OSError as e:
+                    if e.errno != errno.EADDRINUSE:
+                        raise
+                    logging.info(f"Port {PORT} already in use; trying {PORT+1}")
+                    PORT += 1
+                else:
+                    break
 
             while True:
                 await asyncio.sleep(3600)  # sleep forever
