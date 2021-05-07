@@ -650,7 +650,7 @@ test = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
 name = "geogif"
-version = "0.1.0"
+version = "0.1.1"
 description = "Render xarray timestacks into GIFs"
 category = "main"
 optional = true
@@ -661,10 +661,10 @@ dask = {version = ">=2021.4.1,<2022.0.0", extras = ["delayed"]}
 matplotlib = ">=3.4.1,<4.0.0"
 numpy = ">=1.20.2,<2.0.0"
 Pillow = ">=8.2.0,<9.0.0"
-xarray = ">=0.17.0,<0.18.0"
+xarray = ">=0.18,<1"
 
 [package.extras]
-docs = ["Sphinx (>=3.5.4,<4.0.0)", "coiled (>=0.0.38,<0.0.39)", "distributed (>=2021.4.1,<2022.0.0)", "furo (>=2021.4.11-beta.34,<2022.0.0)", "ipython (>=7.23.0,<8.0.0)", "nbsphinx (>=0.8.4,<0.9.0)", "numpydoc (>=1.1.0,<2.0.0)", "pandoc (>=1.0.2,<2.0.0)", "pystac-client (>=0.1.1,<0.2.0)", "sphinx-autodoc-typehints (>=1.12.0,<2.0.0)", "stackstac (>=0.1.1,<0.2.0)"]
+docs = ["Sphinx (>=3.5.4,<4.0.0)", "coiled (>=0,<1)", "distributed (>=2021.4.1,<2022.0.0)", "furo (>=2021.4.11-beta.34,<2022.0.0)", "ipython (>=7.23.0,<8.0.0)", "nbsphinx (>=0.8.4,<0.9.0)", "numpydoc (>=1.1.0,<2.0.0)", "pandoc (>=1.0.2,<2.0.0)", "pystac-client (>=0,<1)", "sphinx-autodoc-typehints (>=1.12.0,<2.0.0)", "stackstac (>=0,<1)"]
 test = ["hypothesis (>=6.10.1,<7.0.0)", "ipython (>=7.23.0,<8.0.0)", "pytest (>=6.2.3,<7.0.0)"]
 
 [[package]]
@@ -1521,7 +1521,7 @@ testing = ["nose", "coverage"]
 
 [[package]]
 name = "planetary-computer"
-version = "0.1.0"
+version = "0.2.2"
 description = "Planetary Computer SDK for Python"
 category = "main"
 optional = true
@@ -2388,15 +2388,15 @@ python-versions = "*"
 
 [[package]]
 name = "xarray"
-version = "0.17.0"
+version = "0.18.0"
 description = "N-D labeled arrays and datasets in Python"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
-numpy = ">=1.15"
-pandas = ">=0.25"
+numpy = ">=1.17"
+pandas = ">=1.0"
 
 [package.extras]
 accel = ["scipy", "bottleneck", "numbagg"]
@@ -2449,7 +2449,7 @@ viz = ["aiohttp", "cachetools", "distributed", "ipyleaflet", "matplotlib", "merc
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "e7d999160b11f1038c869dbe6a1a80d050f32d77d519c6049066b6827b2bdf7c"
+content-hash = "fed52c4264cc3328373b80e8da56ae18e3609a5ad09b2ade1c10c0d7ebd9d284"
 
 [metadata.files]
 affine = [
@@ -2841,8 +2841,8 @@ furo = [
     {file = "furo-2021.4.11b34.tar.gz", hash = "sha256:3d88e2855949cecf5f562e8a28cab1a6d3355d82f3cf5796eddf9ec234e97519"},
 ]
 geogif = [
-    {file = "geogif-0.1.0-py3-none-any.whl", hash = "sha256:d89f332777991f6636b0a0f06a425131ce7b4dff2e1901ee15256d438a567f22"},
-    {file = "geogif-0.1.0.tar.gz", hash = "sha256:bc6b0671dce0bc2487786dcd5ef14ab621c90566b048b75fccaca8b246480173"},
+    {file = "geogif-0.1.1-py3-none-any.whl", hash = "sha256:5f72ca2a0877fd2119adec84047efcb1b776740793779fd0351082aa8720bd77"},
+    {file = "geogif-0.1.1.tar.gz", hash = "sha256:03809403f261baff2a125e1254861e4ed864b25d98289e7523a35141a2d19089"},
 ]
 graphviz = [
     {file = "graphviz-0.16-py2.py3-none-any.whl", hash = "sha256:3cad5517c961090dfc679df6402a57de62d97703e2880a1a46147bb0dc1639eb"},
@@ -3319,8 +3319,8 @@ pkginfo = [
     {file = "pkginfo-1.7.0.tar.gz", hash = "sha256:029a70cb45c6171c329dfc890cde0879f8c52d6f3922794796e06f577bb03db4"},
 ]
 planetary-computer = [
-    {file = "planetary-computer-0.1.0.tar.gz", hash = "sha256:a451b9dfd266d077e7a64a164b73d761f6a1d8bc5b63f413f8ceb35b33507a71"},
-    {file = "planetary_computer-0.1.0-py3-none-any.whl", hash = "sha256:c208d40072eaea9b8f10f1e34a189984d074e8d120465046b8e01e4c0bde7c02"},
+    {file = "planetary-computer-0.2.2.tar.gz", hash = "sha256:f39ba7183fd2c7d48764637948f5b142b18c6793ea80779b2573cc9cd9b04f0d"},
+    {file = "planetary_computer-0.2.2-py3-none-any.whl", hash = "sha256:f15420e5d3b1f96d73723c6c5e8dba87fe16678a1c34bbdd646e55d847dbedb4"},
 ]
 ply = [
     {file = "ply-3.11-py2.py3-none-any.whl", hash = "sha256:096f9b8350b65ebd2fd1346b12452efe5b9607f7482813ffca50c22722a807ce"},
@@ -3887,8 +3887,8 @@ wrapt = [
     {file = "wrapt-1.12.1.tar.gz", hash = "sha256:b62ffa81fb85f4332a4f609cab4ac40709470da05643a082ec1eb88e6d9b97d7"},
 ]
 xarray = [
-    {file = "xarray-0.17.0-py3-none-any.whl", hash = "sha256:ce204fb5015c3d382036f7c065c927df5684276976810aef43d78908c3ceb440"},
-    {file = "xarray-0.17.0.tar.gz", hash = "sha256:9c2edad2a4e588f9117c666a4249920b9717fb75703b96998cf65fcd4f60551f"},
+    {file = "xarray-0.18.0-py3-none-any.whl", hash = "sha256:c5b665d18fabb4071312619e975094a20a0f280d45fbf6a7a403634cdc33ccef"},
+    {file = "xarray-0.18.0.tar.gz", hash = "sha256:c0b0d24ee43db2bec14a95503266c81181586174004d1b60860c1091e4f74ac8"},
 ]
 yarl = [
     {file = "yarl-1.6.3-cp36-cp36m-macosx_10_14_x86_64.whl", hash = "sha256:0355a701b3998dcd832d0dc47cc5dedf3874f966ac7f870e0f3a6788d802d434"},
