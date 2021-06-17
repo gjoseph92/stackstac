@@ -21,7 +21,7 @@ def bounds_from_affine(
     ul_x, ul_y = af * (0, 0)
     ll_x, ll_y = af * (0, ysize)
     lr_x, lr_y = af * (xsize, ysize)
-    ur_x, ur_y = af * (0, xsize)
+    ur_x, ur_y = af * (xsize, 0)
 
     xs = [ul_x, ll_x, lr_x, ur_x]
     ys = [ul_y, ll_y, lr_y, ur_y]
