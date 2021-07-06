@@ -45,6 +45,12 @@ except ImportError:
         def get_all_items(self) -> Iterator[PystacItem]:
             ...
 
+# pystac 1.0
+try:
+    from pystac import ItemCollection as PystacItemCollection
+except ImportError:
+    class PystacItemCollection:
+        features: List[PystacItem]
 
 try:
     from pystac_client import ItemCollection as PystacClientItemCollection
@@ -113,7 +119,7 @@ ItemSequence = Sequence[ItemDict]
 
 ItemIsh = Union[SatstacItem, PystacItem, ItemDict]
 ItemCollectionIsh = Union[
-    SatstacItemCollection, PystacCatalog, PystacClientItemCollection, ItemSequence
+    SatstacItemCollection, PystacCatalog, PystacClientItemCollection, PystacItemCollection, ItemSequence
 ]
 
 
@@ -153,7 +159,7 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     if isinstance(items, PystacCatalog):
         return [item.to_dict() for item in items.get_all_items()]
 
-    if isinstance(items, PystacClientItemCollection):
+    if isinstance(items, (PystacItemCollection, PystacClientItemCollection)):
         return [item.to_dict() for item in items.features]
 
     raise TypeError(f"Unrecognized STAC collection type {type(items)}: {items!r}")
