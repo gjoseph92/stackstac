@@ -52,13 +52,6 @@ except ImportError:
     class PystacItemCollection:
         features: List[PystacItem]
 
-try:
-    from pystac_client import ItemCollection as PystacClientItemCollection
-except ImportError:
-
-    class PystacClientItemCollection:
-        features: List[PystacItem]
-
 
 class EOBand(TypedDict, total=False):
     name: str
@@ -119,7 +112,7 @@ ItemSequence = Sequence[ItemDict]
 
 ItemIsh = Union[SatstacItem, PystacItem, ItemDict]
 ItemCollectionIsh = Union[
-    SatstacItemCollection, PystacCatalog, PystacClientItemCollection, PystacItemCollection, ItemSequence
+    SatstacItemCollection, PystacCatalog, PystacItemCollection, ItemSequence
 ]
 
 
@@ -128,7 +121,7 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     Convert something like a collection/Catalog of STAC items into a list of plain dicts
 
     Currently works on ``satstac.ItemCollection``, ``pystac.Catalog`` (inefficiently),
-    ``pystac_client.ItemCollection`` (inefficiently), and plain Python lists-of-dicts.
+    ``pystac.ItemCollection`` (inefficiently), and plain Python lists-of-dicts.
     """
 
     if isinstance(items, dict):
@@ -158,8 +151,8 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     # which can handle each object type, preventing the need for this sort of copying.
     if isinstance(items, PystacCatalog):
         return [item.to_dict() for item in items.get_all_items()]
-
-    if isinstance(items, (PystacItemCollection, PystacClientItemCollection)):
-        return [item.to_dict() for item in items.features]
-
+    
+    if isinstance(items, PystacItemCollection):
+        return [item.to_dict() for item in items]
+    
     raise TypeError(f"Unrecognized STAC collection type {type(items)}: {items!r}")
