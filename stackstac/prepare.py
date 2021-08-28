@@ -15,6 +15,7 @@ from typing import (
     Any,
     cast,
 )
+import warnings
 
 
 import affine
@@ -90,6 +91,18 @@ def prepare_items(
             id: [Mimetype.from_str(t) for t in types if t is not None]
             for id, types in type_strs_by_id.items()
         }
+
+        ids_without_type = [
+            id for id, mimetypes in mimetypes_by_id.items() if not mimetypes
+        ]
+        if ids_without_type:
+            warnings.warn(
+                f"You're filtering for assets that match the mimetype(s) {assets}, but since {len(ids_without_type)} "
+                f"(out of {len(type_strs_by_id)}) asset(s) have no `type` specified on any item, those will be "
+                "dropped. Consider passing a list of asset IDs instead to the `assets=` parameter.\n"
+                f"Assets with no type: {ids_without_type}",
+            )
+
         asset_ids = [
             asset_id
             for asset_id, asset_mimetypes in mimetypes_by_id.items()
