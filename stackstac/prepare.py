@@ -81,19 +81,20 @@ def prepare_items(
         asset_ids = list(max((item["assets"] for item in items), key=len))
     elif isinstance(assets, AbstractSet):
         allowed_mimetypes = [Mimetype.from_str(t) for t in assets]
-        type_strs_by_id = collections.defaultdict(set)
+        type_strs_by_id: dict[str, set[Optional[str]]] = collections.defaultdict(set)
         for item in items:
             for asset_id, asset in item["assets"].items():
                 type_strs_by_id[asset_id].add(asset.get("type"))
 
         mimetypes_by_id = {
-            id: [Mimetype.from_str(t) for t in types]
+            id: [Mimetype.from_str(t) for t in types if t is not None]
             for id, types in type_strs_by_id.items()
         }
         asset_ids = [
             asset_id
             for asset_id, asset_mimetypes in mimetypes_by_id.items()
-            if all(
+            if asset_mimetypes
+            and all(
                 any(
                     asset_mt.is_valid_for(allowed_mt)
                     for allowed_mt in allowed_mimetypes
@@ -110,6 +111,8 @@ def prepare_items(
 
     if len(items) == 0:
         raise ValueError("No items")
+    if len(asset_ids) == 0:
+        raise ValueError("Zero asset IDs requested")
 
     for item_i, item in enumerate(items):
         item_epsg = item["properties"].get("proj:epsg")

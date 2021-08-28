@@ -109,6 +109,7 @@ def stack(
         on others, then ``B1`` will not be included. Mimetypes structure is respected, so
         ``image/tiff`` will also match ``image/tiff; application=geotiff``; ``image`` will match
         ``image/tiff`` and ``image/jp2``, etc. See the `STAC common media types <MT>`_ for ideas.
+        Assets which don't have ``type`` specified on any item will be dropped in this case.
 
         Note: each asset's data must contain exactly one band. Multi-band assets (like an RGB GeoTIFF)
         are not yet supported.
