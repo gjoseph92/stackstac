@@ -35,7 +35,7 @@ async def create_software_environment_quiet(
 
 async def make_coiled_stuff(
     deps: List[str],
-    regions: List[str],
+    region: str,
     name: str,
 ) -> None:
     examples = Path(__file__).parent.parent / "examples"
@@ -54,18 +54,18 @@ async def make_coiled_stuff(
                     name=name_software,
                     container="coiled/notebook:latest",
                     pip=deps,
+                    backend_options={"region": region},
                 )
             )
 
-            for region in regions:
-                tg.create_task(
-                    create_software_environment_quiet(
-                        cloud,
-                        name=name,
-                        pip=deps,
-                        backend_options={"region": region},
-                    )
+            tg.create_task(
+                create_software_environment_quiet(
+                    cloud,
+                    name=name,
+                    pip=deps,
+                    backend_options={"region": region},
                 )
+            )
 
         # Create job configuration for notebook
         await cloud.create_job_configuration(
@@ -111,6 +111,4 @@ if __name__ == "__main__":
         stackstac_dep = f"stackstac[binder,viz]=={version}"
     deps += [stackstac_dep]
 
-    asyncio.run(
-        make_coiled_stuff(deps, regions=["us-west-2", "eu-central-1"], name=name)
-    )
+    asyncio.run(make_coiled_stuff(deps, region="us-west-2", name=name))
