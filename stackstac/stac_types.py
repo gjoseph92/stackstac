@@ -45,12 +45,17 @@ except ImportError:
         def get_all_items(self) -> Iterator[PystacItem]:
             ...
 
+
 # pystac 1.0
 try:
     from pystac import ItemCollection as PystacItemCollection
 except ImportError:
+
     class PystacItemCollection:
         features: List[PystacItem]
+
+        def __iter__(self) -> Iterator[PystacItem]:
+            ...
 
 
 class EOBand(TypedDict, total=False):
@@ -151,8 +156,8 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     # which can handle each object type, preventing the need for this sort of copying.
     if isinstance(items, PystacCatalog):
         return [item.to_dict() for item in items.get_all_items()]
-    
+
     if isinstance(items, PystacItemCollection):
         return [item.to_dict() for item in items]
-    
+
     raise TypeError(f"Unrecognized STAC collection type {type(items)}: {items!r}")
