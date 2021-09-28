@@ -48,7 +48,6 @@ def log_event(topic: str, msg: dict) -> None:
 # Default GDAL configuration options
 DEFAULT_GDAL_ENV = LayeredEnv(
     always=dict(
-        CPL_VSIL_CURL_ALLOWED_EXTENSIONS="tif,tiff",  # don't really know what this does. may not be necessary/desireable
         GDAL_HTTP_MULTIRANGE="YES",  # unclear if this actually works
         GDAL_HTTP_MERGE_CONSECUTIVE_RANGES="YES",
         # ^ unclear if this works either. won't do much when our dask chunks are aligned to the dataset's chunks.
