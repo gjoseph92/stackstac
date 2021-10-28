@@ -8,12 +8,10 @@ For more information and examples, please [see the documentation](https://stacks
 
 ```python
 import stackstac
-import pystac_client
+import satsearch
 
-URL = "https://earth-search.aws.element84.com/v0"
-catalog = pystac_client.Client.open(URL)
-
-stac_items = catalog.Search(
+stac_items = satsearch.Search(
+    url="https://earth-search.aws.element84.com/v0",
     intersects=dict(type="Point", coordinates=[-105.78, 35.79]),
     collections=["sentinel-s2-l2a-cogs"],
     datetime="2020-04-01/2020-05-01"
