@@ -33,9 +33,9 @@ class Reader(Pickleable, Protocol):
         spec: RasterSpec,
         resampling: Resampling,
         dtype: np.dtype,
-        fill_value: Optional[Union[int, float]] = np.nan,
-        rescale: bool = True,
-        gdal_env: Optional[LayeredEnv] = None,
+        fill_value: Optional[Union[int, float]],
+        rescale: bool,
+        gdal_env: Optional[LayeredEnv],
         errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
         """
