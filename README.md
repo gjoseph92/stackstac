@@ -8,35 +8,37 @@ For more information and examples, please [see the documentation](https://stacks
 
 ```python
 import stackstac
-import satsearch
+import pystac_client
 
-stac_items = satsearch.Search(
-    url="https://earth-search.aws.element84.com/v0",
+URL = "https://earth-search.aws.element84.com/v0"
+catalog = pystac_client.Client.open(URL)
+
+stac_items = catalog.search(
     intersects=dict(type="Point", coordinates=[-105.78, 35.79]),
     collections=["sentinel-s2-l2a-cogs"],
     datetime="2020-04-01/2020-05-01"
-).items()
+).get_all_items()
 
 stack = stackstac.stack(stac_items)
 print(stack)
 ```
 ```
-<xarray.DataArray 'stackstac-f350f6bfc3213d7eee2e6cb159246d88' (time: 13, band: 17, y: 10980, x: 10980)>
+<xarray.DataArray 'stackstac-fefccf3d6b2f9922dc658c114e79865b' (time: 13, band: 17, y: 10980, x: 10980)>
 dask.array<fetch_raster_window, shape=(13, 17, 10980, 10980), dtype=float64, chunksize=(1, 1, 1024, 1024), chunktype=numpy.ndarray>
-Coordinates: (12/23)
+Coordinates: (12/24)
   * time                        (time) datetime64[ns] 2020-04-01T18:04:04 ......
     id                          (time) <U24 'S2B_13SDV_20200401_0_L2A' ... 'S...
   * band                        (band) <U8 'overview' 'visual' ... 'WVP' 'SCL'
   * x                           (x) float64 4e+05 4e+05 ... 5.097e+05 5.098e+05
   * y                           (y) float64 4e+06 4e+06 ... 3.89e+06 3.89e+06
-    eo:cloud_cover              (time) float64 29.24 1.16 27.26 ... 87.33 5.41
+    view:off_nadir              int64 0
     ...                          ...
-    data_coverage               (time) object 33.85 100 33.9 ... 32.84 100 34.29
-    platform                    (time) <U11 'sentinel-2b' ... 'sentinel-2b'
+    instruments                 <U3 'msi'
+    created                     (time) <U24 '2020-09-05T06:23:47.836Z' ... '2...
     sentinel:sequence           <U1 '0'
-    proj:epsg                   int64 32613
-    sentinel:data_coverage      (time) float64 33.85 100.0 33.9 ... 100.0 34.29
+    sentinel:grid_square        <U2 'DV'
     title                       (band) object None ... 'Scene Classification ...
+    epsg                        int64 32613
 Attributes:
     spec:        RasterSpec(epsg=32613, bounds=(399960.0, 3890220.0, 509760.0...
     crs:         epsg:32613
