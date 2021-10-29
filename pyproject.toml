@@ -44,7 +44,6 @@ xarray = ">=0.18,<1"
 
 [tool.poetry.dev-dependencies]
 Pympler = "^0.9"
-aiotools = "^1.2.1"
 awkward = {version = "^1.1.2"}
 black = "^21.4b2"
 debugpy = "^1.2.1"
