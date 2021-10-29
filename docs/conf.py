@@ -114,12 +114,6 @@ nbsphinx_prolog = f"""
     }}
 """
 
-# TODO enable binder once Coiled supports websocket clusters over 443.
-# (Binder blocks outbound traffic on all ports besides 22, 80, and 443, so we can't connect to Coiled on 8786.)
-# nbsphinx_prolog = """
-# {% set docname = env.doc2path(env.docname, base=False) %}
-# """
-
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

@@ -5,7 +5,6 @@ and upload all notebook files into a Coiled notebook (aka Job).
 Pass --dev to build off the latest commit on `origin/main` instead.
 """
 
-import io
 import subprocess
 import sys
 import warnings
@@ -42,15 +41,9 @@ if __name__ == "__main__":
         stackstac_dep = f"stackstac[binder,viz]=={version}"
     deps += [stackstac_dep]
 
-    log = io.StringIO()
-    try:
-        coiled.create_software_environment(
-            name=name, pip=deps, backend_options={"region": "us-west-2"}, log_output=log
-        )
-    except Exception:
-        print(
-            f"Error creating software environment:\n{log.getvalue()}",
-            file=sys.stderr,
-        )
-        raise
-    print(f"Built software environment for {stackstac_dep}")
+    coiled.create_software_environment(
+        name=name,
+        conda=["python=3.8"],
+        pip=deps,
+        backend_options={"region": "us-west-2"},
+    )
