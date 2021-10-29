@@ -23,6 +23,13 @@ except ImportError:
 
     show = add_to_map = server_stats = _missing_imports
 
+# Single-source version from pyproject.toml: https://github.com/python-poetry/poetry/issues/273#issuecomment-769269759
+# Note that this will be incorrect for local installs
+import importlib.metadata
+
+__version__ = importlib.metadata.version("stackstac")
+del importlib
+
 
 __all__ = [
     "LayeredEnv",
@@ -37,4 +44,5 @@ __all__ = [
     "array_bounds",
     "array_epsg",
     "xyztile_of_array",
+    "__version__",
 ]
