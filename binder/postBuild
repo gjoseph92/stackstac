@@ -1,0 +1,4 @@
+
+set -ex
+
+poetry install -E binder -E viz
