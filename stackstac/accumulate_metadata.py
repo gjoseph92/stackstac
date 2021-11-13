@@ -63,8 +63,9 @@ def accumulate_metadata(
     """
     if isinstance(fields, str):
         fields = (fields,)
-
+    
     all_fields: Dict[str, Any] = {}
+    
     i = 0
     for i, item in enumerate(items):
         for existing_field in all_fields.keys():
@@ -89,7 +90,7 @@ def accumulate_metadata(
                     # start a new list collecting them, including Nones at the front
                     # for however many items were missing the field.
                     all_fields[existing_field] = _ourlist(
-                        [None] * (i - 1) + [existing_value, value]
+                        [value] * (i - 1) + [existing_value, value]
                     )
 
         if fields is True:
@@ -147,8 +148,13 @@ def dict_to_coords(metadata: Dict[str, Any], dim_name: str) -> Dict[str, xr.Vari
             except TypeError:
                 # if it's not set-able, just give up
                 break
-
-        props_arr = np.squeeze(np.array(props))
+                
+        # Avoid DeprecationWarning: (list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes)
+        if isinstance(props, _ourlist) and isinstance(props[0], (list,tuple)):
+            props_arr = np.squeeze(np.array(props, dtype='object'))
+        else:
+            props_arr = np.squeeze(np.array(props))
+        
         if (
             props_arr.ndim > 1
             or props_arr.ndim == 1
