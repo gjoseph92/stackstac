@@ -90,7 +90,7 @@ def accumulate_metadata(
                     # start a new list collecting them, including Nones at the front
                     # for however many items were missing the field.
                     all_fields[existing_field] = _ourlist(
-                        [value] * (i - 1) + [existing_value, value]
+                        [existing_value] * (i - 1) + [existing_value, value]
                     )
 
         if fields is True:
