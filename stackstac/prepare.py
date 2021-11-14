@@ -475,13 +475,9 @@ def to_coords(
 
     if band_coords:
         flattened_metadata_by_asset = [
-            accumulate_metadata.accumulate_metadata(
+            accumulate_metadata.accumulate_metadata_only_allsame(
                 (item["assets"].get(asset_id, {}) for item in items),
                 skip_fields={"href", "type", "roles"},
-                only_allsame="ignore-missing",
-                # ^ NOTE: we `ignore-missing` because I've observed some STAC collections
-                # missing `eo:bands` on some items.
-                # xref https://github.com/sat-utils/sat-api/issues/229
             )
             for asset_id in asset_ids
         ]
@@ -512,7 +508,7 @@ def to_coords(
                 # skip_fields={"href", "title", "description", "type", "roles"},
             )
         )
-        if any(d for d in eo_by_asset):
+        if any(eo_by_asset):
             coords.update(
                 accumulate_metadata.metadata_to_coords(
                     eo_by_asset,
