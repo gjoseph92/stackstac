@@ -1,12 +1,13 @@
 from typing import (
-    Any,
     Container,
     Dict,
+    Hashable,
     Iterable,
     Literal,
     Mapping,
     Sequence,
     Union,
+    TypeVar,
 )
 
 import numpy as np
@@ -20,22 +21,29 @@ class _ourlist(list):
 
 
 def metadata_to_coords(
-    items: Iterable[Mapping[str, Any]],
+    items: Iterable[Mapping[str, object]],
     dim_name: str,
     fields: Union[str, Sequence[str], Literal[True]] = True,
     skip_fields: Container[str] = (),
-):
+) -> Dict[str, xr.Variable]:
     return dict_to_coords(
-        accumulate_metadata(items, fields=fields, skip_fields=skip_fields),
+        accumulate_metadata(
+            items,
+            fields=[fields] if isinstance(fields, str) else fields,
+            skip_fields=skip_fields,
+        ),
         dim_name,
     )
 
 
+T = TypeVar("T", bound=Hashable)
+
+
 def accumulate_metadata(
-    items: Iterable[Mapping[str, Any]],
-    fields: Union[str, Sequence[str], Literal[True]] = True,
-    skip_fields: Container[str] = (),
-) -> Dict[str, Any]:
+    items: Iterable[Mapping[T, object]],
+    fields: Union[Sequence[T], Literal[True]] = True,
+    skip_fields: Container[T] = (),
+) -> Dict[T, object]:
     """
     Accumulate a sequence of multiple similar dicts into a single dict of lists.
 
@@ -53,10 +61,7 @@ def accumulate_metadata(
     skip_fields:
         Skip these fields.
     """
-    if isinstance(fields, str):
-        fields = (fields,)
-
-    all_fields: Dict[str, Any] = {}
+    all_fields: Dict[T, object] = {}
     for i, item in enumerate(items):
         # Inductive case: update existing fields
         for existing_field, existing_value in all_fields.items():
@@ -94,9 +99,9 @@ def accumulate_metadata(
 
 
 def accumulate_metadata_only_allsame(
-    items: Iterable[Mapping[str, Any]],
-    skip_fields: Container[str] = (),
-) -> Dict[str, Any]:
+    items: Iterable[Mapping[T, object]],
+    skip_fields: Container[T] = (),
+) -> Dict[T, object]:
     """
     Accumulate multiple similar dicts into a single flattened dict of only consistent values.
 
@@ -112,7 +117,7 @@ def accumulate_metadata_only_allsame(
     skip_fields:
         Skip these fields when ``fields`` is True.
     """
-    all_fields: Dict[str, Any] = {}
+    all_fields: Dict[T, object] = {}
     for item in items:
         for field, value in item.items():
             if field in skip_fields:
@@ -126,7 +131,9 @@ def accumulate_metadata_only_allsame(
     return {field: value for field, value in all_fields.items() if value is not None}
 
 
-def dict_to_coords(metadata: Dict[str, Any], dim_name: str) -> Dict[str, xr.Variable]:
+def dict_to_coords(
+    metadata: Dict[str, object], dim_name: str
+) -> Dict[str, xr.Variable]:
     """
     Convert the output of `accumulate_metadata` into a dict of xarray Variables.
 
