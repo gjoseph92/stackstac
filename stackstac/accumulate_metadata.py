@@ -164,7 +164,20 @@ def dict_to_coords(
                 # if it's not set-able, just give up
                 break
 
-        props_arr = np.squeeze(np.array(props))
+        props_arr = np.squeeze(
+            np.array(
+                props,
+                # Avoid DeprecationWarning creating ragged arrays when elements are lists/tuples of different lengths
+                dtype="object"
+                if (
+                    isinstance(props, _ourlist)
+                    and len(set(len(x) for x in props if isinstance(x, (list, tuple))))
+                    > 1
+                )
+                else None,
+            )
+        )
+
         if (
             props_arr.ndim > 1
             or props_arr.ndim == 1
