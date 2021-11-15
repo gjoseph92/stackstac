@@ -1,13 +1,13 @@
 from typing import (
-    Any,
     Container,
     Dict,
+    Hashable,
     Iterable,
     Literal,
     Mapping,
     Sequence,
     Union,
-    cast,
+    TypeVar,
 )
 
 import numpy as np
@@ -21,26 +21,29 @@ class _ourlist(list):
 
 
 def metadata_to_coords(
-    items: Iterable[Mapping[str, Any]],
+    items: Iterable[Mapping[str, object]],
     dim_name: str,
     fields: Union[str, Sequence[str], Literal[True]] = True,
     skip_fields: Container[str] = (),
-    only_allsame: Union[bool, Literal["ignore-missing"]] = False,
-):
+) -> Dict[str, xr.Variable]:
     return dict_to_coords(
         accumulate_metadata(
-            items, fields=fields, skip_fields=skip_fields, only_allsame=only_allsame
+            items,
+            fields=[fields] if isinstance(fields, str) else fields,
+            skip_fields=skip_fields,
         ),
         dim_name,
     )
 
 
+T = TypeVar("T", bound=Hashable)
+
+
 def accumulate_metadata(
-    items: Iterable[Mapping[str, Any]],
-    fields: Union[str, Sequence[str], Literal[True]] = True,
-    skip_fields: Container[str] = (),
-    only_allsame: Union[bool, Literal["ignore-missing"]] = False,
-) -> Dict[str, Any]:
+    items: Iterable[Mapping[T, object]],
+    fields: Union[Sequence[T], Literal[True]] = True,
+    skip_fields: Container[T] = (),
+) -> Dict[T, object]:
     """
     Accumulate a sequence of multiple similar dicts into a single dict of lists.
 
@@ -56,68 +59,81 @@ def accumulate_metadata(
     fields:
         Only use these fields. If True, use all fields.
     skip_fields:
-        Skip these fields when ``fields`` is True.
-    only_allsame:
-        Only return fields that have the same value in every item.
-        If ``"ignore-missing"``, ignores this check on items that were missing that field.
+        Skip these fields.
     """
-    if isinstance(fields, str):
-        fields = (fields,)
-
-    all_fields: Dict[str, Any] = {}
-    i = 0
+    all_fields: Dict[T, object] = {}
     for i, item in enumerate(items):
-        for existing_field in all_fields.keys():
-            value = item.get(existing_field, None)
-            if value is None and only_allsame == "ignore-missing":
-                continue
-            existing_value = all_fields[existing_field]
-            if existing_value == value:
+        # Inductive case: update existing fields
+        for existing_field, existing_value in all_fields.items():
+            new_value = item.get(existing_field, None)
+            if new_value == existing_value:
                 # leave fields that are the same for every item as singletons
                 continue
-
             if isinstance(existing_value, _ourlist):
-                # we already have a list going; add do it
-                existing_value.append(value)
+                # we already have a list going; add to it
+                existing_value.append(new_value)
             else:
-                if only_allsame:
-                    # Either `only_allsame is True`, or `only_allsame == "ignore-missing"`
-                    # and the value wasn't missing
-                    all_fields[existing_field] = None
-                else:
-                    # all prior values for this field were the same (or missing).
-                    # start a new list collecting them, including Nones at the front
-                    # for however many items were missing the field.
-                    all_fields[existing_field] = _ourlist(
-                        [None] * (i - 1) + [existing_value, value]
-                    )
+                # all prior values were the same; this is the first different one
+                all_fields[existing_field] = _ourlist(
+                    [existing_value] * i + [new_value]
+                )
 
+        # Base case 1: add any never-before-seen fields, when inferring field names
         if fields is True:
-            # want all properties - add in any ones we haven't processed already
             for new_field in item.keys() - all_fields.keys():
                 if new_field in skip_fields:
                     continue
-                all_fields[new_field] = item[new_field]
-        else:
-            # just want some properties
-            for field in cast(Iterable[str], fields):
-                # ^ cast: pyright isn't smart enough to know the `else` branch means `properties` isn't True
-                # https://github.com/microsoft/pyright/issues/1573
-                if field not in all_fields.keys():
-                    try:
-                        all_fields[field] = item[field]
-                    except KeyError:
-                        pass
-
-    if only_allsame:
-        return {
-            field: value for field, value in all_fields.items() if value is not None
-        }
+                value = item[new_field]
+                all_fields[new_field] = (
+                    value if i == 0 else _ourlist([None] * i + [value])
+                )
+        # Base case 2: initialize with predefined fields
+        elif i == 0:
+            all_fields.update(
+                (field, item.get(field, None))
+                for field in fields
+                if field not in skip_fields
+            )
 
     return all_fields
 
 
-def dict_to_coords(metadata: Dict[str, Any], dim_name: str) -> Dict[str, xr.Variable]:
+def accumulate_metadata_only_allsame(
+    items: Iterable[Mapping[T, object]],
+    skip_fields: Container[T] = (),
+) -> Dict[T, object]:
+    """
+    Accumulate multiple similar dicts into a single flattened dict of only consistent values.
+
+    If the value of a field differs between items, the field is dropped.
+    If the value of a field is the same for all items that contain that field, the field is kept.
+
+    Note this means that missing fields are ignored, not treated as different.
+
+    Parameters
+    ----------
+    items:
+        Iterable of dicts to accumulate
+    skip_fields:
+        Skip these fields when ``fields`` is True.
+    """
+    all_fields: Dict[T, object] = {}
+    for item in items:
+        for field, value in item.items():
+            if field in skip_fields:
+                continue
+            if field not in all_fields:
+                all_fields[field] = value
+            else:
+                if value != all_fields[field]:
+                    all_fields[field] = None
+
+    return {field: value for field, value in all_fields.items() if value is not None}
+
+
+def dict_to_coords(
+    metadata: Dict[str, object], dim_name: str
+) -> Dict[str, xr.Variable]:
     """
     Convert the output of `accumulate_metadata` into a dict of xarray Variables.
 
@@ -148,7 +164,20 @@ def dict_to_coords(metadata: Dict[str, Any], dim_name: str) -> Dict[str, xr.Vari
                 # if it's not set-able, just give up
                 break
 
-        props_arr = np.squeeze(np.array(props))
+        props_arr = np.squeeze(
+            np.array(
+                props,
+                # Avoid DeprecationWarning creating ragged arrays when elements are lists/tuples of different lengths
+                dtype="object"
+                if (
+                    isinstance(props, _ourlist)
+                    and len(set(len(x) for x in props if isinstance(x, (list, tuple))))
+                    > 1
+                )
+                else None,
+            )
+        )
+
         if (
             props_arr.ndim > 1
             or props_arr.ndim == 1
