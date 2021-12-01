@@ -400,9 +400,9 @@ def to_coords(
                 half_xpixel, half_ypixel = xres / 2, yres / 2
                 minx, miny, maxx, maxy = (
                     minx + half_xpixel,
-                    miny + half_ypixel,
+                    miny - half_ypixel,
                     maxx + half_xpixel,
-                    maxy + half_ypixel,
+                    maxy - half_ypixel,
                 )
 
             height, width = spec.shape
