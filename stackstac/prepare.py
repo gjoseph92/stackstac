@@ -391,32 +391,27 @@ def to_coords(
             )
 
         transform = spec.transform
-        if transform.is_rectilinear:
-            # faster-path for rectilinear transforms: just `arange` it instead of doing the affine math
-            minx, miny, maxx, maxy = spec.bounds
-            xres, yres = spec.resolutions_xy
+        # We generate the transform ourselves in `RasterSpec`, and it's always constructed to be rectilinear.
+        # Someday, this should not always be the case, in order to support non-rectilinear data without warping.
+        assert (
+            transform.is_rectilinear
+        ), f"Non-rectilinear transform generated: {transform}"
+        minx, miny, maxx, maxy = spec.bounds
+        xres, yres = spec.resolutions_xy
 
-            if pixel_center:
-                half_xpixel, half_ypixel = xres / 2, yres / 2
-                minx, miny, maxx, maxy = (
-                    minx + half_xpixel,
-                    miny + half_ypixel,
-                    maxx + half_xpixel,
-                    maxy + half_ypixel,
-                )
+        if pixel_center:
+            half_xpixel, half_ypixel = xres / 2, yres / 2
+            minx, miny, maxx, maxy = (
+                minx + half_xpixel,
+                miny - half_ypixel,
+                maxx + half_xpixel,
+                maxy - half_ypixel,
+            )
 
-            height, width = spec.shape
-            # Wish pandas had an RangeIndex that supported floats...
-            xs = pd.Float64Index(np.linspace(minx, maxx, width, endpoint=False))
-            ys = pd.Float64Index(np.linspace(maxy, miny, height, endpoint=False))
-        else:
-            height, width = spec.shape
-            if pixel_center:
-                xs, _ = transform * (np.arange(width) + 0.5, np.zeros(width) + 0.5)
-                _, ys = transform * (np.zeros(height) + 0.5, np.arange(height) + 0.5)
-            else:
-                xs, _ = transform * (np.arange(width), np.zeros(width))
-                _, ys = transform * (np.zeros(height), np.arange(height))
+        height, width = spec.shape
+        # Wish pandas had an RangeIndex that supported floats...
+        xs = pd.Float64Index(np.linspace(minx, maxx, width, endpoint=False))
+        ys = pd.Float64Index(np.linspace(maxy, miny, height, endpoint=False))
 
         coords["x"] = xs
         coords["y"] = ys
@@ -475,13 +470,9 @@ def to_coords(
 
     if band_coords:
         flattened_metadata_by_asset = [
-            accumulate_metadata.accumulate_metadata(
+            accumulate_metadata.accumulate_metadata_only_allsame(
                 (item["assets"].get(asset_id, {}) for item in items),
                 skip_fields={"href", "type", "roles"},
-                only_allsame="ignore-missing",
-                # ^ NOTE: we `ignore-missing` because I've observed some STAC collections
-                # missing `eo:bands` on some items.
-                # xref https://github.com/sat-utils/sat-api/issues/229
             )
             for asset_id in asset_ids
         ]
@@ -512,7 +503,7 @@ def to_coords(
                 # skip_fields={"href", "title", "description", "type", "roles"},
             )
         )
-        if any(d for d in eo_by_asset):
+        if any(eo_by_asset):
             coords.update(
                 accumulate_metadata.metadata_to_coords(
                     eo_by_asset,
