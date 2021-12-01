@@ -1,6 +1,6 @@
 """
-Make Coiled software environments for stackstac in multiple regions,
-and upload all notebook files into a Coiled notebook (aka Job).
+Make a Coiled software environment for stackstac from the poetry lockfile's
+current deps, for the [binder,viz] extras.
 
 Pass --dev to build off the latest commit on `origin/main` instead.
 """
