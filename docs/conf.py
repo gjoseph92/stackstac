@@ -20,7 +20,7 @@
 import importlib.metadata
 import datetime
 
-DISTRIBUTION_METADATA = importlib.metadata.metadata("MyProjectName")
+DISTRIBUTION_METADATA = importlib.metadata.metadata("stackstac")
 
 author = DISTRIBUTION_METADATA["Author"]
 project = DISTRIBUTION_METADATA["Name"]
