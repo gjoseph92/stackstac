@@ -19,6 +19,15 @@ class RasterSpec:
     bounds: Bbox
     resolutions_xy: Resolutions
 
+    def __post_init__(self):
+        xres, yres = self.resolutions_xy
+        assert xres > 0, f"X resolution {xres} must be > 0"
+        assert yres > 0, f"Y resolution {yres} must be > 0"
+
+        minx, miny, maxx, maxy = self.bounds
+        assert minx < maxx, f"Invalid bounds: {minx=} >= {maxx=}"
+        assert miny < maxy, f"Invalid bounds: {miny=} >= {maxy=}"
+
     @cached_property
     def transform(self) -> affine.Affine:
         return affine.Affine(

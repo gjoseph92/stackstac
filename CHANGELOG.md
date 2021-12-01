@@ -3,6 +3,7 @@
 ## 0.2.2 (...)
 - Support [pystac](https://github.com/stac-utils/pystac) ItemCollections
 - Fix bug where repeated metadata values would be None
+- Fix one-pixel shift when using `xy_coords="center"` [@gjoseph92](https://github.com/gjoseph92) [@Kirill888](https://github.com/Kirill888) [@maawoo](https://github.com/maawoo)
 
 ## 0.2.1 (2021-05-07)
 Support [xarray 0.18](http://xarray.pydata.org/en/stable/whats-new.html#v0-18-0-6-may-2021) and beyond, as well as looser version requirements for some other dependencies.
