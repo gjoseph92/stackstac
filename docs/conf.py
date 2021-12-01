@@ -95,23 +95,23 @@ nbsphinx_prolog = f"""
 {{% set docname = env.doc2path(env.docname, base=False) %}}
 .. note::
     You can view & download the original notebook
-    `on Github <https://github.com/gjoseph92/stackstac/blob/v{version}/docs/{{
+    `on Github <https://github.com/gjoseph92/stackstac/blob/v{version}/docs/{{{{
         "../" + docname if docname.startswith("examples") else docname
-    }}>`_.
+    }}}}>`_.
 
     Or, `click here <https://cloud.coiled.io/gjoseph92/jobs/stackstac>`_
     to run these notebooks on Coiled with access to Dask clusters.
 
 .. note::
     You can run this notebook interactively here: |Binder|, or view & download the original
-    `on Github <https://github.com/gjoseph92/stackstac/blob/v{version}/docs/{{
+    `on Github <https://github.com/gjoseph92/stackstac/blob/v{version}/docs/{{{{
         "../" + docname if docname.startswith("examples") else docname
-    }}>`_.
+    }}}}>`_.
 
 .. |Binder| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/gjoseph92/stackstac/v{version}?urlpath=lab/tree/docs/{{
+   :target: https://mybinder.org/v2/gh/gjoseph92/stackstac/v{version}?urlpath=lab/tree/docs/{{{{
         "../" + docname if docname.startswith("examples") else docname
-    }}
+    }}}}
 """
 
 
