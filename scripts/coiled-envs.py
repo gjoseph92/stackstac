@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     coiled.create_software_environment(
         name=name,
-        conda=["python=3.8"],
+        conda=[f"python={sys.version_info.major}.{sys.version_info.minor}"],
         pip=deps,
         backend_options={"region": "us-west-2"},
     )
