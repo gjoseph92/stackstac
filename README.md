@@ -1,6 +1,6 @@
 # StackSTAC
 
-[![Documentation Status](https://readthedocs.org/projects/stackstac/badge/?version=latest)](https://stackstac.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/stackstac/badge/?version=latest)](https://stackstac.readthedocs.io/en/latest/?badge=latest) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/gjoseph92/stackstac/main?labpath=%2Fdocs%2Fbasic.ipynb%3Ffile-browser-path%3D%2Fexamples)
 
 Turn a list of [STAC](http://stacspec.org) items into a 4D [xarray](http://xarray.pydata.org/en/stable/) DataArray (dims: `time, band, y, x`), including reprojection to a common grid. The array is a lazy [Dask array](https://docs.dask.org/en/latest/array.html), so loading and processing the data in parallel—locally or [on a cluster](https://coiled.io/)—is just a `compute()` call away.
 
