@@ -32,7 +32,7 @@ name = "aiohttp"
 version = "3.8.1"
 description = "Async http client/server framework (asyncio)"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -60,7 +60,7 @@ name = "aiosignal"
 version = "1.2.0"
 description = "aiosignal: a list of registered asynchronous callbacks"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -120,7 +120,7 @@ name = "async-timeout"
 version = "4.0.1"
 description = "Timeout context manager for asyncio programs"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -244,7 +244,7 @@ name = "bokeh"
 version = "2.4.2"
 description = "Interactive plots and applications in the browser from Python"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -499,8 +499,8 @@ test = ["pytest", "pytest-rerunfailures", "pytest-xdist", "pre-commit"]
 name = "dask-labextension"
 version = "5.1.0"
 description = "A JupyterLab extension for Dask."
-category = "main"
-optional = true
+category = "dev"
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -538,7 +538,7 @@ name = "distributed"
 version = "2021.11.2"
 description = "Distributed scheduler for Dask"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -624,7 +624,7 @@ name = "frozenlist"
 version = "1.2.0"
 description = "A list-like structure which implements collections.abc.MutableSequence"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [[package]]
@@ -710,7 +710,7 @@ name = "heapdict"
 version = "1.0.1"
 description = "a heap with decrease-key and increase-key operations"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [[package]]
@@ -1012,8 +1012,8 @@ test = ["coverage", "pytest (>=6.0)", "pytest-cov", "pytest-mock", "requests", "
 name = "jupyter-server-proxy"
 version = "3.2.0"
 description = "Jupyter server extension to supervise and proxy web services"
-category = "main"
-optional = true
+category = "dev"
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -1257,7 +1257,7 @@ name = "msgpack"
 version = "1.0.3"
 description = "MessagePack (de)serializer."
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [[package]]
@@ -1265,7 +1265,7 @@ name = "multidict"
 version = "5.2.0"
 description = "multidict implementation"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [[package]]
@@ -1546,7 +1546,7 @@ name = "pillow"
 version = "8.4.0"
 description = "Python Imaging Library (Fork)"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [[package]]
@@ -1639,7 +1639,7 @@ name = "psutil"
 version = "5.8.0"
 description = "Cross-platform lib for process and system monitoring in Python."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.extras]
@@ -2098,8 +2098,8 @@ vectorized = ["numpy"]
 name = "simpervisor"
 version = "0.4"
 description = "Simple async process supervisor"
-category = "main"
-optional = true
+category = "dev"
+optional = false
 python-versions = "*"
 
 [[package]]
@@ -2157,7 +2157,7 @@ name = "sortedcontainers"
 version = "2.4.0"
 description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [[package]]
@@ -2306,7 +2306,7 @@ name = "tblib"
 version = "1.7.0"
 description = "Traceback serialization library."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
@@ -2521,7 +2521,7 @@ name = "yarl"
 version = "1.7.2"
 description = "Yet another URL library"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -2533,7 +2533,7 @@ name = "zict"
 version = "2.0.0"
 description = "Mutable mapping tools"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [package.dependencies]
@@ -2552,14 +2552,14 @@ docs = ["sphinx", "jaraco.packaging (>=8.2)", "rst.linker (>=1.9)"]
 testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-cov", "pytest-enabler (>=1.0.1)", "jaraco.itertools", "func-timeout", "pytest-black (>=0.3.7)", "pytest-mypy"]
 
 [extras]
-binder = ["Bottleneck", "coiled", "dask-labextension", "distributed", "geogif", "ipyleaflet", "jupyterlab-geojson", "jupyterlab-system-monitor", "matplotlib", "planetary-computer", "pystac-client", "sat-search"]
+binder = ["Bottleneck", "coiled", "distributed", "geogif", "ipyleaflet", "jupyterlab-geojson", "jupyterlab-system-monitor", "matplotlib", "planetary-computer", "pystac-client", "sat-search"]
 docs = ["furo", "ipyleaflet", "ipython", "jupyter-sphinx", "nbsphinx", "numpydoc", "pandoc", "sphinx-autodoc-typehints", "Sphinx"]
 viz = ["aiohttp", "cachetools", "distributed", "ipyleaflet", "matplotlib", "mercantile", "Pillow"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "db54fb2753b4409439bae14627f7f48f740c0266fa81cce4589cc53ab006d59b"
+content-hash = "610f3e9adc862da497657111d31d5793a857b215f48f84b3315a0536c4d2708a"
 
 [metadata.files]
 affine = [

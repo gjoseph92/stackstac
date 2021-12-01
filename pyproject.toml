@@ -16,7 +16,6 @@ aiohttp = {version = "^3.7.4", optional = true}
 cachetools = {version = "^4.2.2", optional = true}
 coiled = {version = "^0", optional = true}
 dask = {extras = ["array"], version = "^2021.4.1"}
-dask-labextension = {version = "^5.0.1", optional = true}
 distributed = {version = "^2021.4.1", optional = true}
 furo = {version = "^2021.4.11-beta.34", optional = true}
 geogif = {version = "^0", optional = true}
@@ -46,6 +45,7 @@ xarray = ">=0.18,<1"
 Pympler = "^0.9"
 awkward = {version = "^1.1.2"}
 black = "^21.4b2"
+dask-labextension = {version = "^5.0.1"}
 debugpy = "^1.2.1"
 filprofiler = "^0.17.0"
 flake8 = "^3.9.1"
@@ -62,7 +62,6 @@ twine = "^3.4.1"
 binder = [
   "Bottleneck",
   "coiled",
-  "dask-labextension",
   "distributed",
   "geogif",
   "ipyleaflet",
