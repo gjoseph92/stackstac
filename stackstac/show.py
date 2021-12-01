@@ -854,7 +854,7 @@ def _launch_server() -> asyncio.AbstractEventLoop:
 
             while True:
                 try:
-                    site = web.TCPSite(runner, "localhost", PORT)
+                    site = web.TCPSite(runner, "127.0.0.1", PORT)
                     await site.start()
                 except OSError as e:
                     if e.errno != errno.EADDRINUSE:
