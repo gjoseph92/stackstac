@@ -17,10 +17,15 @@
 
 # -- Project information -----------------------------------------------------
 
-project = "stackstac"
-copyright = "2021, Gabe Joseph"
-author = "Gabe Joseph"
+import importlib.metadata
+import datetime
 
+DISTRIBUTION_METADATA = importlib.metadata.metadata("stackstac")
+
+author = DISTRIBUTION_METADATA["Author"]
+project = DISTRIBUTION_METADATA["Name"]
+version = DISTRIBUTION_METADATA["Version"]
+copyright = f"{datetime.datetime.now().year}, {author}"
 
 # -- General configuration ---------------------------------------------------
 
@@ -73,42 +78,32 @@ html_sourcelink_suffix = ""
 # Gotta fight fire with fire. nbsphinx injects their CSS directly into the page...
 # https://github.com/spatialaudio/nbsphinx/blob/master/src/nbsphinx.py#L437-L683
 # so we just inject after it to undo their settings that look bad in dark mode.
-nbsphinx_prolog = """
+nbsphinx_prolog = f"""
 .. raw:: html
 
     <style>
-    @media (prefers-color-scheme: dark) {
+    @media (prefers-color-scheme: dark) {{
         /* input area */
-        div.nbinput.container div.input_area {
+        div.nbinput.container div.input_area {{
             border: unset;
             border-radius: unset;
-        }
-    }
+        }}
+    }}
 
     </style>
 
-{% set docname = env.doc2path(env.docname, base=False) %}
+{{% set docname = env.doc2path(env.docname, base=False) %}}
 .. note::
-    You can view & download the original notebook
-    `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{
+    You can run this notebook interactively: |Binder|, or view & download the original
+    `on GitHub <https://github.com/gjoseph92/stackstac/blob/v{version}/docs/{{{{
         "../" + docname if docname.startswith("examples") else docname
-    }}>`_.
+    }}}}>`_.
 
-    Or, `click here <https://cloud.coiled.io/gjoseph92/jobs/stackstac>`_
-    to run these notebooks on Coiled with access to Dask clusters.
+.. |Binder| image:: https://mybinder.org/badge_logo.svg
+   :target: https://mybinder.org/v2/gh/gjoseph92/stackstac/v{version}?urlpath=lab/tree/docs/{{{{
+        "../" + docname if docname.startswith("examples") else docname
+    }}}}
 """
-
-# TODO enable binder once Coiled supports websocket clusters over 443.
-# (Binder blocks outbound traffic on all ports besides 22, 80, and 443, so we can't connect to Coiled on 8786.)
-# nbsphinx_prolog = """
-# {% set docname = env.doc2path(env.docname, base=False) %}
-# .. note::
-#     You can run this notebook interactively here: |Binder|, or view & download the original
-#     `on Github <https://github.com/gjoseph92/stackstac/blob/main/docs/{{ docname }}>`_.
-
-# .. |Binder| image:: https://mybinder.org/badge_logo.svg
-#    :target: https://mybinder.org/v2/gh/gjoseph92/stackstac/main?urlpath=lab/tree/docs/{{ docname }}
-# """
 
 
 # Add any paths that contain custom static files (such as style sheets) here,
