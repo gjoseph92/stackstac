@@ -1,9 +1,16 @@
 # Changelog
 
-## 0.2.2 (...)
-- Support [pystac](https://github.com/stac-utils/pystac) ItemCollections
-- Fix bug where repeated metadata values would be None
+## 0.2.2 (2021-12-03)
+- Support [pystac](https://github.com/stac-utils/pystac) ItemCollections [@TomAugspurger](https://github.com/TomAugspurger), [@scottyhq](https://github.com/scottyhq)
+- Fix bug where repeated metadata values would be None [@gjoseph92](https://github.com/gjoseph92) [@scottyhq](https://github.com/scottyhq)
 - Fix one-pixel shift when using `xy_coords="center"` [@gjoseph92](https://github.com/gjoseph92) [@Kirill888](https://github.com/Kirill888) [@maawoo](https://github.com/maawoo)
+- Fix upper-right-hand corner calculation in `bounds_from_affine` [@g2giovanni](https://github.com/g2giovanni)
+- Fix error with valid STAC items that don't have a `type` field [@scottyhq](https://github.com/scottyhq)
+- Allow all file extensions (not just `.tif`) [@JamesOConnor](https://github.com/JamesOConnor) [@gjoseph92](https://github.com/gjoseph92)
+- Fix `Error when attempting to bind on address ::1` with `stackstac.show` [@gjoseph92](https://github.com/gjoseph92)
+- Fix empty map from `stackstac.show` due to `jupyter-server-proxy` not being installed [@robintw](https://github.com/robintw) [@gjoseph92](https://github.com/gjoseph92)
+- Fix occasional `RuntimeError: Set changed size during iteration` errors while computing [@gjoseph92](https://github.com/gjoseph92)
+- Use BinderHub instead of Coiled notebook for runnable examples in documentation [@gjoseph92](https://github.com/gjoseph92)
 
 ## 0.2.1 (2021-05-07)
 Support [xarray 0.18](http://xarray.pydata.org/en/stable/whats-new.html#v0-18-0-6-may-2021) and beyond, as well as looser version requirements for some other dependencies.
