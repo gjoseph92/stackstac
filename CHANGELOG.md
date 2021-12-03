@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.2 (2015-12-3)
+## 0.2.2 (2021-12-03)
 - Support [pystac](https://github.com/stac-utils/pystac) ItemCollections [@TomAugspurger](https://github.com/TomAugspurger), [@scottyhq](https://github.com/scottyhq)
 - Fix bug where repeated metadata values would be None [@gjoseph92](https://github.com/gjoseph92) [@scottyhq](https://github.com/scottyhq)
 - Fix one-pixel shift when using `xy_coords="center"` [@gjoseph92](https://github.com/gjoseph92) [@Kirill888](https://github.com/Kirill888) [@maawoo](https://github.com/maawoo)

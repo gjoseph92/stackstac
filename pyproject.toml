@@ -6,7 +6,7 @@ license = "MIT"
 name = "stackstac"
 readme = "README.md"
 repository = "https://github.com/gjoseph92/stackstac"
-version = "0.2.1"
+version = "0.2.2"
 
 [tool.poetry.dependencies]
 Bottleneck = {version = "^1.3.2", optional = true}
