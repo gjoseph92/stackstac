@@ -629,7 +629,7 @@ class MapObserver:
     def base_url_from_window_location(url: str) -> Optional[str]:
         if not url:
             return None
-        if path_re := re.match(r"(^.+)\/(?:lab|notebook|voila)", url):
+        if path_re := re.match(r"(^.+?)\/(?:lab|notebook|voila)", url):
             return path_re.group(1)
         return None
 
