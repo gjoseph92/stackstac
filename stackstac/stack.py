@@ -30,7 +30,7 @@ def stack(
     resampling: Resampling = Resampling.nearest,
     chunksize: int = 1024,
     dtype: np.dtype = np.dtype("float64"),
-    fill_value: Optional[Union[int, float]] = np.nan,
+    fill_value: Union[int, float] = np.nan,
     rescale: bool = True,
     sortby_date: Literal["asc", "desc", False] = "asc",
     xy_coords: Literal["center", "topleft", False] = "topleft",
@@ -192,9 +192,7 @@ def stack(
         don't set it here---instead, call ``.chunk`` on the DataArray to re-chunk it.
     dtype:
         The NumPy data type of the output array. Default: ``float64``. Must be a data type
-        that's compatible with ``fill_value``. Note that if ``fill_value`` is None, whatever nodata
-        value is set in each asset's file will be used, so that value needs to be compatible
-        with ``dtype`` as well.
+        that's compatible with ``fill_value``.
     fill_value:
         Value to fill nodata/masked pixels with. Default: ``np.nan``.
 
@@ -249,7 +247,7 @@ def stack(
     errors_as_nodata:
         Exception patterns to ignore when opening datasets or reading data.
         Exceptions matching the pattern will be logged as warnings, and just
-        produce nodata (``fill_value``). A non-None ``fill_value`` is required when using this.
+        produce nodata (``fill_value``).
 
         The exception patterns should be instances of an Exception type to catch,
         where ``str(exception_pattern)`` is a regex pattern to match against
@@ -282,9 +280,9 @@ def stack(
     if sortby_date is not False:
         plain_items = sorted(
             plain_items,
-            key=lambda item: item["properties"].get("datetime", ""),
+            key=lambda item: item["properties"].get("datetime", "") or "",
             reverse=sortby_date == "desc",
-        )  # type: ignore
+        )
 
     asset_table, spec, asset_ids, plain_items = prepare_items(
         plain_items,

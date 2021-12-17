@@ -279,7 +279,7 @@ class PickleState(TypedDict):
     spec: RasterSpec
     resampling: Resampling
     dtype: np.dtype
-    fill_value: Optional[Union[int, float]]
+    fill_value: Union[int, float]
     rescale: bool
     gdal_env: Optional[LayeredEnv]
     errors_as_nodata: Tuple[Exception, ...]
@@ -302,7 +302,7 @@ class AutoParallelRioReader:
         spec: RasterSpec,
         resampling: Resampling,
         dtype: np.dtype,
-        fill_value: Optional[Union[int, float]],
+        fill_value: Union[int, float],
         rescale: bool,
         gdal_env: Optional[LayeredEnv] = None,
         errors_as_nodata: Tuple[Exception, ...] = (),
@@ -407,8 +407,6 @@ class AutoParallelRioReader:
 
         result = result.astype(self.dtype, copy=False)
         result = np.ma.filled(result, fill_value=self.fill_value)
-        # ^ NOTE: if `self.fill_value` was None, rasterio set the masked array's fill value to the
-        # nodata value of the band, which `np.ma.filled` will then use.
         return result
 
     def close(self) -> None:

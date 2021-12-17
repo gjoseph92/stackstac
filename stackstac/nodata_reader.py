@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Type, Union, cast
+from typing import Tuple, Type, Union, cast
 import re
 
 import numpy as np
@@ -6,7 +6,7 @@ from rasterio.windows import Window
 
 from .reader_protocol import Reader
 
-State = Tuple[np.dtype, Optional[Union[int, float]]]
+State = Tuple[np.dtype, Union[int, float]]
 
 
 class NodataReader:
@@ -17,7 +17,7 @@ class NodataReader:
         self,
         *,
         dtype: np.dtype,
-        fill_value: Optional[Union[int, float]] = None,
+        fill_value: Union[int, float],
         **kwargs,
     ) -> None:
         self.dtype = dtype
@@ -36,13 +36,7 @@ class NodataReader:
         self.dtype, self.fill_value = state
 
 
-def nodata_for_window(
-    window: Window, fill_value: Optional[Union[int, float]], dtype: np.dtype
-):
-    assert (
-        fill_value is not None
-    ), "Trying to convert an exception to nodata, but `fill_value` is None"
-
+def nodata_for_window(window: Window, fill_value: Union[int, float], dtype: np.dtype):
     height = cast(int, window.height)
     width = cast(int, window.width)
     # Argument of type "tuple[_T@attrib, _T@attrib]" cannot be assigned to parameter "shape" of type "_ShapeLike"

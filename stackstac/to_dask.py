@@ -24,18 +24,12 @@ def items_to_dask(
     chunksize: int,
     resampling: Resampling = Resampling.nearest,
     dtype: np.dtype = np.dtype("float64"),
-    fill_value: Optional[Union[int, float]] = np.nan,
+    fill_value: Union[int, float] = np.nan,
     rescale: bool = True,
     reader: Type[Reader] = AutoParallelRioReader,
     gdal_env: Optional[LayeredEnv] = None,
     errors_as_nodata: Tuple[Exception, ...] = (),
 ) -> da.Array:
-    if fill_value is None and errors_as_nodata:
-        raise ValueError(
-            "A non-None `fill_value` is required when using `errors_as_nodata`. "
-            "If an exception occurs, we need to know what to use as the nodata value, "
-            "since there may not be an open dataset to infer it from."
-        )
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
 
     if fill_value is not None and not np.can_cast(fill_value, dtype):
@@ -114,17 +108,18 @@ def asset_entry_to_reader_and_window(
     spec: RasterSpec,
     resampling: Resampling,
     dtype: np.dtype,
-    fill_value: Optional[Union[int, float]],
+    fill_value: Union[int, float],
     rescale: bool,
     gdal_env: Optional[LayeredEnv],
     errors_as_nodata: Tuple[Exception, ...],
     reader: Type[ReaderT],
-) -> Optional[Tuple[ReaderT, windows.Window]]:
+) -> Tuple[ReaderT, windows.Window] | np.ndarray:
     asset_entry = asset_entry[0, 0]
     # ^ because dask adds extra outer dims in `from_array`
     url = asset_entry["url"]
     if url is None:
-        return None
+        # Signifies empty value
+        return np.array(fill_value, dtype)
 
     asset_bounds: Bbox = asset_entry["bounds"]
     asset_window = windows.from_bounds(*asset_bounds, transform=spec.transform)
@@ -159,11 +154,11 @@ def asset_entry_to_reader_and_window(
 
 
 def fetch_raster_window(
-    asset_entry: Optional[Tuple[Reader, windows.Window]],
+    asset_entry: Tuple[ReaderT, windows.Window] | np.ndarray,
     slices: Tuple[slice, ...],
 ) -> np.ndarray:
     current_window = windows.Window.from_slices(*slices)
-    if asset_entry is not None:
+    if isinstance(asset_entry, tuple):
         reader, asset_window = asset_entry
 
         # check that the window we're fetching overlaps with the asset
@@ -172,7 +167,11 @@ def fetch_raster_window(
             data = reader.read(current_window)
 
             return data[None, None]
+        fill_arr = np.array(reader.fill_value, reader.dtype)
+    else:
+        fill_arr: np.ndarray = asset_entry
 
     # no dataset, or we didn't overlap it: return empty data.
     # use the broadcast trick for even fewer memz
-    return np.broadcast_to(np.nan, (1, 1) + windows.shape(current_window))
+    return np.broadcast_to(fill_arr, (1, 1) + windows.shape(current_window))
+

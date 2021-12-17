@@ -26,6 +26,9 @@ class Reader(Pickleable, Protocol):
     Protocol for a thread-safe, lazily-loaded object for reading data from a single-band STAC asset.
     """
 
+    fill_value: Union[int, float]
+    dtype: np.dtype
+
     def __init__(
         self,
         *,
@@ -33,7 +36,7 @@ class Reader(Pickleable, Protocol):
         spec: RasterSpec,
         resampling: Resampling,
         dtype: np.dtype,
-        fill_value: Optional[Union[int, float]],
+        fill_value: Union[int, float],
         rescale: bool,
         gdal_env: Optional[LayeredEnv],
         errors_as_nodata: Tuple[Exception, ...] = (),
@@ -113,13 +116,15 @@ class FakeReader:
     or inherent to the dask graph.
     """
 
-    def __init__(self, *, url: str, spec: RasterSpec, **kwargs) -> None:
+    def __init__(
+        self, *, dtype: np.dtype, fill_value: Union[int, float], **kwargs
+    ) -> None:
         pass
-        # self.url = url
-        # self.spec = spec
+        self.dtype = dtype
+        self.fill_value = fill_value
 
     def read(self, window: Window, **kwargs) -> np.ndarray:
-        return np.random.random((window.height, window.width))
+        return np.random.random((window.height, window.width)).astype(self.dtype)
 
     def close(self) -> None:
         pass
