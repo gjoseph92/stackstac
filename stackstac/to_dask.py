@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import itertools
-from typing import Optional, Tuple, Type, TypeVar, Union
+from typing import ClassVar, Optional, Tuple, Type, TypeVar, Union
 import warnings
 
 import dask
 import dask.array as da
+from dask.blockwise import BlockwiseDep, blockwise
+from dask.highlevelgraph import HighLevelGraph
 import numpy as np
 from rasterio import windows
 from rasterio.enums import Resampling
@@ -13,9 +15,6 @@ from rasterio.enums import Resampling
 from .raster_spec import Bbox, RasterSpec
 from .rio_reader import AutoParallelRioReader, LayeredEnv
 from .reader_protocol import Reader
-
-# from xarray.backends import CachingFileManager
-# from xarray.backends.locks import DummyLock
 
 
 def items_to_dask(
@@ -70,33 +69,28 @@ def items_to_dask(
         meta=asset_table_dask._meta,
     )
 
-    # MEGAHACK: generate a fake array for our spatial dimensions following `shape` and `chunksize`,
-    # but where each chunk is not actually NumPy a array, but just a 2-tuple of the (y-slice, x-slice)
-    # to `read` from the rasterio dataset to fetch that window of data.
-    shape = spec.shape
-    name = "slices-" + dask.base.tokenize(chunksize, shape)
-    chunks = da.core.normalize_chunks(chunksize, shape)
-    keys = itertools.product([name], *(range(len(bds)) for bds in chunks))
-    slices = da.core.slices_from_chunks(chunks)
-    # HACK: `slices_fake_arr` is in no way a real dask array: the chunks aren't ndarrays; they're tuples of slices!
-    # We just stick it in an Array container to make dask's blockwise logic handle broadcasting between the graphs of
-    # `datasets` and `slices_fake_arr`.
-    slices_fake_arr = da.Array(
-        dict(zip(keys, slices)), name, chunks, meta=datasets._meta
-    )
+    shape_yx = spec.shape
+    chunks_yx = da.core.normalize_chunks(chunksize, shape_yx)
+    chunks = datasets.chunks + chunks_yx
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=da.core.PerformanceWarning)
 
-        rasters = da.blockwise(
+        name = f"fetch_raster_window-{dask.base.tokenize(datasets, chunks)}"
+        # TODO use `da.blockwise` once it supports `BlockwiseDep`s as arguments
+        lyr = blockwise(
             fetch_raster_window,
+            name,
             "tbyx",
-            datasets,
+            datasets.name,
             "tb",
-            slices_fake_arr,
+            Slices(chunks_yx),
             "yx",
-            meta=np.ndarray((), dtype=dtype),  # TODO dtype
+            numblocks={datasets.name: datasets.numblocks},  # ugh
         )
+        dsk = HighLevelGraph.from_collections(name, lyr, [datasets])
+        rasters = da.Array(dsk, name, chunks, meta=np.ndarray((), dtype=dtype))
+
     return rasters
 
 
@@ -125,20 +119,6 @@ def asset_entry_to_reader_and_window(
     asset_window = windows.from_bounds(*asset_bounds, transform=spec.transform)
 
     return (
-        # CachingFileManager(
-        #     AutoParallelRioBackend,  # TODO other backends
-        #     url,
-        #     spec,
-        #     resampling,
-        #     gdal_env,
-        #     lock=DummyLock(),
-        #     # ^ NOTE: this lock only protects the file cache, not the file itself.
-        #     # xarray's file cache is already thread-safe, so using a lock is pointless.
-        # ),
-        # NOTE: skip the `CachingFileManager` for now to be sure datasets aren't leaked.
-        # There are a few issues with `CachingFileManager`: faulty ref-counting logic,
-        # and misleading `close` and `lock` interfaces. Either refactor that upstream,
-        # or implement our own caching logic.
         reader(
             url=url,
             spec=spec,
@@ -155,15 +135,15 @@ def asset_entry_to_reader_and_window(
 
 def fetch_raster_window(
     asset_entry: Tuple[ReaderT, windows.Window] | np.ndarray,
-    slices: Tuple[slice, ...],
+    slices: Tuple[slice, slice],
 ) -> np.ndarray:
+    assert len(slices) == 2, slices
     current_window = windows.Window.from_slices(*slices)
     if isinstance(asset_entry, tuple):
         reader, asset_window = asset_entry
 
         # check that the window we're fetching overlaps with the asset
         if windows.intersect(current_window, asset_window):
-            # backend: Backend = manager.acquire(needs_lock=False)
             data = reader.read(current_window)
 
             return data[None, None]
@@ -175,3 +155,30 @@ def fetch_raster_window(
     # use the broadcast trick for even fewer memz
     return np.broadcast_to(fill_arr, (1, 1) + windows.shape(current_window))
 
+
+class Slices(BlockwiseDep):
+    starts: list[tuple[int, ...]]
+    produces_tasks: ClassVar[bool] = False
+
+    def __init__(self, chunks: Tuple[Tuple[int, ...], ...]):
+        self.starts = [tuple(itertools.accumulate(c, initial=0)) for c in chunks]
+
+    def __getitem__(self, idx: Tuple[int, ...]) -> Tuple[slice, ...]:
+        return tuple(
+            slice(start[i], start[i + 1]) for i, start in zip(idx, self.starts)
+        )
+
+    @property
+    def numblocks(self) -> list[int]:
+        return [len(s) - 1 for s in self.starts]
+
+    def __dask_distributed_pack__(
+        self, required_indices: Optional[list[Tuple[int, ...]]] = None
+    ) -> list[Tuple[int, ...]]:
+        return self.starts
+
+    @classmethod
+    def __dask_distributed_unpack__(cls, state: list[Tuple[int, ...]]) -> Slices:
+        self = cls.__new__(cls)
+        self.starts = state
+        return self
