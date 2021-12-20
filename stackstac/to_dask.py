@@ -101,6 +101,8 @@ def items_to_dask(
             "tb",
             slices_fake_arr,
             "yx",
+            window_dtype=dtype,
+            fill_value=fill_value,
             meta=np.ndarray((), dtype=dtype),  # TODO dtype
         )
     return rasters
@@ -161,6 +163,8 @@ def asset_entry_to_reader_and_window(
 def fetch_raster_window(
     asset_entry: Optional[Tuple[Reader, windows.Window]],
     slices: Tuple[slice, ...],
+    window_dtype: np.dtype = np.dtype("float64"),
+    fill_value: Optional[Union[int, float]] = np.nan,
 ) -> np.ndarray:
     current_window = windows.Window.from_slices(*slices)
     if asset_entry is not None:
@@ -175,4 +179,6 @@ def fetch_raster_window(
 
     # no dataset, or we didn't overlap it: return empty data.
     # use the broadcast trick for even fewer memz
-    return np.broadcast_to(np.nan, (1, 1) + windows.shape(current_window))
+    return np.broadcast_to(
+        np.array(fill_value, dtype=window_dtype), (1, 1) + windows.shape(current_window)
+    )
