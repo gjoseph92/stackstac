@@ -31,7 +31,7 @@ def items_to_dask(
 ) -> da.Array:
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
 
-    if fill_value is not None and not np.can_cast(fill_value, dtype):
+    if not np.can_cast(fill_value, dtype):
         raise ValueError(
             f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
             f"Either use `dtype={np.array(fill_value).dtype.name!r}`, or pick a different `fill_value`."
@@ -117,7 +117,9 @@ def asset_entry_to_reader_and_window(
 
     asset_bounds: Bbox = asset_entry["bounds"]
     asset_window = windows.from_bounds(
-        *asset_bounds, transform=spec.transform, precision=0.0
+        *asset_bounds,
+        transform=spec.transform,
+        precision=0.0
         # ^ `precision=0.0`: https://github.com/rasterio/rasterio/issues/2374
     )
 
