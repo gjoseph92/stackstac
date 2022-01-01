@@ -116,7 +116,10 @@ def asset_entry_to_reader_and_window(
         return np.array(fill_value, dtype)
 
     asset_bounds: Bbox = asset_entry["bounds"]
-    asset_window = windows.from_bounds(*asset_bounds, transform=spec.transform)
+    asset_window = windows.from_bounds(
+        *asset_bounds, transform=spec.transform, precision=0.0
+        # ^ `precision=0.0`: https://github.com/rasterio/rasterio/issues/2374
+    )
 
     return (
         reader(
