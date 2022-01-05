@@ -1,4 +1,6 @@
 from __future__ import annotations
+from threading import Lock
+from typing import ClassVar
 
 import numpy as np
 from rasterio import windows
@@ -20,7 +22,7 @@ def test_items_to_dask_basic():
         ],
         dtype=ASSET_TABLE_DT,
     )
-    spec_ = RasterSpec(4326, (0, 0, 7, 8), (0.2, 0.2))
+    spec_ = RasterSpec(4326, (0, 0, 7, 8), (0.5, 0.5))
     chunksize = 2
     dtype_ = np.dtype("int32")
     fill_value_ = -1
@@ -59,6 +61,9 @@ def test_items_to_dask_basic():
                 )
 
     class TestReader:
+        opened: ClassVar[set[str]] = set()
+        lock: ClassVar[Lock] = Lock()
+
         def __init__(
             self,
             *,
@@ -68,6 +73,12 @@ def test_items_to_dask_basic():
             fill_value: int | float,
             **kwargs,
         ) -> None:
+            with self.lock:
+                # Each URL should only be opened once.
+                # The `dask.annotate` on the `asset_table_to_reader_and_window` step is necessary for this,
+                # otherwise blockwise fusion would merge the Reader creation into every `fetch_raster_window`!
+                assert url not in self.opened
+                self.opened.add(url)
             i, j = map(int, url[7:].split("/"))
             self.full_data = results[i, j]
             self.window = asset_windows[url]
