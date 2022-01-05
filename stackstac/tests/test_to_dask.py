@@ -45,7 +45,7 @@ def test_items_to_dask_basic():
                 *asset["bounds"],
                 transform=spec_.transform,
                 precision=0.0
-                # ^ `precision=0.0`: https://github.com/rasterio/rasterio/issues/2374
+                # ^ https://github.com/rasterio/rasterio/issues/2374
             )
             # convert to int so `toslices` works for indexing
             window_int = window.round_lengths().round_offsets()

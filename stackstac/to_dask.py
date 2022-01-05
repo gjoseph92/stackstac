@@ -29,6 +29,7 @@ def items_to_dask(
     gdal_env: Optional[LayeredEnv] = None,
     errors_as_nodata: Tuple[Exception, ...] = (),
 ) -> da.Array:
+    "Create a dask Array from an asset table"
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
 
     if not np.can_cast(fill_value, dtype):
@@ -38,8 +39,10 @@ def items_to_dask(
         )
 
     # The overall strategy in this function is to materialize the outer two dimensions (items, assets)
-    # as one dask array, then the chunks of the inner two dimensions (y, x) as another dask array, then use
-    # Blockwise to represent the cartesian product between them, to avoid materializing that entire graph.
+    # as one dask array (the "asset table"), then map a function over it which opens each URL as a `Reader`
+    # instance (the "reader table").
+    # Then, we use the `Slices` `BlockwiseDep` to represent the inner inner two dimensions (y, x), and
+    # `Blockwise` to create the cartesian product between them, avoiding materializing that entire graph.
     # Materializing the (items, assets) dimensions is unavoidable: every asset has a distinct URL, so that information
     # has to be included somehow.
 
@@ -129,7 +132,7 @@ def asset_table_to_reader_and_window(
                 *asset_bounds,
                 transform=spec.transform,
                 precision=0.0
-                # ^ `precision=0.0`: https://github.com/rasterio/rasterio/issues/2374
+                # ^ https://github.com/rasterio/rasterio/issues/2374
             )
 
             entry: ReaderTableEntry = (
@@ -190,6 +193,10 @@ def fetch_raster_window(
 
 
 class Slices(BlockwiseDep):
+    "Produces the slice into the full-size array corresponding to the current chunk"
+    # TODO this needs to be in dask/dask, otherwise the scheduler will refuse to import it
+    # without passlisting stackstac in `distributed.scheduler.allowed-imports`.
+
     starts: list[tuple[int, ...]]
     produces_tasks: ClassVar[bool] = False
 
