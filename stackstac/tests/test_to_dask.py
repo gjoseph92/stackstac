@@ -86,9 +86,6 @@ def test_items_to_dask_basic():
             assert spec == spec_
             assert dtype == dtype_
             assert fill_value == fill_value_
-            # NOTE: needed for `Reader` interface:
-            self.dtype = dtype
-            self.fill_value = fill_value
 
         def read(self, window: windows.Window) -> np.ndarray:
             assert (window.height, window.width) == (chunksize, chunksize)
