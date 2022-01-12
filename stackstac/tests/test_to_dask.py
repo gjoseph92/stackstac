@@ -2,6 +2,8 @@ from __future__ import annotations
 from threading import Lock
 from typing import ClassVar
 
+from hypothesis import given, strategies as st
+import hypothesis.extra.numpy as st_np
 import numpy as np
 from rasterio import windows
 from dask.array.utils import assert_eq
@@ -9,9 +11,11 @@ from dask.array.utils import assert_eq
 from stackstac.raster_spec import RasterSpec
 from stackstac.prepare import ASSET_TABLE_DT
 from stackstac.to_dask import items_to_dask
+from stackstac.testing import strategies as st_stc
 
 
-def test_items_to_dask_basic():
+@given(st.data(), st_stc.raster_dtypes)
+def test_items_to_dask_basic(data: st.DataObject, dtype_: np.dtype):
     asset_table = np.array(
         [
             # Encode the (i, j) index in the table in the URL
@@ -24,8 +28,7 @@ def test_items_to_dask_basic():
     )
     spec_ = RasterSpec(4326, (0, 0, 7, 8), (0.5, 0.5))
     chunksize = 2
-    dtype_ = np.dtype("int32")
-    fill_value_ = -1
+    fill_value_ = data.draw(st_np.from_dtype(dtype_), label="fill_value")
 
     # Build expected array of the final stack.
     # Start with all nodata, then write data in for each asset.
@@ -52,9 +55,7 @@ def test_items_to_dask_basic():
             chunk = results[(i, j) + windows.window_index(window)]
             if chunk.size:
                 # Asset falls within final bounds
-                chunk[:] = np.random.default_rng().integers(
-                    0, 10000, (int(window.height), int(window.width)), dtype_
-                )
+                chunk[:] = np.random.default_rng().uniform(0, 128, chunk.shape)
 
     class TestReader:
         opened: ClassVar[set[str]] = set()
@@ -81,7 +82,7 @@ def test_items_to_dask_basic():
 
             assert spec == spec_
             assert dtype == dtype_
-            assert fill_value == fill_value_
+            np.testing.assert_equal(fill_value, fill_value_)
 
         def read(self, window: windows.Window) -> np.ndarray:
             assert (window.height, window.width) == (chunksize, chunksize)
@@ -109,4 +110,4 @@ def test_items_to_dask_basic():
     assert arr.chunksize == (1, 1, chunksize, chunksize)
     assert arr.dtype == dtype_
 
-    assert_eq(arr, results)
+    assert_eq(arr, results, equal_nan=True)
