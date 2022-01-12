@@ -83,7 +83,7 @@ def items_to_dask(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=da.core.PerformanceWarning)
 
-        name = f"fetch_raster_window-{dask.base.tokenize(reader_table, chunks)}"
+        name = f"fetch_raster_window-{dask.base.tokenize(reader_table, chunks, dtype, fill_value)}"
         # TODO use `da.blockwise` once it supports `BlockwiseDep`s as arguments
         lyr = blockwise(
             fetch_raster_window,
