@@ -160,10 +160,11 @@ def fetch_raster_window(
     assert len(slices) == 2, slices
     current_window = windows.Window.from_slices(*slices)
 
-    assert reader_table.size, "Empty reader_table"
+    assert reader_table.size, f"Empty reader_table: {reader_table.shape=}"
     # Start with an empty output array, using the broadcast trick for even fewer memz.
     # If none of the assets end up actually existing, or overlapping the current window,
-    # we'll just return this 1-element array that's been broadcast to look like a full-size array.
+    # or containing data, we'll just return this 1-element array that's been broadcast
+    # to look like a full-size array.
     output = np.broadcast_to(
         np.array(fill_value, dtype),
         reader_table.shape + (current_window.height, current_window.width),
@@ -184,7 +185,7 @@ def fetch_raster_window(
                 data = reader.read(current_window)
 
                 if all_empty:
-                    # Turn `output` from a broadcast-trick array a real array so it's writeable
+                    # Turn `output` from a broadcast-trick array to a real array, so it's writeable
                     if (
                         np.isnan(data)
                         if np.isnan(fill_value)
@@ -203,9 +204,12 @@ def fetch_raster_window(
 def normalize_chunks(
     chunks: ChunksParam, shape: tuple[int, int, int, int], dtype: np.dtype
 ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
-    "Normalize chunks to tuple of tuples, assuming 1D and 2D chunks only apply to spatial coordinates"
-    # If only 1 or 2 chunks are given, assume they're for the y,x coordinates,
-    # and that the time,band coordinates should be chunksize 1.
+    """
+    Normalize chunks to tuple of tuples, assuming 1D and 2D chunks only apply to spatial coordinates
+
+    If only 1 or 2 chunks are given, assume they're for the ``y, x`` coordinates,
+    and that the ``time, band`` coordinates should be chunksize 1.
+    """
     # TODO implement our own auto-chunking that makes the time,band coordinates
     # >1 if the spatial chunking would create too many tasks?
     if isinstance(chunks, int):
