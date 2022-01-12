@@ -2,7 +2,6 @@ from __future__ import annotations
 from threading import Lock
 from typing import ClassVar
 
-from affine import Affine
 from hypothesis import given, settings, strategies as st
 import hypothesis.extra.numpy as st_np
 import numpy as np
@@ -11,7 +10,12 @@ from dask.array.utils import assert_eq
 
 from stackstac.raster_spec import Bbox, RasterSpec
 from stackstac.prepare import ASSET_TABLE_DT
-from stackstac.to_dask import ChunksParam, items_to_dask, normalize_chunks
+from stackstac.to_dask import (
+    ChunksParam,
+    items_to_dask,
+    normalize_chunks,
+    window_from_bounds,
+)
 from stackstac.testing import strategies as st_stc
 
 
@@ -168,29 +172,6 @@ def test_items_to_dask(
 
     assert_eq(arr, results, equal_nan=True)
     # TODO test broadcast-trick chunks
-
-
-def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:
-    "Get the window corresponding to the bounding coordinates (correcting for rasterio bugs)"
-    window = windows.from_bounds(
-        *bounds,
-        transform=transform,
-        precision=0.0
-        # ^ https://github.com/rasterio/rasterio/issues/2374
-    )
-
-    # Trim negative `row_off`/`col_off` to work around https://github.com/rasterio/rasterio/issues/2378
-    window = windows.Window(
-        max(window.col_off, 0),  # type: ignore "Expected 0 positional arguments"
-        max(window.row_off, 0),
-        (max(window.col_off + window.width, 0) if window.col_off < 0 else window.width),
-        (
-            max(window.row_off + window.height, 0)
-            if window.row_off < 0
-            else window.height
-        ),
-    )
-    return window
 
 
 @given(
