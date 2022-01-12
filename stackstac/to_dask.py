@@ -20,7 +20,7 @@ from .reader_protocol import Reader
 def items_to_dask(
     asset_table: np.ndarray,
     spec: RasterSpec,
-    chunksize: int,
+    chunksize: int | tuple[int, int],
     resampling: Resampling = Resampling.nearest,
     dtype: np.dtype = np.dtype("float64"),
     fill_value: Union[int, float] = np.nan,
@@ -178,17 +178,27 @@ def fetch_raster_window(
             reader, asset_window = entry
             # Only read if the window we're fetching actually overlaps with the asset
             if windows.intersect(current_window, asset_window):
-                if all_empty:
-                    # Copy to a full-size array so it's writeable
-                    output = np.array(output)
-                    all_empty = False
-
                 # NOTE: when there are multiple assets, we _could_ parallelize these reads with our own threadpool.
                 # However, that would probably increase memory usage, since the internal, thread-local GDAL datasets
                 # would end up copied to even more threads.
 
                 # TODO when the Reader won't be rescaling, support passing `output` to avoid the copy?
-                output[index] = reader.read(current_window)
+                data = reader.read(current_window)
+
+                if all_empty:
+                    # Turn `output` from a broadcast-trick array a real array so it's writeable
+                    if (
+                        np.isnan(data)
+                        if np.isnan(fill_value)
+                        else np.equal(data, fill_value)
+                    ).all():
+                        # Unless the data we just read is all empty anyway
+                        continue
+                    output = np.array(output)
+                    all_empty = False
+
+                output[index] = data
+
     return output
 
 
