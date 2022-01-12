@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-from typing import ClassVar, Optional, Tuple, Type, Union
+from typing import ClassVar, Literal, Optional, Tuple, Type, Union
 import warnings
 
 import dask
@@ -16,11 +16,14 @@ from .raster_spec import Bbox, RasterSpec
 from .rio_reader import AutoParallelRioReader, LayeredEnv
 from .reader_protocol import Reader
 
+ChunkVal = Union[int, Literal["auto"], str, None]
+ChunksParam = Union[ChunkVal, tuple[ChunkVal, ...], dict[int, ChunkVal]]
+
 
 def items_to_dask(
     asset_table: np.ndarray,
     spec: RasterSpec,
-    chunksize: int | tuple[int, int],
+    chunksize: ChunksParam,
     resampling: Resampling = Resampling.nearest,
     dtype: np.dtype = np.dtype("float64"),
     fill_value: Union[int, float] = np.nan,
@@ -38,6 +41,9 @@ def items_to_dask(
             f"Either use `dtype={np.array(fill_value).dtype.name!r}`, or pick a different `fill_value`."
         )
 
+    chunks = normalize_chunks(chunksize, asset_table.shape + spec.shape, dtype)
+    chunks_tb, chunks_yx = chunks[:2], chunks[2:]
+
     # The overall strategy in this function is to materialize the outer two dimensions (items, assets)
     # as one dask array (the "asset table"), then map a function over it which opens each URL as a `Reader`
     # instance (the "reader table").
@@ -49,7 +55,7 @@ def items_to_dask(
     # make URLs into dask array with 1-element chunks (one chunk per asset)
     asset_table_dask = da.from_array(
         asset_table,
-        chunks=1,
+        chunks=chunks_tb,
         inline_array=True,
         name="asset-table-" + dask.base.tokenize(asset_table),
     )
@@ -72,10 +78,6 @@ def items_to_dask(
             reader,
             dtype=object,
         )
-
-    shape_yx = spec.shape
-    chunks_yx = da.core.normalize_chunks(chunksize, shape_yx)
-    chunks = reader_table.chunks + chunks_yx
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=da.core.PerformanceWarning)
@@ -232,3 +234,26 @@ class Slices(BlockwiseDep):
         self = cls.__new__(cls)
         self.starts = state
         return self
+
+
+def normalize_chunks(
+    chunks: ChunksParam, shape: tuple[int, int, int, int], dtype: np.dtype
+) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    "Normalize chunks to tuple of tuples, assuming 1D and 2D chunks only apply to spatial coordinates"
+    # If only 1 or 2 chunks are given, assume they're for the y,x coordinates,
+    # and that the time,band coordinates should be chunksize 1.
+    # TODO implement our own auto-chunking that makes the time,band coordinates
+    # >1 if the spatial chunking would create too many tasks?
+    if isinstance(chunks, int):
+        chunks = (1, 1, chunks, chunks)
+    elif isinstance(chunks, tuple) and len(chunks) == 2:
+        chunks = (1, 1) + chunks
+
+    return da.core.normalize_chunks(
+        chunks,
+        shape,
+        dtype=dtype,
+        previous_chunks=((1,) * shape[0], (1,) * shape[1], (shape[2],), (shape[3],)),
+        # ^ Give dask some hint of the physical layout of the data, so it prefers widening
+        # the spatial chunks over bundling together items/assets. This isn't totally accurate.
+    )

@@ -11,7 +11,7 @@ from dask.array.utils import assert_eq
 
 from stackstac.raster_spec import Bbox, RasterSpec
 from stackstac.prepare import ASSET_TABLE_DT
-from stackstac.to_dask import items_to_dask
+from stackstac.to_dask import ChunksParam, items_to_dask, normalize_chunks
 from stackstac.testing import strategies as st_stc
 
 
@@ -66,7 +66,16 @@ def asset_tables(
     asset_tables(max_side=5),
     st_stc.simple_bboxes(-4, -4, 4, 4, zero_size=False),
     st_stc.raster_dtypes,
-    st_np.array_shapes(min_dims=2, max_dims=2, max_side=10),
+    st_stc.chunksizes(
+        4,
+        max_side=10,
+        auto=False,
+        bytes=False,
+        none=False,
+        minus_one=False,
+        dicts=False,
+        singleton=False,
+    ),
 )
 @settings(max_examples=500, print_blob=True)
 def test_items_to_dask(
@@ -74,7 +83,7 @@ def test_items_to_dask(
     asset_table: np.ndarray,
     bounds: Bbox,
     dtype_: np.dtype,
-    chunksize_yx: tuple[int, int],
+    chunksize: tuple[int, int, int, int],
 ):
     spec_ = RasterSpec(4326, bounds, (0.5, 0.5))
     fill_value_ = data.draw(st_np.from_dtype(dtype_), label="fill_value")
@@ -129,8 +138,8 @@ def test_items_to_dask(
             np.testing.assert_equal(fill_value, fill_value_)
 
         def read(self, window: windows.Window) -> np.ndarray:
-            assert 0 < window.height <= chunksize_yx[0]
-            assert 0 < window.width <= chunksize_yx[1]
+            assert 0 < window.height <= chunksize[2]
+            assert 0 < window.width <= chunksize[3]
             # Read should be bypassed entirely if windows don't intersect
             assert windows.intersect(window, self.window)
             return self.full_data[window.toslices()]
@@ -147,16 +156,13 @@ def test_items_to_dask(
     arr = items_to_dask(
         asset_table,
         spec_,
-        chunksize_yx,
+        chunksize,
         dtype=dtype_,
         fill_value=fill_value_,
         reader=TestReader,
     )
-    assert arr.chunksize == (
-        1,
-        1,
-        min(chunksize_yx[0], spec_.shape[0]),
-        min(chunksize_yx[1], spec_.shape[1]),
+    assert arr.chunksize == tuple(
+        min(x, y) for x, y in zip(asset_table.shape + spec_.shape, chunksize)
     )
     assert arr.dtype == dtype_
 
@@ -184,3 +190,19 @@ def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:
         ),
     )
     return window
+
+
+@given(
+    st_stc.chunksizes(4, max_side=1000),
+    st_np.array_shapes(min_dims=4, max_dims=4),
+    st_stc.raster_dtypes,
+)
+def test_normalize_chunks(
+    chunksize: ChunksParam, shape: tuple[int, int, int, int], dtype: np.dtype
+):
+    chunks = normalize_chunks(chunksize, shape, dtype)
+    numblocks = tuple(map(len, chunks))
+    assert len(numblocks) == 4
+    assert all(x >= 1 for t in chunks for x in t)
+    if isinstance(chunksize, int) or isinstance(chunks, tuple) and len(chunks) == 2:
+        assert numblocks[:2] == shape[:2]
