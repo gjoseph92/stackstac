@@ -167,6 +167,7 @@ def test_items_to_dask(
     assert arr.dtype == dtype_
 
     assert_eq(arr, results, equal_nan=True)
+    # TODO test broadcast-trick chunks
 
 
 def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:

@@ -52,7 +52,7 @@ def items_to_dask(
     # Materializing the (items, assets) dimensions is unavoidable: every asset has a distinct URL, so that information
     # has to be included somehow.
 
-    # make URLs into dask array with 1-element chunks (one chunk per asset)
+    # make URLs into dask array, chunked as requested for the time,band dimensions
     asset_table_dask = da.from_array(
         asset_table,
         chunks=chunks_tb,
@@ -204,10 +204,33 @@ def fetch_raster_window(
     return output
 
 
+def normalize_chunks(
+    chunks: ChunksParam, shape: tuple[int, int, int, int], dtype: np.dtype
+) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    "Normalize chunks to tuple of tuples, assuming 1D and 2D chunks only apply to spatial coordinates"
+    # If only 1 or 2 chunks are given, assume they're for the y,x coordinates,
+    # and that the time,band coordinates should be chunksize 1.
+    # TODO implement our own auto-chunking that makes the time,band coordinates
+    # >1 if the spatial chunking would create too many tasks?
+    if isinstance(chunks, int):
+        chunks = (1, 1, chunks, chunks)
+    elif isinstance(chunks, tuple) and len(chunks) == 2:
+        chunks = (1, 1) + chunks
+
+    return da.core.normalize_chunks(
+        chunks,
+        shape,
+        dtype=dtype,
+        previous_chunks=((1,) * shape[0], (1,) * shape[1], (shape[2],), (shape[3],)),
+        # ^ Give dask some hint of the physical layout of the data, so it prefers widening
+        # the spatial chunks over bundling together items/assets. This isn't totally accurate.
+    )
+
+
+# FIXME: Get this from Dask once https://github.com/dask/dask/pull/7417 is merged!
+# The scheduler will refuse to import it without passlisting stackstac in `distributed.scheduler.allowed-imports`.
 class Slices(BlockwiseDep):
     "Produces the slice into the full-size array corresponding to the current chunk"
-    # TODO this needs to be in dask/dask, otherwise the scheduler will refuse to import it
-    # without passlisting stackstac in `distributed.scheduler.allowed-imports`.
 
     starts: list[tuple[int, ...]]
     produces_tasks: ClassVar[bool] = False
@@ -234,26 +257,3 @@ class Slices(BlockwiseDep):
         self = cls.__new__(cls)
         self.starts = state
         return self
-
-
-def normalize_chunks(
-    chunks: ChunksParam, shape: tuple[int, int, int, int], dtype: np.dtype
-) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
-    "Normalize chunks to tuple of tuples, assuming 1D and 2D chunks only apply to spatial coordinates"
-    # If only 1 or 2 chunks are given, assume they're for the y,x coordinates,
-    # and that the time,band coordinates should be chunksize 1.
-    # TODO implement our own auto-chunking that makes the time,band coordinates
-    # >1 if the spatial chunking would create too many tasks?
-    if isinstance(chunks, int):
-        chunks = (1, 1, chunks, chunks)
-    elif isinstance(chunks, tuple) and len(chunks) == 2:
-        chunks = (1, 1) + chunks
-
-    return da.core.normalize_chunks(
-        chunks,
-        shape,
-        dtype=dtype,
-        previous_chunks=((1,) * shape[0], (1,) * shape[1], (shape[2],), (shape[3],)),
-        # ^ Give dask some hint of the physical layout of the data, so it prefers widening
-        # the spatial chunks over bundling together items/assets. This isn't totally accurate.
-    )
