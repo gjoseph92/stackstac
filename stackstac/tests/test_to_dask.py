@@ -66,13 +66,17 @@ def asset_tables(
     asset_tables(max_side=5),
     st_stc.simple_bboxes(-4, -4, 4, 4, zero_size=False),
     st_stc.raster_dtypes,
+    st_np.array_shapes(min_dims=2, max_dims=2, max_side=10),
 )
 @settings(max_examples=500, print_blob=True)
 def test_items_to_dask(
-    data: st.DataObject, asset_table: np.ndarray, bounds: Bbox, dtype_: np.dtype
+    data: st.DataObject,
+    asset_table: np.ndarray,
+    bounds: Bbox,
+    dtype_: np.dtype,
+    chunksize_yx: tuple[int, int],
 ):
     spec_ = RasterSpec(4326, bounds, (0.5, 0.5))
-    chunksize = 2
     fill_value_ = data.draw(st_np.from_dtype(dtype_), label="fill_value")
 
     # Build expected array of the final stack.
@@ -125,7 +129,8 @@ def test_items_to_dask(
             np.testing.assert_equal(fill_value, fill_value_)
 
         def read(self, window: windows.Window) -> np.ndarray:
-            assert (window.height, window.width) == (chunksize, chunksize)
+            assert 0 < window.height <= chunksize_yx[0]
+            assert 0 < window.width <= chunksize_yx[1]
             # Read should be bypassed entirely if windows don't intersect
             assert windows.intersect(window, self.window)
             return self.full_data[window.toslices()]
@@ -142,12 +147,17 @@ def test_items_to_dask(
     arr = items_to_dask(
         asset_table,
         spec_,
-        chunksize,
+        chunksize_yx,
         dtype=dtype_,
         fill_value=fill_value_,
         reader=TestReader,
     )
-    assert arr.chunksize == (1, 1, chunksize, chunksize)
+    assert arr.chunksize == (
+        1,
+        1,
+        min(chunksize_yx[0], spec_.shape[0]),
+        min(chunksize_yx[1], spec_.shape[1]),
+    )
     assert arr.dtype == dtype_
 
     assert_eq(arr, results, equal_nan=True)
@@ -164,7 +174,7 @@ def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:
 
     # Trim negative `row_off`/`col_off` to work around https://github.com/rasterio/rasterio/issues/2378
     window = windows.Window(
-        max(window.col_off, 0),
+        max(window.col_off, 0),  # type: ignore "Expected 0 positional arguments"
         max(window.row_off, 0),
         (max(window.col_off + window.width, 0) if window.col_off < 0 else window.width),
         (
