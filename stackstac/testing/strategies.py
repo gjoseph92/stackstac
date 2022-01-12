@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 # from math import isfinite
 # import sys
 
-# from hypothesis import assume, reject, strategies as st
+from hypothesis import assume, reject, strategies as st
 import hypothesis.extra.numpy as st_np
+
 # import numpy as np
 
-# from stackstac.geom_utils import Bbox, bounds_width_height
+from stackstac.geom_utils import Bbox
+
 # from stackstac.prepare import ASSET_TABLE_DT
 # from stackstac.raster_spec import RasterSpec
 
@@ -97,42 +100,20 @@ import hypothesis.extra.numpy as st_np
 #     return (west, south, east, north)
 
 
-# @st.composite
-# def simple_bboxes(draw: st.DrawFn, zero_size: bool = True) -> Bbox:
-#     west = draw(st.integers(-100, 99))
-#     south = draw(st.integers(-100, 99))
-#     east = draw(st.integers(west if zero_size else west + 1, 100))
-#     north = draw(st.integers(south if zero_size else south + 1, 100))
-#     factor = draw(st.integers(1, 4))
-#     return (west / factor, south / factor, east / factor, north / factor)
-
-
-# @st.composite
-# def asset_tables(
-#     draw: st.DrawFn,
-#     max_side: int | None = None,
-#     bbox: Bbox | None = None,
-# ) -> np.ndarray:
-#     shape = draw(
-#         st_np.array_shapes(min_dims=2, max_dims=2, max_side=max_side), label="shape"
-#     )
-#     bounds_arr = draw(
-#         st_np.arrays(
-#             object,
-#             shape,
-#             # elements=bboxes() if not bbox else bboxes(*bbox),
-#             elements=simple_bboxes(),
-#             fill=st.none(),
-#         ),
-#         label="bounds_arr",
-#     )
-
-#     asset_table = np.empty_like(bounds_arr, ASSET_TABLE_DT)
-#     for (i, j), bounds in np.ndenumerate(bounds_arr):
-#         if bounds:
-#             asset_table[i, j] = (f"fake://{i}/{j}", bounds)
-
-#     return asset_table
+@st.composite
+def simple_bboxes(
+    draw: st.DrawFn,
+    minx: int = -100,
+    miny: int = -100,
+    maxx: int = 100,
+    maxy: int = 100,
+    zero_size: bool = True,
+) -> Bbox:
+    west = draw(st.integers(minx, maxx - 1))
+    south = draw(st.integers(miny, maxy - 1))
+    east = draw(st.integers(west if zero_size else west + 1, maxy))
+    north = draw(st.integers(south if zero_size else south + 1, maxy))
+    return (west, south, east, north)
 
 
 # def resolutions(
