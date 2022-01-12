@@ -47,17 +47,13 @@ def test_items_to_dask_basic():
                 precision=0.0
                 # ^ https://github.com/rasterio/rasterio/issues/2374
             )
-            # convert to int so `toslices` works for indexing
-            window_int = window.round_lengths().round_offsets()
-            # sanity check; rounding should not have changed anything
-            assert window_int == window
-            asset_windows[url] = window_int
+            asset_windows[url] = window
 
-            chunk = results[(i, j) + window_int.toslices()]
+            chunk = results[(i, j) + windows.window_index(window)]
             if chunk.size:
                 # Asset falls within final bounds
                 chunk[:] = np.random.default_rng().integers(
-                    0, 10000, (int(window_int.height), int(window_int.width)), dtype_
+                    0, 10000, (int(window.height), int(window.width)), dtype_
                 )
 
     class TestReader:
