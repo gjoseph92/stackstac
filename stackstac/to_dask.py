@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import itertools
-from typing import ClassVar, Literal, Optional, Tuple, Type, Union
+from typing import ClassVar, Dict, Literal, Optional, Tuple, Type, Union
 import warnings
 
 from affine import Affine
@@ -18,7 +18,7 @@ from .rio_reader import AutoParallelRioReader, LayeredEnv
 from .reader_protocol import Reader
 
 ChunkVal = Union[int, Literal["auto"], str, None]
-ChunksParam = Union[ChunkVal, tuple[ChunkVal, ...], dict[int, ChunkVal]]
+ChunksParam = Union[ChunkVal, Tuple[ChunkVal, ...], Dict[int, ChunkVal]]
 
 
 def items_to_dask(
@@ -105,7 +105,7 @@ def items_to_dask(
     return rasters
 
 
-ReaderTableEntry = Optional[tuple[Reader, windows.Window]]
+ReaderTableEntry = Optional[Tuple[Reader, windows.Window]]
 
 
 def asset_table_to_reader_and_window(
@@ -202,8 +202,8 @@ def fetch_raster_window(
 
 
 def normalize_chunks(
-    chunks: ChunksParam, shape: tuple[int, int, int, int], dtype: np.dtype
-) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...]]:
+    chunks: ChunksParam, shape: Tuple[int, int, int, int], dtype: np.dtype
+) -> Tuple[Tuple[int, ...], Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]:
     """
     Normalize chunks to tuple of tuples, assuming 1D and 2D chunks only apply to spatial coordinates
 
@@ -261,7 +261,7 @@ def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:
 class Slices(BlockwiseDep):
     "Produces the slice into the full-size array corresponding to the current chunk"
 
-    starts: list[tuple[int, ...]]
+    starts: list[Tuple[int, ...]]
     produces_tasks: ClassVar[bool] = False
 
     def __init__(self, chunks: Tuple[Tuple[int, ...], ...]):
