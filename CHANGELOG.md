@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.1 (2022-01-20)
+- Support `nodata=` argument to `stackstac.mosaic` [@TomAugspurger](https://github.com/TomAugspurger) [@gjoseph92](https://github.com/gjoseph92)
+
 ## 0.3.0 (2022-01-20)
 - **Breaking change:** `fill_value=None` is no longer supported. You must always specify a `fill_value` (default is still NaN); it can no longer be inferred from the GeoTIFF files. [@gjoseph92](https://github.com/gjoseph92)
 - Respect `fill_value` for array chunks that don't overlap with any Asset, instead of always using NaN [@gjoseph92](https://github.com/gjoseph92) [@TomAugspurger](https://github.com/TomAugspurger)
