@@ -45,11 +45,21 @@ def mosaic(
     nodata:
         The value to treat as invalid. Default: NaN.
 
+        To catch common mis-use, raises a ``ValueError`` if ``nodata=nan``
+        is used when the array has an integer or boolean dtype. Since NaN
+        cannot exist in those arrays, this indicates a different ``nodata``
+        value needs to be used.
+
     Returns
     -------
     xarray.DataArray:
         The mosaicked `~xarray.DataArray`.
     """
+    if np.isnan(nodata) and arr.dtype.kind in "biu":
+        # Try to catch usage errors forgetting to set `nodata=`
+        raise ValueError(
+            f"Cannot use {nodata=} when mosaicing a {arr.dtype} array, since {nodata} cannot exist in the array."
+        )
     return arr.reduce(
         _mosaic,
         dim=dim,
