@@ -45,6 +45,11 @@ def mosaic(
     nodata:
         The value to treat as invalid. Default: NaN.
 
+        To catch common mis-use, raises a ``ValueError`` if ``nodata=nan``
+        is used when the array has an integer or boolean dtype. Since NaN
+        cannot exist in those arrays, this indicates a different ``nodata``
+        value needs to be used.
+
     Returns
     -------
     xarray.DataArray:
