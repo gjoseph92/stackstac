@@ -50,6 +50,11 @@ def mosaic(
     xarray.DataArray:
         The mosaicked `~xarray.DataArray`.
     """
+    if np.isnan(nodata) and arr.dtype.kind in "biu":
+        # Try to catch usage errors forgetting to set `nodata=`
+        raise ValueError(
+            f"Cannot use {nodata=} when mosaicing a {arr.dtype} array, since {nodata} cannot exist in the array."
+        )
     return arr.reduce(
         _mosaic,
         dim=dim,
