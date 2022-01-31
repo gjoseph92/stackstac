@@ -2637,7 +2637,7 @@ viz = ["aiohttp", "cachetools", "distributed", "ipyleaflet", "jupyter-server-pro
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "10c0d8d7933453a6e975522defe70299bfb7150f0234b5483e6f6ac1cf5f6203"
+content-hash = "280d124e3d767339e5a21bb1dc058607c13e9976577283a76ccd587e7c6f192c"
 
 [metadata.files]
 affine = [

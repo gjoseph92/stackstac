@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import itertools
-from typing import ClassVar, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Dict, Literal, Optional, Tuple, Type, Union
 import warnings
 
 from affine import Affine
 import dask
 import dask.array as da
-from dask.blockwise import BlockwiseDep, blockwise
+from dask.blockwise import blockwise
 from dask.highlevelgraph import HighLevelGraph
+from dask.layers import ArraySliceDep
 import numpy as np
 from rasterio import windows
 from rasterio.enums import Resampling
@@ -48,7 +48,7 @@ def items_to_dask(
     # The overall strategy in this function is to materialize the outer two dimensions (items, assets)
     # as one dask array (the "asset table"), then map a function over it which opens each URL as a `Reader`
     # instance (the "reader table").
-    # Then, we use the `Slices` `BlockwiseDep` to represent the inner inner two dimensions (y, x), and
+    # Then, we use the `ArraySliceDep` `BlockwiseDep` to represent the inner inner two dimensions (y, x), and
     # `Blockwise` to create the cartesian product between them, avoiding materializing that entire graph.
     # Materializing the (items, assets) dimensions is unavoidable: every asset has a distinct URL, so that information
     # has to be included somehow.
@@ -91,7 +91,7 @@ def items_to_dask(
             "tbyx",
             reader_table.name,
             "tb",
-            Slices(chunks_yx),
+            ArraySliceDep(chunks_yx),
             "yx",
             dtype,
             None,
@@ -254,35 +254,3 @@ def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:
         ),
     )
     return window
-
-
-# FIXME: Get this from Dask once https://github.com/dask/dask/pull/7417 is merged!
-# The scheduler will refuse to import it without passlisting stackstac in `distributed.scheduler.allowed-imports`.
-class Slices(BlockwiseDep):
-    "Produces the slice into the full-size array corresponding to the current chunk"
-
-    starts: list[Tuple[int, ...]]
-    produces_tasks: ClassVar[bool] = False
-
-    def __init__(self, chunks: Tuple[Tuple[int, ...], ...]):
-        self.starts = [tuple(itertools.accumulate(c, initial=0)) for c in chunks]
-
-    def __getitem__(self, idx: Tuple[int, ...]) -> Tuple[slice, ...]:
-        return tuple(
-            slice(start[i], start[i + 1]) for i, start in zip(idx, self.starts)
-        )
-
-    @property
-    def numblocks(self) -> list[int]:
-        return [len(s) - 1 for s in self.starts]
-
-    def __dask_distributed_pack__(
-        self, required_indices: Optional[list[Tuple[int, ...]]] = None
-    ) -> list[Tuple[int, ...]]:
-        return self.starts
-
-    @classmethod
-    def __dask_distributed_unpack__(cls, state: list[Tuple[int, ...]]) -> Slices:
-        self = cls.__new__(cls)
-        self.starts = state
-        return self
