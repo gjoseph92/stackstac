@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 (2022-01-20)
+- Support `nodata=` argument to `stackstac.mosaic` [@TomAugspurger](https://github.com/TomAugspurger) [@gjoseph92](https://github.com/gjoseph92)
+
+## 0.3.0 (2022-01-20)
+- **Breaking change:** `fill_value=None` is no longer supported. You must always specify a `fill_value` (default is still NaN); it can no longer be inferred from the GeoTIFF files. [@gjoseph92](https://github.com/gjoseph92)
+- Respect `fill_value` for array chunks that don't overlap with any Asset, instead of always using NaN [@gjoseph92](https://github.com/gjoseph92) [@TomAugspurger](https://github.com/TomAugspurger)
+- Fix bugs with `stackstac.show` when the path to your notebook file had the word `notebook`, `lab`, or `voila` in it [@robintw](https://github.com/robintw)
+- Support 2022 version of Dask [@gjoseph92](https://github.com/gjoseph92)
+- Relax NumPy requirement, supporting any NumPy version supported by Dask [@gjoseph92](https://github.com/gjoseph92) [@scottyhq](https://github.com/scottyhq)
+- Require minimum Pillow version of 9.0, due to vulnerabilities reported in older versions (in features unused by stackstac)
+
 ## 0.2.2 (2021-12-03)
 - Support [pystac](https://github.com/stac-utils/pystac) ItemCollections [@TomAugspurger](https://github.com/TomAugspurger), [@scottyhq](https://github.com/scottyhq)
 - Fix bug where repeated metadata values would be None [@gjoseph92](https://github.com/gjoseph92) [@scottyhq](https://github.com/scottyhq)
