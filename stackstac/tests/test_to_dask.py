@@ -6,6 +6,8 @@ from hypothesis import given, settings, strategies as st
 import hypothesis.extra.numpy as st_np
 import numpy as np
 from rasterio import windows
+import dask.core
+import dask.threaded
 from dask.array.utils import assert_eq
 
 from stackstac.raster_spec import Bbox, RasterSpec
@@ -171,7 +173,17 @@ def test_items_to_dask(
     assert arr.dtype == dtype_
 
     assert_eq(arr, results, equal_nan=True)
-    # TODO test broadcast-trick chunks
+
+    # Check that entirely-empty chunks are broadcast-tricked into being tiny.
+    # NOTE: unfortunately, this computes the array again, which slows down tests.
+    # But passing a computed array into `assert_eq` would skip handy checks for chunks, meta, etc.
+    TestReader.opened.clear()
+    chunks = dask.threaded.get(arr.dask, list(dask.core.flatten(arr.__dask_keys__())))
+    for chunk in chunks:
+        if (
+            np.isnan(chunk) if np.isnan(fill_value_) else np.equal(chunk, fill_value_)
+        ).all():
+            assert chunk.strides == (0, 0, 0, 0)
 
 
 @given(
