@@ -168,7 +168,7 @@ def stack(
         such as ``1024``, ``(1024, 2048)``, ``(10, "auto", 512, 512)``, ``15 MB``, etc.
 
         If only 1 or 2 sizes are given, like ``2048`` or ``(512, 1024)``, this is used to chunk
-        just the spatial dimensions. The time and band dimensions will have a chunksize of 1,
+        just the spatial dimensions (last two). The time and band dimensions will have a chunksize of 1,
         meaning that every STAC Asset will be its own chunk. (This is the default.)
 
         If you'll be filtering items somewhat randomly (like ``stack[stack["eo:cloud_cover"] < 20]``),
@@ -180,7 +180,7 @@ def stack(
         for the time or band dimensions can help a lot. For example, ``chunksize=(10, 1, 512, 512)`` would
         process in 512x512 pixel tiles, loading 10 assets at a time per tile. ``chunksize=(-1, 1, 512, 512)``
         would load *every* item within the 512x512 tile into the chunk.
-        If you'll be immediately compositing the data (like ``.mean("time")``), doing this is
+        If you'll be immediately compositing the data (like ``.median("time")``), doing this is
         often a good idea because you'll be flattening the assets together anyway.
     dtype:
         The NumPy data type of the output array. Default: ``float64``. Must be a data type
