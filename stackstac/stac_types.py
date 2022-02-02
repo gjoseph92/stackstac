@@ -19,10 +19,12 @@ from typing import (
     cast,
 )
 
+possible_problems: list[str] = []
+
 try:
-    from satstac import Item as SatstacItem
-    from satstac import ItemCollection as SatstacItemCollection
-except ImportError:
+    from satstac.item import Item as SatstacItem
+    from satstac.itemcollection import ItemCollection as SatstacItemCollection
+except ImportError as e:
 
     class SatstacItem:
         _data: ItemDict
@@ -31,11 +33,20 @@ except ImportError:
         def __iter__(self) -> Iterator[SatstacItem]:
             ...
 
+    if not isinstance(e, ModuleNotFoundError):
+        possible_problems.append(
+            "Your version of `satstac` is too old (or new) for stackstac. "
+            "`satstac.Item` and `satstac.ItemCollection` aren't supported "
+            f"because they could not be imported: {e!r}"
+        )
+    del e
+
 
 try:
     from pystac import Catalog as PystacCatalog
     from pystac import Item as PystacItem
-except ImportError:
+    from pystac import ItemCollection as PystacItemCollection
+except ImportError as e:
 
     class PystacItem:
         def to_dict(self) -> ItemDict:
@@ -45,17 +56,19 @@ except ImportError:
         def get_all_items(self) -> Iterator[PystacItem]:
             ...
 
-
-# pystac 1.0
-try:
-    from pystac import ItemCollection as PystacItemCollection
-except ImportError:
-
     class PystacItemCollection:
         features: List[PystacItem]
 
         def __iter__(self) -> Iterator[PystacItem]:
             ...
+
+    if not isinstance(e, ModuleNotFoundError):
+        possible_problems.append(
+            "Your version of `pystac` is too old (or new) for stackstac. "
+            "`pystac.Item`, `pystac.ItemCollection`, and `pystac.Catalog` aren't supported "
+            f"because they could not be imported: {e!r}"
+        )
+    del e
 
 
 class EOBand(TypedDict, total=False):
@@ -160,4 +173,11 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     if isinstance(items, PystacItemCollection):
         return [item.to_dict() for item in items]
 
-    raise TypeError(f"Unrecognized STAC collection type {type(items)}: {items!r}")
+    raise TypeError(
+        f"Unrecognized STAC collection type {type(items)}: {items!r}"
+        + (
+            "\n".join(["\nPossible problems:"] + possible_problems)
+            if possible_problems
+            else ""
+        )
+    )
