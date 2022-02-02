@@ -14,7 +14,7 @@ Pillow = {version = "^9.0.0", optional = true}
 Sphinx = {version = "^3.5.4", optional = true}
 aiohttp = {version = "^3.7.4", optional = true}
 cachetools = {version = "^4.2.2", optional = true}
-coiled = {version = "^0", optional = true}
+coiled = {version = "^0", optional = true, python = "<3.10"}
 dask = {extras = ["array"], version = "^2022.1.1"}
 distributed = {version = "^2022.1.1", optional = true}
 furo = {version = "^2021.4.11-beta.34", optional = true}
@@ -42,23 +42,20 @@ sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
 xarray = ">=0.18,<1"
 
 [tool.poetry.dev-dependencies]
-Pympler = "^0.9"
-awkward = {version = "^1.1.2"}
 black = "^21.4b2"
 dask-labextension = {version = "^5.0.1"}
-debugpy = "^1.2.1"
-filprofiler = "^0.17.0"
 flake8 = "^3.9.1"
 graphviz = "^0.16"
+hypothesis = "^6.35.0"
 jupyterlab = "^3.0.14"
 keyring = "^23.0.1"
-py-spy = "^0.3.4"
+py-spy = "*"
 pystac = "^1"
+pytest = "^6.2.5"
+scheduler-profilers = {git = "https://github.com/gjoseph92/scheduler-profilers.git", rev = "main"}
 snakeviz = "^2.1.0"
 sphinx-autobuild = "^2021.3.14"
 twine = "^3.4.1"
-pytest = "^6.2.5"
-hypothesis = "^6.35.0"
 
 [tool.poetry.extras]
 binder = [
