@@ -1,4 +1,4 @@
-from typing import Tuple, Type, Union, cast
+from typing import Tuple, Type, Union
 import re
 
 import numpy as np
@@ -37,11 +37,7 @@ class NodataReader:
 
 
 def nodata_for_window(window: Window, fill_value: Union[int, float], dtype: np.dtype):
-    height = cast(int, window.height)
-    width = cast(int, window.width)
-    # Argument of type "tuple[_T@attrib, _T@attrib]" cannot be assigned to parameter "shape" of type "_ShapeLike"
-    # in function "full"
-    return np.full((height, width), fill_value, dtype)
+    return np.full((window.height, window.width), fill_value, dtype)
 
 
 def exception_matches(e: Exception, patterns: Tuple[Exception, ...]) -> bool:

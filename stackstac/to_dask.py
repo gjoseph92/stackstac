@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import itertools
-from typing import Optional, Tuple, Type, TypeVar, Union
+from typing import Dict, Literal, Optional, Tuple, Type, Union
 import warnings
 
+from affine import Affine
 import dask
 import dask.array as da
+from dask.blockwise import blockwise
+from dask.highlevelgraph import HighLevelGraph
+from dask.layers import ArraySliceDep
 import numpy as np
 from rasterio import windows
 from rasterio.enums import Resampling
@@ -14,14 +17,14 @@ from .raster_spec import Bbox, RasterSpec
 from .rio_reader import AutoParallelRioReader, LayeredEnv
 from .reader_protocol import Reader
 
-# from xarray.backends import CachingFileManager
-# from xarray.backends.locks import DummyLock
+ChunkVal = Union[int, Literal["auto"], str, None]
+ChunksParam = Union[ChunkVal, Tuple[ChunkVal, ...], Dict[int, ChunkVal]]
 
 
 def items_to_dask(
     asset_table: np.ndarray,
     spec: RasterSpec,
-    chunksize: int,
+    chunksize: ChunksParam,
     resampling: Resampling = Resampling.nearest,
     dtype: np.dtype = np.dtype("float64"),
     fill_value: Union[int, float] = np.nan,
@@ -30,81 +33,83 @@ def items_to_dask(
     gdal_env: Optional[LayeredEnv] = None,
     errors_as_nodata: Tuple[Exception, ...] = (),
 ) -> da.Array:
+    "Create a dask Array from an asset table"
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
 
-    if fill_value is not None and not np.can_cast(fill_value, dtype):
+    if not np.can_cast(fill_value, dtype):
         raise ValueError(
             f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
             f"Either use `dtype={np.array(fill_value).dtype.name!r}`, or pick a different `fill_value`."
         )
 
+    chunks = normalize_chunks(chunksize, asset_table.shape + spec.shape, dtype)
+    chunks_tb, chunks_yx = chunks[:2], chunks[2:]
+
     # The overall strategy in this function is to materialize the outer two dimensions (items, assets)
-    # as one dask array, then the chunks of the inner two dimensions (y, x) as another dask array, then use
-    # Blockwise to represent the cartesian product between them, to avoid materializing that entire graph.
+    # as one dask array (the "asset table"), then map a function over it which opens each URL as a `Reader`
+    # instance (the "reader table").
+    # Then, we use the `ArraySliceDep` `BlockwiseDep` to represent the inner inner two dimensions (y, x), and
+    # `Blockwise` to create the cartesian product between them, avoiding materializing that entire graph.
     # Materializing the (items, assets) dimensions is unavoidable: every asset has a distinct URL, so that information
     # has to be included somehow.
 
-    # make URLs into dask array with 1-element chunks (one chunk per asset)
+    # make URLs into dask array, chunked as requested for the time,band dimensions
     asset_table_dask = da.from_array(
         asset_table,
-        chunks=1,
+        chunks=chunks_tb,
         inline_array=True,
         name="asset-table-" + dask.base.tokenize(asset_table),
     )
 
-    # then map a function over each chunk that opens that URL as a rasterio dataset
-    # HACK: `url_to_ds` doesn't even return a NumPy array, so `datasets.compute()` would fail
-    # (because the chunks can't be `np.concatenate`d together).
-    # but we're just using this for the graph.
-    # So now we have an array of shape (items, assets), chunksize 1---the outer two dimensions of our final array.
-    datasets = asset_table_dask.map_blocks(
-        asset_entry_to_reader_and_window,
-        spec,
-        resampling,
-        dtype,
-        fill_value,
-        rescale,
-        gdal_env,
-        errors_as_nodata,
-        reader,
-        meta=asset_table_dask._meta,
-    )
-
-    # MEGAHACK: generate a fake array for our spatial dimensions following `shape` and `chunksize`,
-    # but where each chunk is not actually NumPy a array, but just a 2-tuple of the (y-slice, x-slice)
-    # to `read` from the rasterio dataset to fetch that window of data.
-    shape = spec.shape
-    name = "slices-" + dask.base.tokenize(chunksize, shape)
-    chunks = da.core.normalize_chunks(chunksize, shape)
-    keys = itertools.product([name], *(range(len(bds)) for bds in chunks))
-    slices = da.core.slices_from_chunks(chunks)
-    # HACK: `slices_fake_arr` is in no way a real dask array: the chunks aren't ndarrays; they're tuples of slices!
-    # We just stick it in an Array container to make dask's blockwise logic handle broadcasting between the graphs of
-    # `datasets` and `slices_fake_arr`.
-    slices_fake_arr = da.Array(
-        dict(zip(keys, slices)), name, chunks, meta=datasets._meta
-    )
+    # map a function over each chunk that opens that URL as a rasterio dataset
+    with dask.annotate(fuse=False):
+        # ^ HACK: prevent this layer from fusing to the next `fetch_raster_window` one.
+        # This uses the fact that blockwise fusion doesn't happen when the layers' annotations
+        # don't match, which may not be behavior we can rely on.
+        # (The actual content of the annotation is irrelevant here, just that there is one.)
+        reader_table = asset_table_dask.map_blocks(
+            asset_table_to_reader_and_window,
+            spec,
+            resampling,
+            dtype,
+            fill_value,
+            rescale,
+            gdal_env,
+            errors_as_nodata,
+            reader,
+            dtype=object,
+        )
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=da.core.PerformanceWarning)
 
-        rasters = da.blockwise(
+        name = f"fetch_raster_window-{dask.base.tokenize(reader_table, chunks, dtype, fill_value)}"
+        # TODO use `da.blockwise` once it supports `BlockwiseDep`s as arguments
+        lyr = blockwise(
             fetch_raster_window,
+            name,
             "tbyx",
-            datasets,
+            reader_table.name,
             "tb",
-            slices_fake_arr,
+            ArraySliceDep(chunks_yx),
             "yx",
-            meta=np.ndarray((), dtype=dtype),  # TODO dtype
+            dtype,
+            None,
+            fill_value,
+            None,
+            numblocks={reader_table.name: reader_table.numblocks},  # ugh
         )
+        dsk = HighLevelGraph.from_collections(name, lyr, [reader_table])
+        rasters = da.Array(dsk, name, chunks, meta=np.ndarray((), dtype=dtype))
+
     return rasters
 
 
-ReaderT = TypeVar("ReaderT", bound=Reader)
+ReaderTableEntry = Optional[Tuple[Reader, windows.Window]]
 
 
-def asset_entry_to_reader_and_window(
-    asset_entry: np.ndarray,
+def asset_table_to_reader_and_window(
+    asset_table: np.ndarray,
     spec: RasterSpec,
     resampling: Resampling,
     dtype: np.dtype,
@@ -112,66 +117,140 @@ def asset_entry_to_reader_and_window(
     rescale: bool,
     gdal_env: Optional[LayeredEnv],
     errors_as_nodata: Tuple[Exception, ...],
-    reader: Type[ReaderT],
-) -> Tuple[ReaderT, windows.Window] | np.ndarray:
-    asset_entry = asset_entry[0, 0]
-    # ^ because dask adds extra outer dims in `from_array`
-    url = asset_entry["url"]
-    if url is None:
-        # Signifies empty value
-        return np.array(fill_value, dtype)
+    reader: Type[Reader],
+) -> np.ndarray:
+    """
+    "Open" an asset table by creating a `Reader` for each asset.
 
-    asset_bounds: Bbox = asset_entry["bounds"]
-    asset_window = windows.from_bounds(*asset_bounds, transform=spec.transform)
+    This function converts the asset table (or chunks thereof) into an object array,
+    where each element contains a tuple of the `Reader` and `Window` for that asset,
+    or None if the element has no URL.
+    """
+    reader_table = np.empty_like(asset_table, dtype=object)
+    for index, asset_entry in np.ndenumerate(asset_table):
+        url: str | None = asset_entry["url"]
+        if url:
+            asset_bounds: Bbox = asset_entry["bounds"]
+            asset_window = window_from_bounds(asset_bounds, spec.transform)
 
-    return (
-        # CachingFileManager(
-        #     AutoParallelRioBackend,  # TODO other backends
-        #     url,
-        #     spec,
-        #     resampling,
-        #     gdal_env,
-        #     lock=DummyLock(),
-        #     # ^ NOTE: this lock only protects the file cache, not the file itself.
-        #     # xarray's file cache is already thread-safe, so using a lock is pointless.
-        # ),
-        # NOTE: skip the `CachingFileManager` for now to be sure datasets aren't leaked.
-        # There are a few issues with `CachingFileManager`: faulty ref-counting logic,
-        # and misleading `close` and `lock` interfaces. Either refactor that upstream,
-        # or implement our own caching logic.
-        reader(
-            url=url,
-            spec=spec,
-            resampling=resampling,
-            dtype=dtype,
-            fill_value=fill_value,
-            rescale=rescale,
-            gdal_env=gdal_env,
-            errors_as_nodata=errors_as_nodata,
-        ),
-        asset_window,
-    )
+            entry: ReaderTableEntry = (
+                reader(
+                    url=url,
+                    spec=spec,
+                    resampling=resampling,
+                    dtype=dtype,
+                    fill_value=fill_value,
+                    rescale=rescale,
+                    gdal_env=gdal_env,
+                    errors_as_nodata=errors_as_nodata,
+                ),
+                asset_window,
+            )
+            reader_table[index] = entry
+    return reader_table
 
 
 def fetch_raster_window(
-    asset_entry: Tuple[ReaderT, windows.Window] | np.ndarray,
-    slices: Tuple[slice, ...],
+    reader_table: np.ndarray,
+    slices: Tuple[slice, slice],
+    dtype: np.dtype,
+    fill_value: Union[int, float],
 ) -> np.ndarray:
+    "Do a spatially-windowed read of raster data from all the Readers in the table."
+    assert len(slices) == 2, slices
     current_window = windows.Window.from_slices(*slices)
-    if isinstance(asset_entry, tuple):
-        reader, asset_window = asset_entry
 
-        # check that the window we're fetching overlaps with the asset
-        if windows.intersect(current_window, asset_window):
-            # backend: Backend = manager.acquire(needs_lock=False)
-            data = reader.read(current_window)
+    assert reader_table.size, f"Empty reader_table: {reader_table.shape=}"
+    # Start with an empty output array, using the broadcast trick for even fewer memz.
+    # If none of the assets end up actually existing, or overlapping the current window,
+    # or containing data, we'll just return this 1-element array that's been broadcast
+    # to look like a full-size array.
+    output = np.broadcast_to(
+        np.array(fill_value, dtype),
+        reader_table.shape + (current_window.height, current_window.width),
+    )
 
-            return data[None, None]
-        fill_arr = np.array(reader.fill_value, reader.dtype)
-    else:
-        fill_arr: np.ndarray = asset_entry
+    all_empty: bool = True
+    entry: ReaderTableEntry
+    for index, entry in np.ndenumerate(reader_table):
+        if entry:
+            reader, asset_window = entry
+            # Only read if the window we're fetching actually overlaps with the asset
+            if windows.intersect(current_window, asset_window):
+                # NOTE: when there are multiple assets, we _could_ parallelize these reads with our own threadpool.
+                # However, that would probably increase memory usage, since the internal, thread-local GDAL datasets
+                # would end up copied to even more threads.
 
-    # no dataset, or we didn't overlap it: return empty data.
-    # use the broadcast trick for even fewer memz
-    return np.broadcast_to(fill_arr, (1, 1) + windows.shape(current_window))
+                # TODO when the Reader won't be rescaling, support passing `output` to avoid the copy?
+                data = reader.read(current_window)
 
+                if all_empty:
+                    # Turn `output` from a broadcast-trick array to a real array, so it's writeable
+                    if (
+                        np.isnan(data)
+                        if np.isnan(fill_value)
+                        else np.equal(data, fill_value)
+                    ).all():
+                        # Unless the data we just read is all empty anyway
+                        continue
+                    output = np.array(output)
+                    all_empty = False
+
+                output[index] = data
+
+    return output
+
+
+def normalize_chunks(
+    chunks: ChunksParam, shape: Tuple[int, int, int, int], dtype: np.dtype
+) -> Tuple[Tuple[int, ...], Tuple[int, ...], Tuple[int, ...], Tuple[int, ...]]:
+    """
+    Normalize chunks to tuple of tuples, assuming 1D and 2D chunks only apply to spatial coordinates
+
+    If only 1 or 2 chunks are given, assume they're for the ``y, x`` coordinates,
+    and that the ``time, band`` coordinates should be chunksize 1.
+    """
+    # TODO implement our own auto-chunking that makes the time,band coordinates
+    # >1 if the spatial chunking would create too many tasks?
+    if isinstance(chunks, int):
+        chunks = (1, 1, chunks, chunks)
+    elif isinstance(chunks, tuple) and len(chunks) == 2:
+        chunks = (1, 1) + chunks
+
+    return da.core.normalize_chunks(
+        chunks,
+        shape,
+        dtype=dtype,
+        previous_chunks=((1,) * shape[0], (1,) * shape[1], (shape[2],), (shape[3],)),
+        # ^ Give dask some hint of the physical layout of the data, so it prefers widening
+        # the spatial chunks over bundling together items/assets. This isn't totally accurate.
+    )
+
+
+# FIXME remove this once rasterio bugs are fixed
+def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:
+    "Get the window corresponding to the bounding coordinates (correcting for rasterio bugs)"
+    window = windows.from_bounds(
+        *bounds,
+        transform=transform,
+        precision=0.0
+        # ^ https://github.com/rasterio/rasterio/issues/2374
+    )
+
+    # Trim negative `row_off`/`col_off` to work around https://github.com/rasterio/rasterio/issues/2378
+    # Note this does actually alter the window: it clips off anything that was out-of-bounds to the
+    # west/north of the `transform`'s origin. So the size and origin of the window is no longer accurate.
+    # This is okay for our purposes, since we only use these windows for intersection-testing to see if
+    # an asset intersects our current chunk. We don't care about the parts of the asset that fall
+    # outside our AOI.
+    window = windows.Window(
+        max(window.col_off, 0),  # type: ignore "Expected 0 positional arguments"
+        max(window.row_off, 0),
+        (max(window.col_off + window.width, 0) if window.col_off < 0 else window.width),
+        (
+            max(window.row_off + window.height, 0)
+            if window.row_off < 0
+            else window.height
+        ),
+    )
+    return window

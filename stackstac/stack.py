@@ -14,7 +14,7 @@ from .reader_protocol import Reader
 from .rio_env import LayeredEnv
 from .rio_reader import AutoParallelRioReader
 from .stac_types import ItemCollectionIsh, ItemIsh, items_to_plain
-from .to_dask import items_to_dask
+from .to_dask import items_to_dask, ChunksParam
 
 
 def stack(
@@ -28,7 +28,7 @@ def stack(
     bounds_latlon: Optional[Bbox] = None,
     snap_bounds: bool = True,
     resampling: Resampling = Resampling.nearest,
-    chunksize: int = 1024,
+    chunksize: ChunksParam = 1024,
     dtype: np.dtype = np.dtype("float64"),
     fill_value: Union[int, float] = np.nan,
     rescale: bool = True,
@@ -161,35 +161,27 @@ def stack(
         The rasterio resampling method to use when reprojecting or rescaling data to a different CRS or resolution.
         Default: ``rasterio.enums.Resampling.nearest``.
     chunksize:
-        The chunksize to use for the spatial component of the Dask array, in pixels.
-        Default: 1024. Can be given in any format Dask understands for a ``chunks=`` argument,
-        such as ``1024``, ``(1024, 2048)``, ``15 MB``, etc.
+        The chunksize to use for the Dask array. Default: 1024. Picking a good chunksize will
+        have significant effects on performance!
 
-        This is basically the "tile size" all your operations will be parallelized over.
-        Generally, you should use the internal tile size/block size of whatever data
-        you're accessing (or a multiple of that). For example, if all the assets are in
-        Cloud-Optimized GeoTIFF files with an internal tilesize of 512, pass ``chunksize=512``.
+        Can be given in any format :ref:`Dask understands <dask:array.chunks>`,
+        such as ``1024``, ``(1024, 2048)``, ``(10, "auto", 512, 512)``, ``15 MB``, etc.
 
-        You want the chunks of the Dask array to align with the internal tiles of the data.
-        Otherwise, if those grids don't line up, processing one chunk of your Dask array could
-        require reading many tiles from the data, parts of which will then be thrown out.
-        Additionally, those same data tiles might need to be re-read (and re-thrown-out)
-        for a neighboring Dask chunk, which is just as inefficient as it sounds (though setting
-        a high ``GDAL_CACHEMAX`` via ``gdal_env`` will help keep more data tiles cached,
-        at the expense of using more memory).
+        If only 1 or 2 sizes are given, like ``2048`` or ``(512, 1024)``, this is used to chunk
+        just the spatial dimensions (last two). The time and band dimensions will have a chunksize of 1,
+        meaning that every STAC Asset will be its own chunk. (This is the default.)
 
-        Of course, when reprojecting data to a new grid, the internal tilings of each input
-        almost certainly won't line up anyway, so some misalignment is inevitable, and not
-        that big of a deal.
+        If you'll be filtering items somewhat randomly (like ``stack[stack["eo:cloud_cover"] < 20]``),
+        you want the chunksize to be like ``(1, X, X, X)``. Otherwise, if you had a chunksize like
+        ``(3, 1, X, X)``, Dask would always load three items per chunk, even if two of them would be
+        immediately thrown away because they didn't match the cloud-cover filter.
 
-        **This is the one parameter we can't pick for you automatically**, because the STAC
-        specification offers no metadata about the internal tiling of the assets. We'd
-        have to open the data files to find out, which is very slow. But to make an educated
-        guess, you should look at ``rasterio.open(url).block_shapes`` for a few sample assets.
-
-        The most important thing to avoid is making your ``chunksize`` here *smaller* than
-        the internal tilesize of the data. If you want small Dask chunks for other reasons,
-        don't set it here---instead, call ``.chunk`` on the DataArray to re-chunk it.
+        However, when your graph starts getting too large for Dask to handle, using a larger chunksize
+        for the time or band dimensions can help a lot. For example, ``chunksize=(10, 1, 512, 512)`` would
+        process in 512x512 pixel tiles, loading 10 assets at a time per tile. ``chunksize=(-1, 1, 512, 512)``
+        would load *every* item within the 512x512 tile into the chunk.
+        If you'll be immediately compositing the data (like ``.median("time")``), doing this is
+        often a good idea because you'll be flattening the assets together anyway.
     dtype:
         The NumPy data type of the output array. Default: ``float64``. Must be a data type
         that's compatible with ``fill_value``.
