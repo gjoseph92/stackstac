@@ -11,6 +11,7 @@ import sys
 import warnings
 
 import coiled
+import stackstac
 
 
 def run(cmd: str, **kwargs) -> str:
@@ -28,29 +29,32 @@ if __name__ == "__main__":
         version = line.split("-")[1].split(".")
         version_str = ".".join(version[:2])
         print(f"Building for Python version: {version_str}")
+        version = tuple(map(int, version))
         if version[:2] != sys.version_info[:2]:
             warnings.warn(
-                f"senv version {version_str} does not match interpreter version {sys.version_info[:2]}"
+                f"senv version {version[:2]} does not match interpreter version {sys.version_info[:2]}"
             )
 
     deps = run("poetry export --without-hashes -E binder -E viz").splitlines()
 
     if dev:
-        name = "stackstac-dev"
         subprocess.run("git fetch", shell=True, check=True)
-        main = run("git rev-parse main")
-        origin_main = run("git rev-parse origin/main")
-        if main != origin_main:
-            warnings.warn("Your local main branch is not up to date with origin/main")
-        print(f"Commit (origin/main): {origin_main}")
-        stackstac_dep = f"git+https://github.com/gjoseph92/stackstac.git@{origin_main}#egg=stackstac[binder,viz]"
+        branch = run("git rev-parse --abbrev-ref HEAD")
+        commit = run(f"git rev-parse {branch}")
+        origin_commit = run(f"git rev-parse origin/{branch}")
+        if commit != origin_commit:
+            warnings.warn(
+                f"Your local branch {branch!r} is not up to date with origin/{branch}"
+            )
+        name = f"stackstac-dev-{branch}"
+        stackstac_dep = f"git+https://github.com/gjoseph92/stackstac.git@{origin_commit}#egg=stackstac[binder,viz]"
     else:
         name = "stackstac"
-        # TODO single-source the version! this is annoying
-        version = run("poetry version -s")
-        print(f"stackstac version: {version}")
+        version = stackstac.__version__
         stackstac_dep = f"stackstac[binder,viz]=={version}"
-    deps += [stackstac_dep]
+
+    deps += [stackstac_dep, "git+https://github.com/gjoseph92/scheduler-profilers.git@main"]
+    print(f"Building senv {name!r} for {stackstac_dep}")
 
     coiled.create_software_environment(
         name=name,
