@@ -39,7 +39,7 @@ rasterio = "^1.2.3"
 sat-search = {version = "^0.3.0", optional = true}
 scipy = {version = "^1.6.1", optional = true}
 sphinx-autodoc-typehints = {version = "^1.11.1", optional = true}
-xarray = ">=0.18,<1"
+xarray = ">=0.18"
 
 [tool.poetry.dev-dependencies]
 black = "^21.4b2"
