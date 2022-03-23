@@ -410,8 +410,9 @@ def to_coords(
 
         height, width = spec.shape
         # Wish pandas had an RangeIndex that supported floats...
-        xs = pd.Float64Index(np.linspace(minx, maxx, width, endpoint=False))
-        ys = pd.Float64Index(np.linspace(maxy, miny, height, endpoint=False))
+        # https://github.com/pandas-dev/pandas/issues/46484
+        xs = pd.Index(np.linspace(minx, maxx, width, endpoint=False), dtype="float64")
+        ys = pd.Index(np.linspace(maxy, miny, height, endpoint=False), dtype="float64")
 
         coords["x"] = xs
         coords["y"] = ys
