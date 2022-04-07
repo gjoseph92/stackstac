@@ -202,7 +202,9 @@ def mosaic(
     if np.isnan(nodata) and arr.dtype.kind in "biu":
         # Try to catch usage errors forgetting to set `nodata=`
         raise ValueError(
-            f"Cannot use {nodata=} when mosaicing a {arr.dtype} array, since {nodata} cannot exist in the array."
+            "You've probably forgotten to pass a custom `nodata=` argument. "
+            f"Cannot use {nodata=} (the default) when mosaicing a {arr.dtype} array, "
+            f"since {nodata} cannot exist in that dtype. "
         )
 
     func = (
