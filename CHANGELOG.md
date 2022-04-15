@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (2022-04-15)
+- Use `pd.Index` instead of deprecated `pd.Float64Index` [@TomAugspurger](https://github.com/TomAugspurger)
+- Better error when forgetting a custom nodata value to `mosaic` [@gjoseph92](https://github.com/gjoseph92)
+
 ## 0.4.0 (2022-03-16)
 - Support specifying a chunk pattern for the `time`/`band` dimensions, allowing you to load multiple items in one spatial chunk (like `stackstac.stack(..., chunksize=(-1, 1, 512, 512))`). This can moderately to significantly decrease memory usage and improve performance when creating composites (like `stack(..., chunksize=(-1, 1, "128MiB", "128MiB")).median("time")`). See [#116 (comment)](https://github.com/gjoseph92/stackstac/pull/116#issuecomment-1027606996) for details.
 - `stackstac.mosaic` generates a more efficient dask graph, with hopefully lower memory usage [@gjoseph92](https://github.com/gjoseph92)
