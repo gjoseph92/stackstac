@@ -1,10 +1,12 @@
 from __future__ import annotations
+import itertools
 from threading import Lock
 from typing import ClassVar
 
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, note, settings, strategies as st
 import hypothesis.extra.numpy as st_np
 import numpy as np
+import pytest
 from rasterio import windows
 import dask.core
 import dask.threaded
@@ -16,6 +18,7 @@ from stackstac.to_dask import (
     ChunksParam,
     items_to_dask,
     normalize_chunks,
+    process_multiband_chunks,
     window_from_bounds,
 )
 from stackstac.testing import strategies as st_stc
@@ -194,9 +197,58 @@ def test_items_to_dask(
 def test_normalize_chunks(
     chunksize: ChunksParam, shape: tuple[int, int, int, int], dtype: np.dtype
 ):
-    chunks = normalize_chunks(chunksize, shape, dtype)
+    nbands_per_asset = (1,) * shape[1]  # not testing this here, keep it simple
+    chunks, asset_table_band_chunks = normalize_chunks(
+        chunksize, shape, nbands_per_asset, dtype
+    )
     numblocks = tuple(map(len, chunks))
     assert len(numblocks) == 4
     assert all(x >= 1 for t in chunks for x in t)
     if isinstance(chunksize, int) or isinstance(chunks, tuple) and len(chunks) == 2:
         assert numblocks[:2] == shape[:2]
+
+
+@given(st.data(), st.lists(st.integers(1, 5), max_size=5).map(tuple))
+def test_process_multiband_chunks(
+    data: st.DataObject, nbands_per_asset: tuple[int, ...]
+):
+    total_bands = sum(nbands_per_asset)
+    chunks: list[int] = []
+    remaining = total_bands
+    while remaining:
+        c = data.draw(st.integers(1, remaining))
+        remaining -= c
+        assert remaining >= 0
+        chunks.append(c)
+
+    note(f"{nbands_per_asset=}")
+    note(f"          {chunks=}")
+
+    # Expand chunks form into 1-elem-per-band form. This is a simpler but less efficient way to validate.
+    # Ex: [2, 4, 1, 1] -> [0, 0, 1, 1, 1, 1, 2, 3]
+    physical_layout = [
+        x for i, n in enumerate(nbands_per_asset) for x in itertools.repeat(i, n)
+    ]
+    requested_layout = [x for i, n in enumerate(chunks) for x in itertools.repeat(i, n)]
+    assert len(physical_layout) == len(requested_layout)
+
+    invalid = False
+    for i in range(1, len(requested_layout)):
+        if requested_layout[i - 1] != requested_layout[i]:
+            # Wherever the asset we're pulling from changes in the requested layout,
+            # it must also change in the physical layout.
+            if physical_layout[i - 1] == physical_layout[i]:
+                invalid = True
+                break
+
+    note(f" {physical_layout=}")
+    note(f"{requested_layout=}")
+
+    if invalid:
+        with pytest.raises(NotImplementedError):
+            process_multiband_chunks(tuple(chunks), nbands_per_asset)
+    else:
+        asset_table_band_chunks = process_multiband_chunks(
+            tuple(chunks), nbands_per_asset
+        )
+        assert len(asset_table_band_chunks) == len(chunks)

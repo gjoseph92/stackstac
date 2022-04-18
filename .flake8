@@ -3,3 +3,6 @@ max-line-length = 120
 exclude =
     .pyi
     typings
+ignore =
+    E203  # whitespace before ':'
+    W503  # line break before binary operator

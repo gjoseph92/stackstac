@@ -3,7 +3,16 @@ from __future__ import annotations
 import logging
 import threading
 import warnings
-from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, TypedDict, Union
+from typing import (
+    TYPE_CHECKING,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+    TypedDict,
+    Union,
+)
 
 import numpy as np
 import rasterio as rio
@@ -13,7 +22,7 @@ from .rio_env import LayeredEnv
 from .timer import time
 from .reader_protocol import Reader
 from .raster_spec import RasterSpec
-from .nodata_reader import NodataReader, exception_matches, nodata_for_window
+from .nodata import exception_matches, nodata_for_window
 
 if TYPE_CHECKING:
     from rasterio.enums import Resampling
@@ -70,7 +79,7 @@ MULTITHREADED_DRIVER_ALLOWLIST = {"GTiff"}
 class ThreadsafeRioDataset(Protocol):
     scale_offset: Tuple[float, float]
 
-    def read(self, window: Window, **kwargs) -> np.ndarray:
+    def read(self, bands: Sequence[int], window: Window, **kwargs) -> np.ndarray:
         ...
 
     def close(self) -> None:
@@ -99,11 +108,11 @@ class SingleThreadedRioDataset:
 
         self._lock = threading.Lock()
 
-    def read(self, window: Window, **kwargs) -> np.ndarray:
+    def read(self, bands: Sequence[int], window: Window, **kwargs) -> np.ndarray:
         "Acquire the lock, then read from the dataset"
         reader = self.vrt or self.ds
         with self._lock, self.env.read:
-            return reader.read(1, window=window, **kwargs)
+            return reader.read(bands, window=window, **kwargs)
 
     def close(self) -> None:
         "Acquire the lock, then close the dataset"
@@ -220,11 +229,11 @@ class ThreadLocalRioDataset:
         except AttributeError:
             return self._open()
 
-    def read(self, window: Window, **kwargs) -> np.ndarray:
+    def read(self, bands: Sequence[int], window: Window, **kwargs) -> np.ndarray:
         "Read from the current thread's dataset, opening a new copy of the dataset on first access from each thread."
         with time(f"Read {self._url!r} in {_curthread()}: {{t}}"):
             with self._env.read:
-                return self.dataset.read(1, window=window, **kwargs)
+                return self.dataset.read(bands, window=window, **kwargs)
 
     def close(self) -> None:
         """
@@ -274,8 +283,29 @@ class SelfCleaningDatasetReader(rio.DatasetReader):
         self.close()
 
 
+class Nodataset:
+    "`ThreadsafeRioDataset` that returns a constant (nodata) value for all reads"
+    scale_offset = (1.0, 0.0)
+
+    def __init__(
+        self,
+        *,
+        dtype: np.dtype,
+        fill_value: Union[int, float],
+    ) -> None:
+        self.dtype = dtype
+        self.fill_value = fill_value
+
+    def read(self, bands: Sequence[int], window: Window, **kwargs) -> np.ndarray:
+        return nodata_for_window(len(bands), window, self.fill_value, self.dtype)
+
+    def close(self) -> None:
+        pass
+
+
 class PickleState(TypedDict):
     url: str
+    bands: Optional[Sequence[int]]
     spec: RasterSpec
     resampling: Resampling
     dtype: np.dtype
@@ -295,10 +325,22 @@ class AutoParallelRioReader:
     for non-thread-safe drivers.
     """
 
+    url: str
+    bands: Sequence[int]
+    exactly_one_band: bool
+    spec: RasterSpec
+    resampling: Resampling
+    dtype: np.dtype
+    fill_value: Union[int, float]
+    rescale: bool
+    gdal_env: LayeredEnv
+    errors_as_nodata: Tuple[Exception, ...]
+
     def __init__(
         self,
         *,
         url: str,
+        bands: Optional[Sequence[int]],
         spec: RasterSpec,
         resampling: Resampling,
         dtype: np.dtype,
@@ -308,6 +350,8 @@ class AutoParallelRioReader:
         errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
         self.url = url
+        self.bands = bands if bands is not None else (1,)
+        self.exactly_one_band = bands is None
         self.spec = spec
         self.resampling = resampling
         self.dtype = dtype
@@ -330,17 +374,34 @@ class AutoParallelRioReader:
                     msg = f"Error opening {self.url!r}: {e!r}"
                     if exception_matches(e, self.errors_as_nodata):
                         warnings.warn(msg)
-                        return NodataReader(
-                            dtype=self.dtype, fill_value=self.fill_value
+                        return Nodataset(
+                            dtype=self.dtype,
+                            fill_value=self.fill_value,
                         )
 
                     raise RuntimeError(msg) from e
-            if ds.count != 1:
+
+            if self.exactly_one_band:
+                # Unknown band count. If the asset actually has 3 bands, we don't want to
+                # silently read just the first one.
+                if ds.count != 1:
+                    ds.close()
+                    raise RuntimeError(
+                        f"Assets must have exactly 1 band, but file {self.url!r} has {ds.count}. "
+                        "We can't currently handle multi-band rasters (each band has to be "
+                        "a separate STAC asset), so you'll need to exclude this asset from your analysis."
+                        # TODO change this error message once we actually determine band counts from STAC metadata.
+                        # Then, this should mention that the asset was missing `eo:bands` and `raster:bands` metadata,
+                        # so the expected band count was unknown and defaults to 1.
+                        # Alternatively, we could get rid of this bands==None codepath entirely, and always require
+                        # STAC metadata to specify `eo:bands` or `raster:bands` (allowing you to explicitly provide
+                        # values for them if they're missing?).
+                    )
+            elif ds.count < len(self.bands):
                 ds.close()
                 raise RuntimeError(
-                    f"Assets must have exactly 1 band, but file {self.url!r} has {ds.count}. "
-                    "We can't currently handle multi-band rasters (each band has to be "
-                    "a separate STAC asset), so you'll need to exclude this asset from your analysis."
+                    f"Expected to read {len(self.bands)} {tuple(self.bands)}, but there are only "
+                    f"{ds.count} band(s) in the asset at {self.url!r}."
                 )
 
             # Only make a VRT if the dataset doesn't match the spatial spec we want
@@ -375,7 +436,7 @@ class AutoParallelRioReader:
             return SingleThreadedRioDataset(self.gdal_env, ds, vrt=vrt)
 
     @property
-    def dataset(self):
+    def dataset(self) -> ThreadsafeRioDataset:
         with self._dataset_lock:
             if self._dataset is None:
                 self._dataset = self._open()
@@ -385,6 +446,7 @@ class AutoParallelRioReader:
         reader = self.dataset
         try:
             result = reader.read(
+                self.bands,
                 window=window,
                 masked=True,
                 # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
@@ -395,10 +457,14 @@ class AutoParallelRioReader:
             msg = f"Error reading {window} from {self.url!r}: {e!r}"
             if exception_matches(e, self.errors_as_nodata):
                 warnings.warn(msg)
-                return nodata_for_window(window, self.fill_value, self.dtype)
+                return nodata_for_window(
+                    len(self.bands), window, self.fill_value, self.dtype
+                )
 
             raise RuntimeError(msg) from e
 
+        # TODO scale and offset might not apply to all bands.
+        # Should probably just remove this.
         if self.rescale:
             scale, offset = reader.scale_offset
             if scale != 1 and offset != 0:
@@ -430,6 +496,7 @@ class AutoParallelRioReader:
     ) -> PickleState:
         return {
             "url": self.url,
+            "bands": None if self.exactly_one_band else self.bands,
             "spec": self.spec,
             "resampling": self.resampling,
             "dtype": self.dtype,

@@ -27,7 +27,16 @@ from .raster_spec import IntFloat, Bbox, Resolutions, RasterSpec
 from .stac_types import ItemSequence
 from . import accumulate_metadata, geom_utils
 
-ASSET_TABLE_DT = np.dtype([("url", object), ("bounds", "float64", 4)])
+ASSET_TABLE_DT = np.dtype(
+    [("url", object), ("bounds", "float64", 4), ("bands", object)]
+)
+# ^ NOTE: `bands` should be a `Sequence[int]` of _1-indexed_ bands to fetch from the asset.
+# We support specifying a sequence of band indices (rather than just the number of bands,
+# and always doing a `read()` of all bands) for future optimizations to support fetching
+# (and possibly reordering?) a subset of bands per asset. This could be done either via
+# another argument to `stack` (please no!) or a custom Dask optimization, akin to column
+# projection for DataFrames.
+# But at the moment, `bands == list(range(1, ds.count + 1))`.
 
 
 class Mimetype(NamedTuple):
@@ -64,7 +73,7 @@ def prepare_items(
     bounds: Optional[Bbox] = None,
     bounds_latlon: Optional[Bbox] = None,
     snap_bounds: bool = True,
-) -> Tuple[np.ndarray, RasterSpec, List[str], ItemSequence]:
+) -> Tuple[np.ndarray, RasterSpec, List[str], ItemSequence, tuple[int, ...]]:
 
     if bounds is not None and bounds_latlon is not None:
         raise ValueError(
@@ -119,6 +128,7 @@ def prepare_items(
         asset_ids = assets
 
     asset_table = np.full((len(items), len(asset_ids)), None, dtype=ASSET_TABLE_DT)
+    nbands_per_asset: list[int | None] = [None] * len(asset_ids)
 
     # TODO support item-assets https://github.com/radiantearth/stac-spec/tree/master/extensions/item-assets
 
@@ -321,7 +331,25 @@ def prepare_items(
                     )
 
             # Phew, we figured out all the spatial stuff! Now actually store the information we care about.
-            asset_table[item_i, asset_i] = (asset["href"], asset_bbox_proj)
+
+            bands: Optional[Sequence[int]] = None
+            # ^ TODO actually determine this from `eo:bands` or `raster:bands`
+            # https://github.com/gjoseph92/stackstac/issues/62
+
+            nbands = 1 if bands is None else len(bands)
+            prev_nbands = nbands_per_asset[asset_i]
+            if prev_nbands is None:
+                nbands_per_asset[asset_i] = nbands
+            else:
+                if prev_nbands != nbands:
+                    raise ValueError(
+                        f"The asset {id!r} has {nbands} band(s) on item {item_i} {item['id']!r}, "
+                        f"but on all previous items, it had {prev_nbands}."
+                        # TODO improve this error message with something actionable
+                        # (it's probably a data provider issue), once multi-band is actually supported.
+                    )
+
+            asset_table[item_i, asset_i] = (asset["href"], asset_bbox_proj, bands)
             # ^ NOTE: If `asset_bbox_proj` is None, NumPy automatically converts it to NaNs
 
     # At this point, everything has been set (or there was as error)
@@ -346,9 +374,18 @@ def prepare_items(
     if item_isnan.any() or asset_id_isnan.any():
         asset_table = asset_table[np.ix_(~item_isnan, ~asset_id_isnan)]
         asset_ids = [id for id, isnan in zip(asset_ids, asset_id_isnan) if not isnan]
+        nbands_per_asset = [
+            id for id, isnan in zip(nbands_per_asset, asset_id_isnan) if not isnan
+        ]
         items = [item for item, isnan in zip(items, item_isnan) if not isnan]
 
-    return asset_table, spec, asset_ids, items
+    # Being for the benefit of mr. typechecker
+    nbpa = tuple(x for x in nbands_per_asset if x is not None)
+    assert len(nbpa) == len(
+        nbands_per_asset
+    ), f"Some `nbands_per_asset` are None: {nbands_per_asset}"
+
+    return asset_table, spec, asset_ids, items, nbpa
 
 
 def to_coords(
