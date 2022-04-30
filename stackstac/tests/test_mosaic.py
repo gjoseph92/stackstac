@@ -46,9 +46,10 @@ def test_mosaic_dtype_error(dtype: np.dtype):
     st_stc.raster_dtypes,
     st_np.array_shapes(max_dims=4, max_side=5),
     st.booleans(),
+    st.booleans(),
 )
 def test_fuzz_mosaic(
-    data: st.DataObject, dtype: np.dtype, shape: Tuple[int, ...], reverse: bool
+    data: st.DataObject, dtype: np.dtype, shape: Tuple[int, ...], reverse: bool, use_dim: bool,
 ):
     """
     See if we can break mosaic.
@@ -73,8 +74,13 @@ def test_fuzz_mosaic(
     split_every = data.draw(st.integers(1, darr.numblocks[axis]), label="split_every")
     xarr = xr.DataArray(darr)
 
+    if use_dim:
+        kwargs = dict(dim=xarr.dims[axis])
+    else:
+        kwargs = dict(axis=axis)
+
     result = mosaic(
-        xarr, axis=axis, reverse=reverse, nodata=fill_value, split_every=split_every
+        xarr, reverse=reverse, nodata=fill_value, split_every=split_every, **kwargs
     )
     assert result.dtype == arr.dtype
     result_np = mosaic(xr.DataArray(arr), axis=axis, reverse=reverse, nodata=fill_value)
