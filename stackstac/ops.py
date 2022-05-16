@@ -174,8 +174,8 @@ def mosaic(
     dim:
         The dimension name to mosaic. Default: None.
     axis:
-        The axis number to mosaic. Default: 0. Only one of
-        ``dim`` and ``axis`` can be given.
+        The axis number to mosaic. Default: 0. If ``dim`` is given, ``axis``
+        is ignored.
     reverse:
         If False (default), the last item along the dimension is on top.
         If True, the first item in the dimension is on top.
@@ -206,6 +206,8 @@ def mosaic(
             f"Cannot use {nodata=} (the default) when mosaicing a {arr.dtype} array, "
             f"since {nodata} cannot exist in that dtype. "
         )
+
+    axis = None if dim is not None else axis
 
     func = (
         partial(_mosaic_dask, split_every=split_every)
