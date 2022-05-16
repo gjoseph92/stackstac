@@ -276,7 +276,7 @@ def stack(
             reverse=sortby_date == "desc",
         )
 
-    asset_table, spec, asset_ids, plain_items = prepare_items(
+    asset_table, spec, asset_ids, plain_items, nbands_per_asset = prepare_items(
         plain_items,
         assets=assets,
         epsg=epsg,
@@ -289,6 +289,7 @@ def stack(
         asset_table,
         spec,
         chunksize=chunksize,
+        nbands_per_asset=nbands_per_asset,
         dtype=dtype,
         resampling=resampling,
         fill_value=fill_value,
@@ -309,5 +310,5 @@ def stack(
             band_coords=band_coords,
         ),
         attrs=to_attrs(spec),
-        name="stackstac-" + dask.base.tokenize(arr)
+        name="stackstac-" + dask.base.tokenize(arr),
     )

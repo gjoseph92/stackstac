@@ -1,5 +1,14 @@
 from __future__ import annotations
-from typing import Optional, Protocol, Tuple, Type, TYPE_CHECKING, TypeVar, Union
+from typing import (
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+    TYPE_CHECKING,
+    TypeVar,
+    Union,
+)
 
 import numpy as np
 
@@ -30,6 +39,7 @@ class Reader(Pickleable, Protocol):
         self,
         *,
         url: str,
+        bands: Optional[Sequence[int]],
         spec: RasterSpec,
         resampling: Resampling,
         dtype: np.dtype,
@@ -45,6 +55,9 @@ class Reader(Pickleable, Protocol):
         ----------
         url:
             Fetch data from the asset at this URL.
+        bands:
+            List of (one-indexed!) band indices to read, or None for all bands.
+            If None, the asset must have exactly one band.
         spec:
             Reproject data to match this georeferencing information.
         resampling:
@@ -69,7 +82,6 @@ class Reader(Pickleable, Protocol):
             where ``str(exception_pattern)`` is a regex pattern to match against
             ``str(raised_exception)``.
         """
-        # TODO colormaps?
 
     def read(self, window: Window) -> np.ndarray:
         """
@@ -87,7 +99,7 @@ class Reader(Pickleable, Protocol):
 
         Returns
         -------
-        array: The window of data read
+        array: The window of data read from all bands, as a 3D array
         """
         ...
 
@@ -113,11 +125,16 @@ class FakeReader:
     or inherent to the dask graph.
     """
 
-    def __init__(self, *, dtype: np.dtype, **kwargs) -> None:
+    def __init__(
+        self, *, bands: Optional[Sequence[int]], dtype: np.dtype, **kwargs
+    ) -> None:
         self.dtype = dtype
+        self.ndim = len(bands) if bands is not None else 1
 
     def read(self, window: Window, **kwargs) -> np.ndarray:
-        return np.random.random((window.height, window.width)).astype(self.dtype)
+        return np.random.random((self.ndim, window.height, window.width)).astype(
+            self.dtype
+        )
 
     def close(self) -> None:
         pass
