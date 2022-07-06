@@ -115,10 +115,10 @@ intersphinx_mapping = {
     "rasterio": ("https://rasterio.readthedocs.io/en/latest/", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
     "pystac": ("https://pystac.readthedocs.io/en/latest/", None),
-    "xarray": ("http://xarray.pydata.org/en/stable/", None),
+    "xarray": ("https://xarray.pydata.org/en/stable/", None),
     "dask": ("https://docs.dask.org/en/latest/", None),
     "distributed": ("https://distributed.dask.org/en/latest/", None),
     "matplotlib": ("https://matplotlib.org/stable", None),
     "ipyleaflet": ("https://ipyleaflet.readthedocs.io/en/latest/", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy", None),
 }
