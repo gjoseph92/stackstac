@@ -404,7 +404,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "coiled"
-version = "0.2.12"
+version = "0.2.12.post0.dev4"
 description = ""
 category = "main"
 optional = true
@@ -617,7 +617,7 @@ pyflakes = ">=2.4.0,<2.5.0"
 
 [[package]]
 name = "fonttools"
-version = "4.33.3"
+version = "4.34.2"
 description = "Tools to manipulate font files"
 category = "main"
 optional = true
@@ -1342,7 +1342,7 @@ python-versions = "*"
 
 [[package]]
 name = "nbclassic"
-version = "0.4.0"
+version = "0.4.2"
 description = "A web-based notebook environment for interactive computing"
 category = "main"
 optional = false
@@ -1959,7 +1959,7 @@ python-versions = "*"
 
 [[package]]
 name = "pywinpty"
-version = "2.0.5"
+version = "2.0.6"
 description = "Pseudo terminal support for Windows from Python."
 category = "main"
 optional = false
@@ -2738,7 +2738,7 @@ viz = ["aiohttp", "cachetools", "distributed", "ipyleaflet", "jupyter-server-pro
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "62217989628e495e0215a593e8c5a2b8e0db3c98dbc454d4a66ecbeeb44c11e0"
+content-hash = "e99011bded87c3542e4a76b04b2825309bff7768a959c74d31efe478c6f52687"
 
 [metadata.files]
 affine = [
@@ -3076,8 +3076,8 @@ cloudpickle = [
     {file = "cloudpickle-2.1.0.tar.gz", hash = "sha256:bb233e876a58491d9590a676f93c7a5473a08f747d5ab9df7f9ce564b3e7938e"},
 ]
 coiled = [
-    {file = "coiled-0.2.12-py3-none-any.whl", hash = "sha256:78ac6304de31a08e7051eaf00a8b431a15f3802c66e96fc2b997480a8c845ce2"},
-    {file = "coiled-0.2.12.tar.gz", hash = "sha256:e83ded58badd9d726f9b7915d88025a88aafbde69f4e4037d170aec36c6001f1"},
+    {file = "coiled-0.2.12.post0.dev4-py3-none-any.whl", hash = "sha256:1398d6309221cf0de6f0791e28087d33d86c237da43c9039962ea901597b10e0"},
+    {file = "coiled-0.2.12.post0.dev4.tar.gz", hash = "sha256:c29c17f0df826f0a23d2dd831dd8ab947bc4432fba886e413d27d91430d8eb46"},
 ]
 colorama = [
     {file = "colorama-0.4.5-py2.py3-none-any.whl", hash = "sha256:854bf444933e37f5824ae7bfc1e98d5bce2ebe4160d46b5edf346a89358e99da"},
@@ -3176,8 +3176,8 @@ flake8 = [
     {file = "flake8-4.0.1.tar.gz", hash = "sha256:806e034dda44114815e23c16ef92f95c91e4c71100ff52813adf7132a6ad870d"},
 ]
 fonttools = [
-    {file = "fonttools-4.33.3-py3-none-any.whl", hash = "sha256:f829c579a8678fa939a1d9e9894d01941db869de44390adb49ce67055a06cc2a"},
-    {file = "fonttools-4.33.3.zip", hash = "sha256:c0fdcfa8ceebd7c1b2021240bd46ef77aa8e7408cf10434be55df52384865f8e"},
+    {file = "fonttools-4.34.2-py3-none-any.whl", hash = "sha256:c6c5a896c9760132614caa57b444ee5b4719c08f84b304bf8ce9295edfb7cbc3"},
+    {file = "fonttools-4.34.2.zip", hash = "sha256:3fb3bef8e743dad8fe96e12a47a9ce9bd367ac0a24c089256615518c88309dbd"},
 ]
 frozenlist = [
     {file = "frozenlist-1.3.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:d2257aaba9660f78c7b1d8fea963b68f3feffb1a9d5d05a18401ca9eb3e8d0a3"},
@@ -3654,8 +3654,8 @@ mypy-extensions = [
     {file = "mypy_extensions-0.4.3.tar.gz", hash = "sha256:2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8"},
 ]
 nbclassic = [
-    {file = "nbclassic-0.4.0-py3-none-any.whl", hash = "sha256:daa7e8918c5444c31899b516284292552e257e821d92e7a1868bca7b7b9c7f41"},
-    {file = "nbclassic-0.4.0.tar.gz", hash = "sha256:dfdab838f41d60f4d66b4af143cea250d32a0fa8573116921ea6532d1710aa27"},
+    {file = "nbclassic-0.4.2-py3-none-any.whl", hash = "sha256:7d2dd7196d142fb81fb3e03dd2d908964ede170d34cbb522fa38fcc25af62541"},
+    {file = "nbclassic-0.4.2.tar.gz", hash = "sha256:b00694d33e844e0f6d02bb6aa4b32e7342d03e27d21b73003ac200978e1bd61a"},
 ]
 nbclient = [
     {file = "nbclient-0.6.6-py3-none-any.whl", hash = "sha256:09bae4ea2df79fa6bc50aeb8278d8b79d2036792824337fa6eee834afae17312"},
@@ -4065,11 +4065,11 @@ pywin32-ctypes = [
     {file = "pywin32_ctypes-0.2.0-py2.py3-none-any.whl", hash = "sha256:9dc2d991b3479cc2df15930958b674a48a227d5361d413827a4cfd0b5876fc98"},
 ]
 pywinpty = [
-    {file = "pywinpty-2.0.5-cp310-none-win_amd64.whl", hash = "sha256:f86c76e2881c37e69678cbbf178109f8da1fa8584db24d58e1b9369b0276cfcb"},
-    {file = "pywinpty-2.0.5-cp37-none-win_amd64.whl", hash = "sha256:ff9b52f182650cfdf3db1b264a6fe0963eb9d996a7a1fa843ac406c1e32111f8"},
-    {file = "pywinpty-2.0.5-cp38-none-win_amd64.whl", hash = "sha256:651ee1467bd7eb6f64d44dbc954b7ab7d15ab6d8adacc4e13299692c67c5d5d2"},
-    {file = "pywinpty-2.0.5-cp39-none-win_amd64.whl", hash = "sha256:e59a508ae78374febada3e53b5bbc90b5ad07ae68cbfd72a2e965f9793ae04f3"},
-    {file = "pywinpty-2.0.5.tar.gz", hash = "sha256:e125d3f1804d8804952b13e33604ad2ca8b9b2cac92b27b521c005d1604794f8"},
+    {file = "pywinpty-2.0.6-cp310-none-win_amd64.whl", hash = "sha256:7fadc5265484c7d7c84554b9f1cfd7acf6383a877c1cfb3ee77d51179145b3ce"},
+    {file = "pywinpty-2.0.6-cp37-none-win_amd64.whl", hash = "sha256:906a3048ecfec6ece1b141594ebbbcd5c4751960714c50524e8e907bb77c9207"},
+    {file = "pywinpty-2.0.6-cp38-none-win_amd64.whl", hash = "sha256:5e4b2167e813575bf495b46adb2d88be5c470d9daf49d488900350853e95248f"},
+    {file = "pywinpty-2.0.6-cp39-none-win_amd64.whl", hash = "sha256:f7ae5d29f1c3d028e06032f8d267b51fd72ea219b9bba3e2a972a7bc26a25a87"},
+    {file = "pywinpty-2.0.6.tar.gz", hash = "sha256:a91a77d23f29a58b44f62a9474a31ed67df1277cddb69665275f8d22429046ac"},
 ]
 pyyaml = [
     {file = "PyYAML-6.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:d4db7c7aef085872ef65a8fd7d6d09a14ae91f691dec3e87ee5ee0539d516f53"},
