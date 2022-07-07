@@ -16,7 +16,6 @@ from stackstac.to_dask import (
     ChunksParam,
     items_to_dask,
     normalize_chunks,
-    window_from_bounds,
 )
 from stackstac.testing import strategies as st_stc
 
@@ -108,7 +107,8 @@ def test_items_to_dask(
                 continue
             assert url == f"fake://{i}/{j}"
 
-            window = window_from_bounds(asset["bounds"], spec_.transform)
+            asset_bounds: Bbox = asset["bounds"]
+            window = windows.from_bounds(*asset_bounds, spec_.transform)
             asset_windows[url] = window
 
             chunk = results[(i, j) + windows.window_index(window)]

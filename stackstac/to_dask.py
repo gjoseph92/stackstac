@@ -131,7 +131,7 @@ def asset_table_to_reader_and_window(
         url: str | None = asset_entry["url"]
         if url:
             asset_bounds: Bbox = asset_entry["bounds"]
-            asset_window = window_from_bounds(asset_bounds, spec.transform)
+            asset_window = windows.from_bounds(*asset_bounds, spec.transform)
 
             entry: ReaderTableEntry = (
                 reader(
@@ -225,32 +225,3 @@ def normalize_chunks(
         # ^ Give dask some hint of the physical layout of the data, so it prefers widening
         # the spatial chunks over bundling together items/assets. This isn't totally accurate.
     )
-
-
-# FIXME remove this once rasterio bugs are fixed
-def window_from_bounds(bounds: Bbox, transform: Affine) -> windows.Window:
-    "Get the window corresponding to the bounding coordinates (correcting for rasterio bugs)"
-    window = windows.from_bounds(
-        *bounds,
-        transform=transform,
-        precision=0.0
-        # ^ https://github.com/rasterio/rasterio/issues/2374
-    )
-
-    # Trim negative `row_off`/`col_off` to work around https://github.com/rasterio/rasterio/issues/2378
-    # Note this does actually alter the window: it clips off anything that was out-of-bounds to the
-    # west/north of the `transform`'s origin. So the size and origin of the window is no longer accurate.
-    # This is okay for our purposes, since we only use these windows for intersection-testing to see if
-    # an asset intersects our current chunk. We don't care about the parts of the asset that fall
-    # outside our AOI.
-    window = windows.Window(
-        max(window.col_off, 0),  # type: ignore "Expected 0 positional arguments"
-        max(window.row_off, 0),
-        (max(window.col_off + window.width, 0) if window.col_off < 0 else window.width),
-        (
-            max(window.row_off + window.height, 0)
-            if window.row_off < 0
-            else window.height
-        ),
-    )
-    return window
