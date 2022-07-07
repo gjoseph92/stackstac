@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 (2022-07-06)
+- Support (and require) rasterio 1.3.0 [@carderne](https://github.com/carderne) [@gjoseph92](https://github.com/gjoseph92)
+- Fix `ValueError` when passing `dim=` to `mosaic` [@aazuspan](https://github.com/aazuspan)
+
 ## 0.4.1 (2022-04-15)
 - Use `pd.Index` instead of deprecated `pd.Float64Index` [@TomAugspurger](https://github.com/TomAugspurger)
 - Better error when forgetting a custom nodata value to `mosaic` [@gjoseph92](https://github.com/gjoseph92)
