@@ -13,12 +13,20 @@ from .raster_spec import Bbox, IntFloat, Resolutions
 from .reader_protocol import Reader
 from .rio_env import LayeredEnv
 from .rio_reader import AutoParallelRioReader
-from .stac_types import ItemCollectionIsh, ItemIsh, items_to_plain
+from .stac_types import (
+    ItemCollectionIsh,
+    ItemIsh,
+    PystacItem,
+    SatstacItem,
+    items_to_plain,
+)
 from .to_dask import items_to_dask, ChunksParam
 
 
 def stack(
-    items: Union[ItemCollectionIsh, ItemIsh],
+    items: Union[
+        ItemCollectionIsh, ItemIsh, Sequence[PystacItem], Sequence[SatstacItem]
+    ],
     assets: Optional[Union[List[str], AbstractSet[str]]] = frozenset(
         ["image/tiff", "image/x.geotiff", "image/vnd.stac.geotiff", "image/jp2"]
     ),
@@ -309,5 +317,5 @@ def stack(
             band_coords=band_coords,
         ),
         attrs=to_attrs(spec),
-        name="stackstac-" + dask.base.tokenize(arr)
+        name="stackstac-" + dask.base.tokenize(arr),
     )
