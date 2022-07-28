@@ -9,6 +9,87 @@ import pystac
 
 from stackstac import stac_types
 
+satstac_itemcollection = satstac.itemcollection.ItemCollection(
+    [
+        satstac.item.Item(
+            {"id": "foo"},
+        ),
+        satstac.item.Item(
+            {"id": "bar"},
+        ),
+    ]
+)
+
+
+pystac_catalog = pystac.Catalog("foo", "bar")
+pystac_catalog.add_items(
+    [
+        pystac.Item("foo", None, None, datetime(2000, 1, 1), {}),
+        pystac.Item("bar", None, None, datetime(2001, 1, 1), {}),
+    ]
+)
+pystac_foo_dict = {
+    k: v
+    for k, v in pystac_catalog.get_item("foo").to_dict().items()
+    if k
+    in (
+        "type",
+        "stac_version",
+        "id",
+        "properties",
+        "geometry",
+        "href",
+        "assets",
+        "stac_extensions",
+    )
+}
+pystac_bar_dict = {
+    k: v
+    for k, v in pystac_catalog.get_item("bar").to_dict().items()
+    if k
+    in (
+        "type",
+        "stac_version",
+        "id",
+        "properties",
+        "geometry",
+        "assets",
+        "stac_extensions",
+    )
+}
+
+
+@pytest.mark.parametrize(
+    "input, expected",
+    [
+        ({"id": "foo"}, [{"id": "foo"}]),
+        ([{"id": "foo"}, {"id": "bar"}], [{"id": "foo"}, {"id": "bar"}]),
+        # satstac,
+        (satstac_itemcollection[0], [{"id": "foo"}]),
+        (satstac_itemcollection, [{"id": "foo"}, {"id": "bar"}]),
+        (satstac_itemcollection[:], [{"id": "foo"}, {"id": "bar"}]),
+        # pystac,
+        (pystac_catalog.get_item("foo"), [pystac_foo_dict]),
+        (
+            pystac.ItemCollection(pystac_catalog.get_all_items()),
+            [pystac_foo_dict, pystac_bar_dict],
+        ),
+        (
+            pystac_catalog,
+            [pystac_foo_dict, pystac_bar_dict],
+        ),
+        (list(pystac_catalog.get_all_items()), [pystac_foo_dict, pystac_bar_dict]),
+    ],
+)
+def test_basic(input, expected):
+    results = stac_types.items_to_plain(input)
+    assert isinstance(results, list)
+    assert len(results) == len(expected)
+    for result, exp in zip(results, expected):
+        # Only check fields stackstac actually cares about (we don't use the `link` field, for example)
+        subset = {k: v for k, v in result.items() if k in exp}
+        assert subset == exp
+
 
 def test_normal_case():
     assert stac_types.SatstacItem is satstac.item.Item
@@ -31,6 +112,9 @@ def test_missing_satstac(monkeypatch: pytest.MonkeyPatch):
     assert "stackstac" in reloaded_stac_types.SatstacItemCollection.__module__
 
     assert not reloaded_stac_types.possible_problems
+    # clean things up for other tests
+    monkeypatch.undo()
+    importlib.reload(stac_types)
 
 
 def test_missing_pystac(monkeypatch: pytest.MonkeyPatch):
@@ -44,6 +128,9 @@ def test_missing_pystac(monkeypatch: pytest.MonkeyPatch):
     assert "stackstac" in reloaded_stac_types.PystacItemCollection.__module__
 
     assert not reloaded_stac_types.possible_problems
+    # clean things up for other tests
+    monkeypatch.undo()
+    importlib.reload(stac_types)
 
 
 @pytest.mark.parametrize(
@@ -52,26 +139,26 @@ def test_missing_pystac(monkeypatch: pytest.MonkeyPatch):
         (
             satstac,
             "item.Item",
-            satstac.item.Item(
-                {"id": "foo"},
-            ),
+            satstac_itemcollection[0],
         ),
         (
             satstac,
             "itemcollection.ItemCollection",
-            satstac.itemcollection.ItemCollection(
-                [],
-            ),
+            satstac_itemcollection,
         ),
-        (pystac, "Item", pystac.Item("foo", None, None, datetime(2000, 1, 1), {})),
-        (pystac, "Catalog", pystac.Catalog("foo", "bar")),
+        (
+            satstac,
+            "item.Item",
+            list(satstac_itemcollection),
+        ),
+        (pystac, "Item", pystac_catalog.get_item("foo")),
+        (pystac, "Catalog", pystac_catalog),
         (
             pystac,
             "ItemCollection",
-            pystac.ItemCollection(
-                [],
-            ),
+            pystac.ItemCollection([]),
         ),
+        (pystac, "Item", list(pystac_catalog.get_all_items())),
     ],
 )
 def test_unimportable_path(
@@ -97,3 +184,7 @@ def test_unimportable_path(
 
     with pytest.raises(TypeError, match=f"Your version of `{modname}` is too old"):
         reloaded_stac_types.items_to_plain(inst)
+
+    # clean things up for other tests
+    monkeypatch.undo()
+    importlib.reload(stac_types)

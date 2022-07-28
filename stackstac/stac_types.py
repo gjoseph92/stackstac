@@ -16,7 +16,6 @@ from typing import (
     Tuple,
     TypedDict,
     Union,
-    cast,
 )
 
 possible_problems: list[str] = []
@@ -134,7 +133,11 @@ ItemCollectionIsh = Union[
 ]
 
 
-def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
+def items_to_plain(
+    items: Union[
+        ItemCollectionIsh, ItemIsh, Sequence[PystacItem], Sequence[SatstacItem]
+    ]
+) -> ItemSequence:
     """
     Convert something like a collection/Catalog of STAC items into a list of plain dicts
 
@@ -149,10 +152,24 @@ def items_to_plain(items: Union[ItemCollectionIsh, ItemIsh]) -> ItemSequence:
     if isinstance(items, Sequence):
         # slicing a satstac `ItemCollection` produces a list, not another `ItemCollection`,
         # so having a `List[SatstacItem]` is quite possible
-        try:
-            return [item._data for item in cast(SatstacItemCollection, items)]
-        except AttributeError:
-            return items
+        results = []
+        for item in items:
+            if isinstance(item, PystacItem):
+                results.append(item.to_dict())
+            elif isinstance(item, SatstacItem):
+                results.append(item._data)
+            elif isinstance(item, dict):
+                results.append(item)
+            else:
+                raise TypeError(
+                    f"Unrecognized STAC item type {type(item)}: {item!r}"
+                    + (
+                        "\n".join(["\nPossible problems:"] + possible_problems)
+                        if possible_problems
+                        else ""
+                    )
+                )
+        return results
 
     if isinstance(items, SatstacItem):
         return [items._data]
