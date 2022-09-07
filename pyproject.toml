@@ -28,18 +28,16 @@ viz = [
   "cachetools<5.0.0,>=4.2.2",
   "mercantile<2.0.0,>=1.1.6",
   "scipy<2.0.0,>=1.6.1",
+  "ipyleaflet<1.0.0,>=0.13.6",
+  "ipywidgets<8.0.0,>=7.6.3",
 ]
 
-[tool.pdm]
-includes = []
 [tool.pdm.dev-dependencies]
 binder = [
   "Bottleneck<2.0.0,>=1.3.2",
   "coiled<1",
   "distributed<2023.0.0,>=2022.1.1",
   "geogif<1,>=0",
-  "ipyleaflet<1.0.0,>=0.13.6",
-  "ipywidgets<8.0.0,>=7.6.3",
   "jupyter-server-proxy<4.0.0,>=3.2.0",
   "jupyterlab-geojson<4.0.0,>=3.1.2",
   "jupyterlab-system-monitor<1.0.0,>=0.8.0",
