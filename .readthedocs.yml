@@ -10,12 +10,13 @@ build:
   jobs:
     post_install:
       - env
+      - which pip
+      - which python
+      - realpath $(which python)
       - ls -l $(dirname $(which python))
       - pip install --upgrade pdm
       - pdm use $(which python)
       - pdm info
-      - which pip
-      - which python
       - pip list -v
       # pandoc fails in isolation mode
       - pdm install -vv --no-isolation --dev -G docs -G viz
