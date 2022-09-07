@@ -20,5 +20,5 @@ build:
       - VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm info
       - pip list -v
       # pandoc fails in isolation mode
-      - pdm install -vv --no-isolation --dev -G docs -G viz
+      - VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm install -vv --no-isolation --dev -G docs -G viz
       - pip list -v
