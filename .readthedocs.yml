@@ -10,4 +10,6 @@ build:
   jobs:
     post_install:
       - pip install --upgrade pdm
-      - pdm install --dev -G docs -G viz
+      - pdm use $(which python)
+      # pandoc fails in isolation mode
+      - pdm install --no-isolation --dev -G docs -G viz
