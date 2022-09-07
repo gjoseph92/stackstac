@@ -1,5 +1,4 @@
 
 set -ex
 
-poetry config virtualenvs.create false
-poetry install -E binder -E viz
+pdm install -G viz -dG binder
