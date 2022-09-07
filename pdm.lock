@@ -1649,6 +1649,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "sphinx-paramlinks"
+version = "0.5.4"
+summary = "Allows param links in Sphinx function/method descriptions to be linkable"
+
+[[package]]
 name = "sphinxcontrib-applehelp"
 version = "1.0.2"
 requires_python = ">=3.5"
@@ -1870,7 +1875,7 @@ summary = "Backport of pathlib-compatible object wrapper for zip files"
 
 [metadata]
 lock_version = "4.0"
-content_hash = "sha256:682cdfde5a715cc99ced185c3ec525c58d3810c72fd1ddeeeb05170615dbc1eb"
+content_hash = "sha256:7c091cd84f02a46e2a6296d9790df0bade252d56bb3c2304bfaa8c55d100639d"
 
 [metadata.files]
 "affine 2.3.1" = [
@@ -3560,6 +3565,9 @@ content_hash = "sha256:682cdfde5a715cc99ced185c3ec525c58d3810c72fd1ddeeeb0517061
 "sphinx-basic-ng 0.0.1a12" = [
     {url = "https://files.pythonhosted.org/packages/61/a8/61c562fdb3114ee16efb95b56ebea69ef5e0d9e1d7bd0bfd815dc034afd1/sphinx_basic_ng-0.0.1a12-py3-none-any.whl", hash = "sha256:e8b6efd2c5ece014156de76065eda01ddfca0fee465aa020b1e3c12f84570bbe"},
     {url = "https://files.pythonhosted.org/packages/7a/c4/efee3b7886fa209227dba8988c9320ddc69b2decc6753d88c9584e44d55c/sphinx_basic_ng-0.0.1a12.tar.gz", hash = "sha256:cffffb14914ddd26c94b1330df1d72dab5a42e220aaeb5953076a40b9c50e801"},
+]
+"sphinx-paramlinks 0.5.4" = [
+    {url = "https://files.pythonhosted.org/packages/dd/d0/c1c91d9de717819970131f5f257d9f71dfff1423dca2fd907b3dbdc2b3e1/sphinx-paramlinks-0.5.4.tar.gz", hash = "sha256:9f7bffa9f4197aa60369058c0a13ca5e7aa938e84c0643e300d341bbe2f4958a"},
 ]
 "sphinxcontrib-applehelp 1.0.2" = [
     {url = "https://files.pythonhosted.org/packages/9f/01/ad9d4ebbceddbed9979ab4a89ddb78c9760e74e6757b1880f1b2760e8295/sphinxcontrib-applehelp-1.0.2.tar.gz", hash = "sha256:a072735ec80e7675e3f432fcae8610ecf509c5f1869d17e2eecff44389cdbc58"},
