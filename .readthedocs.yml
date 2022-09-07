@@ -12,4 +12,4 @@ build:
       - pip install --upgrade pdm
       - pdm use $(which python)
       # pandoc fails in isolation mode
-      - pdm install --global --no-isolation --dev -G docs -G viz
+      - pdm install -vv --no-isolation --dev -G docs -G viz
