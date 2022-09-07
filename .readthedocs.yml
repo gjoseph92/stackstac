@@ -9,13 +9,14 @@ build:
     python: "3.8"
   jobs:
     post_install:
+      - export VIRTUAL_ENV=$(dirname $(dirname $(which python)))
       - env
       - which pip
       - which python
       - realpath $(which python)
-      - ls -l $(dirname $(which python))
+      - ls -la $(dirname $(which python))
       - pip install --upgrade pdm
-      - pdm use $(which python)
+      # - pdm use $(which python)
       - pdm info
       - pip list -v
       # pandoc fails in isolation mode
