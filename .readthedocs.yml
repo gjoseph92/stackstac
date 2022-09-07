@@ -9,16 +9,7 @@ build:
     python: "3.8"
   jobs:
     post_install:
-      - export VIRTUAL_ENV=$(dirname $(dirname $(which python)))
-      - env
-      - which pip
-      - which python
-      - realpath $(which python)
-      - ls -la $(dirname $(which python))
       - pip install --upgrade pdm
-      # - pdm use $(which python)
-      - VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm info
-      - pip list -v
-      # pandoc fails in isolation mode
+      # https://github.com/pdm-project/pdm/discussions/1365#discussioncomment-3581356
+      # NOTE: pandoc fails in isolation mode
       - VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm install --no-isolation -G viz -dG docs
-      - pip list -v
