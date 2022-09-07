@@ -35,7 +35,7 @@ if __name__ == "__main__":
                 f"senv version {version[:2]} does not match interpreter version {sys.version_info[:2]}"
             )
 
-    deps = run("poetry export --without-hashes -E binder -E viz").splitlines()
+    deps = run("pdm export --without-hashes --format requirements -G binder -G viz").splitlines()
 
     if dev:
         subprocess.run("git fetch", shell=True, check=True)

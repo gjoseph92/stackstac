@@ -5,6 +5,7 @@ __pycache__
 dask-worker-space
 .ipynb_checkpoints
 .vscode
+.pdm.toml
 /dist
 
 *.DS_Store

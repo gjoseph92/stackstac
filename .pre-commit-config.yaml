@@ -1,0 +1,11 @@
+repos:
+  - repo: local
+    hooks:
+      - id: pdm-check
+        name: pdm check
+        description: Check that PDM lockfile is up to date
+        entry: pdm install --check --dry-run
+        files: "^pyproject.toml$"
+        language: python
+        language_version: python3
+        pass_filenames: false

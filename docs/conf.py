@@ -22,7 +22,7 @@ import datetime
 
 DISTRIBUTION_METADATA = importlib.metadata.metadata("stackstac")
 
-author = DISTRIBUTION_METADATA["Author"]
+author = DISTRIBUTION_METADATA["Author-email"].split(" <")[0]
 project = DISTRIBUTION_METADATA["Name"]
 version = DISTRIBUTION_METADATA["Version"]
 copyright = f"{datetime.datetime.now().year}, {author}"

@@ -1,1 +1,1 @@
-poetry
+pdm

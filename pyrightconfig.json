@@ -1,0 +1,6 @@
+{
+    "exclude": [
+        "__pypackages__",
+        ".venv"
+    ]
+}

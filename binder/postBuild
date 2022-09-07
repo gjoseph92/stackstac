@@ -1,5 +1,3 @@
-
 set -ex
 
-poetry config virtualenvs.create false
-poetry install -E binder -E viz
+VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm install -G viz -dG binder
