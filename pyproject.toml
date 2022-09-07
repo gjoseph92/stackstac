@@ -57,6 +57,7 @@ docs = [
     "numpydoc<2.0.0,>=1.4.0",
     "pandoc<3.0.0,>=2.2",
     "sphinx-autodoc-typehints<2.0.0,>=1.18.3",
+    "sphinx-paramlinks>=0.5.4",
 ]
 style = [
     "flake8<5.0.0,>=4.0.1",
