@@ -2,13 +2,13 @@
 # PEP 621 project metadata
 # See https://www.python.org/dev/peps/pep-0621/
 authors = [
-  {name = "Gabe Joseph", email = "gjoseph92@gmail.com"},
+    {name = "Gabe Joseph", email = "gjoseph92@gmail.com"},
 ]
 dependencies = [
-  "dask[array]<2023.0.0,>=2022.1.1",
-  "pyproj<4.0.0,>=3.0.0",
-  "rasterio<2.0.0,>=1.3.0",
-  "xarray>=0.18",
+    "dask[array]>=2022.1.1",
+    "pyproj<4.0.0,>=3.0.0",
+    "rasterio<2.0.0,>=1.3.0",
+    "xarray>=0.18",
 ]
 description = "Load a STAC collection into xarray with dask"
 license = {text = "MIT"}
@@ -23,58 +23,57 @@ repository = "https://github.com/gjoseph92/stackstac"
 
 [project.optional-dependencies]
 viz = [
-  "Pillow<10.0.0,>=9.0.1",
-  "aiohttp<4.0.0,>=3.7.4",
-  "cachetools<5.0.0,>=4.2.2",
-  "mercantile<2.0.0,>=1.1.6",
-  "scipy<2.0.0,>=1.6.1",
-  "ipyleaflet<1.0.0,>=0.13.6",
-  "ipywidgets<8.0.0,>=7.6.3",
+    "Pillow<10.0.0,>=9.0.1",
+    "aiohttp<4.0.0,>=3.7.4",
+    "distributed>=2022.1.1",
+    "cachetools<5.0.0,>=4.2.2",
+    "mercantile<2.0.0,>=1.1.6",
+    "scipy<2.0.0,>=1.6.1",
+    "ipyleaflet<1.0.0,>=0.13.6",
+    "ipywidgets<8.0.0,>=7.6.3",
 ]
 
 [tool.pdm.dev-dependencies]
 binder = [
-  "Bottleneck<2.0.0,>=1.3.2",
-  "coiled<1",
-  "distributed<2023.0.0,>=2022.1.1",
-  "geogif<1,>=0",
-  "jupyter-server-proxy<4.0.0,>=3.2.0",
-  "jupyterlab-geojson<4.0.0,>=3.1.2",
-  "jupyterlab-system-monitor<1.0.0,>=0.8.0",
-  "matplotlib<4.0.0,>=3.4.1",
-  "planetary-computer<1,>=0.4.3",
-  "pystac-client<1.0,>=0.3",
-  "sat-search<1.0.0,>=0.3.0",
+    "Bottleneck>=1.3.2",
+    "coiled>=0.2.27",
+    "geogif>=0",
+    "jupyter-server-proxy>=3.2.0",
+    "jupyterlab-geojson>=3.1.2",
+    "jupyterlab-system-monitor>=0.8.0",
+    "matplotlib>=3.4.1",
+    "planetary-computer>=0.4.3",
+    "pystac-client>=0.3",
+    "sat-search>=0.3.0",
+    "dask-labextension>=5.0.1",
+    "jupyterlab>=3.0.14",
 ]
 docs = [
-  "Sphinx<6.0.0,>=5.0.2",
-  "furo<2023.0.0.0,>=2022.6.21",
-  "ipython<8.0.0,>=7.20.0",
-  "jupyter-sphinx<1.0.0,>=0.4.0",
-  "nbsphinx<1.0.0,>=0.8.9",
-  "numpydoc<2.0.0,>=1.4.0",
-  "pandoc<3.0.0,>=2.2",
-  "sphinx-autodoc-typehints<2.0.0,>=1.18.3",
+    "Sphinx<6.0.0,>=5.0.2",
+    "furo<2023.0.0.0,>=2022.6.21",
+    "ipython<8.0.0,>=7.20.0",
+    "jupyter-sphinx<1.0.0,>=0.4.0",
+    "nbsphinx<1.0.0,>=0.8.9",
+    "numpydoc<2.0.0,>=1.4.0",
+    "pandoc<3.0.0,>=2.2",
+    "sphinx-autodoc-typehints<2.0.0,>=1.18.3",
 ]
 style = [
-  "flake8<5.0.0,>=4.0.1",
-  "black<23.0.0,>=22.3.0",
+    "flake8<5.0.0,>=4.0.1",
+    "black<23.0.0,>=22.3.0",
 ]
 test = [
-  "hypothesis<7.0.0,>=6.35.0",
-  "pytest<7.0.0,>=6.2.5",
+    "hypothesis<7.0.0,>=6.35.0",
+    "pytest<7.0.0,>=6.2.5",
 ]
 util = [
-  "dask-labextension<6.0.0,>=5.0.1",
-  "jupyterlab<4.0.0,>=3.0.14",
-  "keyring<24.0.0,>=23.0.1",
-  "py-spy",
-  "pystac<2,>=1",
-  "scheduler-profilers @ git+https://github.com/gjoseph92/scheduler-profilers.git@main",
-  "graphviz<1.0,>=0.16",
-  "snakeviz<3.0.0,>=2.1.0",
-  "sphinx-autobuild<2022.0.0,>=2021.3.14",
-  "twine<4.0.0,>=3.4.1",
+    "py-spy",
+    "pystac>=1",
+    "scheduler-profilers @ git+https://github.com/gjoseph92/scheduler-profilers.git@main",
+    "graphviz>=0.16",
+    "snakeviz>=2.1.0",
+    "sphinx-autobuild>=2021.3.14",
+    "twine>=3.4.1",
 ]
 
 [build-system]
