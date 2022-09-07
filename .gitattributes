@@ -1,0 +1,2 @@
+# Make GitHub treat PDM's lockfile as generated and automatically hide its diff
+pdm.lock linguist-generated
