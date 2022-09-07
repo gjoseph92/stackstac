@@ -1,4 +1,5 @@
 
 set -ex
 
+pdm use $(which python)
 pdm install -G viz -dG binder
