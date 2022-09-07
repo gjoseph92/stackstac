@@ -17,7 +17,7 @@ build:
       - ls -la $(dirname $(which python))
       - pip install --upgrade pdm
       # - pdm use $(which python)
-      - pdm info
+      - VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm info
       - pip list -v
       # pandoc fails in isolation mode
       - pdm install -vv --no-isolation --dev -G docs -G viz
