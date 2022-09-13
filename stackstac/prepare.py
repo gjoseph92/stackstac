@@ -279,7 +279,7 @@ def prepare_items(
                         )
 
                         transformer = geom_utils.cached_transformer(
-                            asset_epsg, out_epsg, skip_equivalent=True, always_xy=True
+                            asset_epsg, out_epsg, always_xy=True
                         )
                         out_px_corner_xs, out_px_corner_ys = transformer.transform(
                             px_corner_xs, px_corner_ys, errcheck=True

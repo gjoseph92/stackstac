@@ -27,9 +27,7 @@ def bounds_from_affine(
     ys = [ul_y, ll_y, lr_y, ur_y]
 
     if from_epsg != to_epsg:
-        transformer = cached_transformer(
-            from_epsg, to_epsg, skip_equivalent=True, always_xy=True
-        )
+        transformer = cached_transformer(from_epsg, to_epsg, always_xy=True)
         # TODO handle error
         xs_proj, ys_proj = transformer.transform(xs, ys, errcheck=True)
     else:
@@ -50,9 +48,7 @@ def reproject_bounds(bounds: Bbox, from_epsg: int, to_epsg: int) -> Bbox:
     # read this in pairs, downward by column
     xs = [minx, minx, maxx, maxx]
     ys = [maxy, miny, miny, maxy]
-    transformer = cached_transformer(
-        from_epsg, to_epsg, skip_equivalent=True, always_xy=True
-    )
+    transformer = cached_transformer(from_epsg, to_epsg, always_xy=True)
     xs_proj, ys_proj = transformer.transform(xs, ys, errcheck=True)  # TODO handle error
     return min(xs_proj), min(ys_proj), max(xs_proj), max(ys_proj)
 
@@ -288,9 +284,7 @@ def reproject_array(
     # We do this by, for each point in the output grid, generating
     # the coordinates in the _input_ CRS that correspond to that point.
 
-    reverse_transformer = cached_transformer(
-        spec.epsg, from_epsg, skip_equivalent=True, always_xy=True
-    )
+    reverse_transformer = cached_transformer(spec.epsg, from_epsg, always_xy=True)
 
     xs, ys = np.meshgrid(x, y, copy=False)
     src_xs, src_ys = reverse_transformer.transform(xs, ys, errcheck=True)
