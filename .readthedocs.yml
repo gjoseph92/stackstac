@@ -9,7 +9,8 @@ build:
     python: "3.8"
   jobs:
     post_install:
-      - pip install --upgrade pdm
+      # Install PDM in its own isolated environment, so docs deps don't trample its deps
+      - curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3 -
       # https://github.com/pdm-project/pdm/discussions/1365#discussioncomment-3581356
       # NOTE: pandoc fails in isolation mode
-      - VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm install --no-isolation -G viz -dG docs
+      - pdm install --no-isolation -G viz -dG docs
