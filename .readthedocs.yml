@@ -11,7 +11,7 @@ build:
     post_install:
       # Install PDM in its own isolated environment, so docs deps don't trample its deps
       - curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3 -
-      - export PATH="$HOME/.local/bin:$PATH"
+      - echo "PATH=$HOME/.local/bin:$PATH" >> $HOME/.bashrc
       - env
       # https://github.com/pdm-project/pdm/discussions/1365#discussioncomment-3581356
       # NOTE: pandoc fails in isolation mode
