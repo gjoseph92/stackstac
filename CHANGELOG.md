@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3 (2022-09-14)
+- Support sequences of `Item`s [@gjoseph92](https://github.com/gjoseph92)
+- Fix compatibility with `pyproj>=3.4.0` [@gjoseph92](https://github.com/gjoseph92)
+- stackstac has switched from Poetry to PDM as its package manager. This does not affect users, only developers.
+
 ## 0.4.2 (2022-07-06)
 - Support (and require) rasterio 1.3.0 [@carderne](https://github.com/carderne) [@gjoseph92](https://github.com/gjoseph92)
 - Fix `ValueError` when passing `dim=` to `mosaic` [@aazuspan](https://github.com/aazuspan)
