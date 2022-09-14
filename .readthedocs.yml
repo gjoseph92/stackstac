@@ -14,4 +14,4 @@ build:
       - export "PATH=$HOME/.local/bin:$PATH"
       # https://github.com/pdm-project/pdm/discussions/1365#discussioncomment-3581356
       # NOTE: pandoc fails in isolation mode
-      - pdm install --no-isolation -G viz -dG docs
+      - VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm install --no-isolation -G viz -dG docs
