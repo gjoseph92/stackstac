@@ -357,6 +357,7 @@ class AutoParallelRioReader:
                         resampling=self.resampling,
                         **self.spec.vrt_params,
                     )
+            # Alternatively, try to make VRT when ground control points (gcps) are present
             elif ds.gcps is not None:
                 with self.gdal_env.open_vrt:
                     src_crs = ds.gcps[-1]
