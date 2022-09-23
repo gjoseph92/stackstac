@@ -343,27 +343,24 @@ class AutoParallelRioReader:
                     "a separate STAC asset), so you'll need to exclude this asset from your analysis."
                 )
 
+            # Set source crs from ground control points (gcps) if present
+            if not hasattr(ds.crs, "to_epsg") and ds.gcps is not None:
+                self.spec.vrt_params["src_crs"] = ds.gcps[-1]
+
             # Only make a VRT if the dataset doesn't match the spatial spec we want
-            if hasattr(ds.crs, "to_epsg") and self.spec.vrt_params != {
-                "crs": ds.crs.to_epsg(),
-                "transform": ds.transform,
-                "height": ds.height,
-                "width": ds.width,
-            }:
+            if "src_crs" in self.spec.vrt_params or (
+                hasattr(ds.crs, "to_epsg")
+                and self.spec.vrt_params
+                != {
+                    "crs": ds.crs.to_epsg(),
+                    "transform": ds.transform,
+                    "height": ds.height,
+                    "width": ds.width,
+                }
+            ):
                 with self.gdal_env.open_vrt:
                     vrt = WarpedVRT(
                         ds,
-                        sharing=False,
-                        resampling=self.resampling,
-                        **self.spec.vrt_params,
-                    )
-            # Alternatively, try to make VRT when ground control points (gcps) are present
-            elif ds.gcps is not None:
-                with self.gdal_env.open_vrt:
-                    src_crs = ds.gcps[-1]
-                    vrt = WarpedVRT(
-                        ds,
-                        src_crs=src_crs,
                         sharing=False,
                         resampling=self.resampling,
                         **self.spec.vrt_params,
