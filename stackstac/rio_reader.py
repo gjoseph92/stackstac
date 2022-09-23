@@ -344,12 +344,16 @@ class AutoParallelRioReader:
                 )
 
             # Only make a VRT if the dataset doesn't match the spatial spec we want
-            if self.spec.vrt_params != {
-                "crs": ds.crs.to_epsg(),
-                "transform": ds.transform,
-                "height": ds.height,
-                "width": ds.width,
-            }:
+            if (
+                hasattr(ds.crs, "to_epsg")
+                and self.spec.vrt_params
+                != {
+                    "crs": ds.crs.to_epsg(),
+                    "transform": ds.transform,
+                    "height": ds.height,
+                    "width": ds.width,
+                }
+            ) or ds.gcps is not None:
                 with self.gdal_env.open_vrt:
                     vrt = WarpedVRT(
                         ds,
