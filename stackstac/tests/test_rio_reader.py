@@ -1,9 +1,10 @@
 import tempfile
 
 import numpy as np
+import rasterio
+import rasterio.enums
 from rasterio.control import GroundControlPoint
 from rasterio.crs import CRS
-from rasterio.enums import Resampling
 from rasterio.windows import Window
 from stackstac.raster_spec import RasterSpec
 from stackstac.rio_reader import AutoParallelRioReader
@@ -41,7 +42,7 @@ def test_dataset_read_with_gcps():
                 epsg=4326, bounds=(90, -10, 110, 10), resolutions_xy=(10, 10)
             ),
             resampling=rasterio.enums.Resampling.bilinear,
-            dtype=np.float32,
+            dtype=np.dtype("float32"),
             fill_value=np.nan,
             rescale=True,
         )
