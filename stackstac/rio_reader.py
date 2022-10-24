@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, TypedDict, Un
 
 import numpy as np
 import rasterio as rio
+import rasterio.errors
 from rasterio.vrt import WarpedVRT
 
 from .rio_env import LayeredEnv
@@ -323,9 +324,7 @@ class AutoParallelRioReader:
         with self.gdal_env.open:
             with time(f"Initial read for {self.url!r} on {_curthread()}: {{t}}"):
                 try:
-                    ds = SelfCleaningDatasetReader(
-                        self.url, sharing=False
-                    )
+                    ds = SelfCleaningDatasetReader(self.url, sharing=False)
                 except Exception as e:
                     msg = f"Error opening {self.url!r}: {e!r}"
                     if exception_matches(e, self.errors_as_nodata):
@@ -343,26 +342,30 @@ class AutoParallelRioReader:
                     "a separate STAC asset), so you'll need to exclude this asset from your analysis."
                 )
 
-            # Set source crs from ground control points (gcps) if present
-            if not hasattr(ds.crs, "to_epsg") and ds.gcps is not None:
-                self.spec.vrt_params["src_crs"] = ds.gcps[-1]
+            ds_epsg: int | None
+            try:
+                ds_epsg = ds.crs.to_epsg() if ds.crs is not None else None
+            except rasterio.errors.CRSError:
+                ds_epsg = None
 
             # Only make a VRT if the dataset doesn't match the spatial spec we want
-            if "src_crs" in self.spec.vrt_params or (
-                hasattr(ds.crs, "to_epsg")
-                and self.spec.vrt_params
-                != {
-                    "crs": ds.crs.to_epsg(),
-                    "transform": ds.transform,
-                    "height": ds.height,
-                    "width": ds.width,
-                }
-            ):
+            if ds_epsg is not None and self.spec.vrt_params != {
+                "crs": ds_epsg,
+                "transform": ds.transform,
+                "height": ds.height,
+                "width": ds.width,
+            }:
+                # Set source crs from ground control points (gcps) if present
+                src_crs = (
+                    ds.gcps[-1] if ds.crs is None and ds.gcps is not None else None
+                )
+
                 with self.gdal_env.open_vrt:
                     vrt = WarpedVRT(
                         ds,
                         sharing=False,
                         resampling=self.resampling,
+                        src_crs=src_crs,
                         **self.spec.vrt_params,
                     )
             else:
