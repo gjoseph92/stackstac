@@ -401,8 +401,9 @@ class AutoParallelRioReader:
 
         if self.rescale:
             scale, offset = reader.scale_offset
-            if scale != 1 and offset != 0:
+            if scale != 1:
                 result *= scale
+            if offset != 0:
                 result += offset
 
         result = result.astype(self.dtype, copy=False)
