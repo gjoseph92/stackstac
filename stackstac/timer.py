@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def time(statement: str, level=logging.INFO):
+def time(statement: str, level=logging.DEBUG):
     start = default_timer()
     error = None
     try:
