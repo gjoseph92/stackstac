@@ -13,7 +13,6 @@ from typing import (
     List,
     Dict,
     Any,
-    cast,
 )
 import warnings
 
@@ -164,7 +163,7 @@ def prepare_items(
                         "Please specify a CRS with the `epsg=` argument."
                     )
 
-            out_epsg = cast(int, out_epsg)
+            assert isinstance(out_epsg, int), f"`out_epsg` not found. {out_epsg=}"
             # ^ because if it was None initially, and we didn't error out in the above check, it's now always set
 
             if bounds_latlon is not None and out_bounds is None:
@@ -226,32 +225,6 @@ def prepare_items(
                             # ^ so we can reuse for other assets
                     else:
                         asset_bbox_proj = item_bbox_proj
-
-            # Auto-compute bounds
-            if bounds is None:
-                if asset_bbox_proj is None:
-                    raise ValueError(
-                        f"Cannot automatically compute the bounds, "
-                        f"since asset {id!r} on item {item_i} {item['id']!r} "
-                        f"doesn't provide enough metadata to determine its spatial extent.\n"
-                        f"We'd need at least one of (in order of preference):\n"
-                        f"- The `proj:bbox` field set on the asset, or on the item\n"
-                        f"- The `proj:shape` and `proj:transform` fields set on the asset, or on the item\n"
-                        f"- A `bbox` set on the item {item['id']!r}\n\n"
-                        "Please specify the `bounds=` or `bounds_latlon=` argument to set the output bounds manually."
-                    )
-                out_bounds = (
-                    asset_bbox_proj
-                    if out_bounds is None
-                    else geom_utils.union_bounds(asset_bbox_proj, out_bounds)
-                )
-            else:
-                # Drop asset if it doesn't overlap with the output bounds at all
-                if asset_bbox_proj is not None and not geom_utils.bounds_overlap(
-                    asset_bbox_proj, bounds
-                ):
-                    # I've got a blank space in my ndarray, baby / And I'll write your name
-                    continue
 
             # Auto-compute resolutions
             if resolution is None:
@@ -320,14 +293,42 @@ def prepare_items(
                         min(res_y, out_resolutions_xy[1]),
                     )
 
+            # Auto-compute bounds
+            # We do this last, so that if we have to skip all items (due to non-overlap),
+            # we still get the spatial information needed to construct an array of NaNs.
+            if bounds is None:
+                if asset_bbox_proj is None:
+                    raise ValueError(
+                        f"Cannot automatically compute the bounds, "
+                        f"since asset {id!r} on item {item_i} {item['id']!r} "
+                        f"doesn't provide enough metadata to determine its spatial extent.\n"
+                        f"We'd need at least one of (in order of preference):\n"
+                        f"- The `proj:bbox` field set on the asset, or on the item\n"
+                        f"- The `proj:shape` and `proj:transform` fields set on the asset, or on the item\n"
+                        f"- A `bbox` set on the item {item['id']!r}\n\n"
+                        "Please specify the `bounds=` or `bounds_latlon=` argument to set the output bounds manually."
+                    )
+                out_bounds = (
+                    asset_bbox_proj
+                    if out_bounds is None
+                    else geom_utils.union_bounds(asset_bbox_proj, out_bounds)
+                )
+            else:
+                # Drop asset if it doesn't overlap with the output bounds at all
+                if asset_bbox_proj is not None and not geom_utils.bounds_overlap(
+                    asset_bbox_proj, bounds
+                ):
+                    # I've got a blank space in my ndarray, baby / And I'll write your name
+                    continue
+
             # Phew, we figured out all the spatial stuff! Now actually store the information we care about.
             asset_table[item_i, asset_i] = (asset["href"], asset_bbox_proj)
             # ^ NOTE: If `asset_bbox_proj` is None, NumPy automatically converts it to NaNs
 
     # At this point, everything has been set (or there was as error)
-    out_bounds = cast(Bbox, out_bounds)
-    out_resolutions_xy = cast(Resolutions, out_resolutions_xy)
-    out_epsg = cast(int, out_epsg)
+    assert out_bounds, f"{out_bounds=}"
+    assert out_resolutions_xy is not None, f"{out_resolutions_xy=}"
+    assert out_epsg is not None, f"{out_epsg=}"
 
     if snap_bounds:
         out_bounds = geom_utils.snapped_bounds(out_bounds, out_resolutions_xy)
