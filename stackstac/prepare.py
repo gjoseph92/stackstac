@@ -227,32 +227,6 @@ def prepare_items(
                     else:
                         asset_bbox_proj = item_bbox_proj
 
-            # Auto-compute bounds
-            if bounds is None:
-                if asset_bbox_proj is None:
-                    raise ValueError(
-                        f"Cannot automatically compute the bounds, "
-                        f"since asset {id!r} on item {item_i} {item['id']!r} "
-                        f"doesn't provide enough metadata to determine its spatial extent.\n"
-                        f"We'd need at least one of (in order of preference):\n"
-                        f"- The `proj:bbox` field set on the asset, or on the item\n"
-                        f"- The `proj:shape` and `proj:transform` fields set on the asset, or on the item\n"
-                        f"- A `bbox` set on the item {item['id']!r}\n\n"
-                        "Please specify the `bounds=` or `bounds_latlon=` argument to set the output bounds manually."
-                    )
-                out_bounds = (
-                    asset_bbox_proj
-                    if out_bounds is None
-                    else geom_utils.union_bounds(asset_bbox_proj, out_bounds)
-                )
-            else:
-                # Drop asset if it doesn't overlap with the output bounds at all
-                if asset_bbox_proj is not None and not geom_utils.bounds_overlap(
-                    asset_bbox_proj, bounds
-                ):
-                    # I've got a blank space in my ndarray, baby / And I'll write your name
-                    continue
-
             # Auto-compute resolutions
             if resolution is None:
                 # Prefer computing resolutions from a geotrans, if it exists
@@ -319,6 +293,34 @@ def prepare_items(
                         min(res_x, out_resolutions_xy[0]),
                         min(res_y, out_resolutions_xy[1]),
                     )
+
+            # Auto-compute bounds
+            # We do this last, so that if we have to skip all items (due to non-overlap),
+            # we still get the spatial information needed to construct an array of NaNs.
+            if bounds is None:
+                if asset_bbox_proj is None:
+                    raise ValueError(
+                        f"Cannot automatically compute the bounds, "
+                        f"since asset {id!r} on item {item_i} {item['id']!r} "
+                        f"doesn't provide enough metadata to determine its spatial extent.\n"
+                        f"We'd need at least one of (in order of preference):\n"
+                        f"- The `proj:bbox` field set on the asset, or on the item\n"
+                        f"- The `proj:shape` and `proj:transform` fields set on the asset, or on the item\n"
+                        f"- A `bbox` set on the item {item['id']!r}\n\n"
+                        "Please specify the `bounds=` or `bounds_latlon=` argument to set the output bounds manually."
+                    )
+                out_bounds = (
+                    asset_bbox_proj
+                    if out_bounds is None
+                    else geom_utils.union_bounds(asset_bbox_proj, out_bounds)
+                )
+            else:
+                # Drop asset if it doesn't overlap with the output bounds at all
+                if asset_bbox_proj is not None and not geom_utils.bounds_overlap(
+                    asset_bbox_proj, bounds
+                ):
+                    # I've got a blank space in my ndarray, baby / And I'll write your name
+                    continue
 
             # Phew, we figured out all the spatial stuff! Now actually store the information we care about.
             asset_table[item_i, asset_i] = (asset["href"], asset_bbox_proj)
