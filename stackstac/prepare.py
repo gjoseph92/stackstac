@@ -13,7 +13,6 @@ from typing import (
     List,
     Dict,
     Any,
-    cast,
 )
 import warnings
 
@@ -164,7 +163,7 @@ def prepare_items(
                         "Please specify a CRS with the `epsg=` argument."
                     )
 
-            out_epsg = cast(int, out_epsg)
+            assert isinstance(out_epsg, int), f"`out_epsg` not found. {out_epsg=}"
             # ^ because if it was None initially, and we didn't error out in the above check, it's now always set
 
             if bounds_latlon is not None and out_bounds is None:
@@ -327,9 +326,9 @@ def prepare_items(
             # ^ NOTE: If `asset_bbox_proj` is None, NumPy automatically converts it to NaNs
 
     # At this point, everything has been set (or there was as error)
-    out_bounds = cast(Bbox, out_bounds)
-    out_resolutions_xy = cast(Resolutions, out_resolutions_xy)
-    out_epsg = cast(int, out_epsg)
+    assert out_bounds, f"{out_bounds=}"
+    assert out_resolutions_xy is not None, f"{out_resolutions_xy=}"
+    assert out_epsg is not None, f"{out_epsg=}"
 
     if snap_bounds:
         out_bounds = geom_utils.snapped_bounds(out_bounds, out_resolutions_xy)
