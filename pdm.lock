@@ -1190,7 +1190,7 @@ summary = "Resolve a name to an object."
 
 [[package]]
 name = "planetary-computer"
-version = "0.4.7"
+version = "0.4.9"
 requires_python = ">=3.7"
 summary = "Planetary Computer SDK for Python"
 dependencies = [
@@ -1327,7 +1327,7 @@ dependencies = [
 
 [[package]]
 name = "pystac-client"
-version = "0.5.0"
+version = "0.5.1"
 requires_python = ">=3.7"
 summary = "Python library for working with Spatiotemporal Asset Catalog (STAC)."
 dependencies = [
@@ -3082,9 +3082,9 @@ content_hash = "sha256:c11dbfcbb620186cb38cde6570dd54793e77eb20359d7adae393dd43a
     {url = "https://files.pythonhosted.org/packages/70/f2/f2891a9dc37398696ddd945012b90ef8d0a034f0012e3f83c3f7a70b0f79/pkgutil_resolve_name-1.3.10.tar.gz", hash = "sha256:357d6c9e6a755653cfd78893817c0853af365dd51ec97f3d358a819373bbd174"},
     {url = "https://files.pythonhosted.org/packages/c9/5c/3d4882ba113fd55bdba9326c1e4c62a15e674a2501de4869e6bd6301f87e/pkgutil_resolve_name-1.3.10-py3-none-any.whl", hash = "sha256:ca27cc078d25c5ad71a9de0a7a330146c4e014c2462d9af19c6b828280649c5e"},
 ]
-"planetary-computer 0.4.7" = [
-    {url = "https://files.pythonhosted.org/packages/42/4e/21e3734ba23be01c86ffa2597a292d5e4a9dd2d486e5d42077328d99a674/planetary_computer-0.4.7-py3-none-any.whl", hash = "sha256:bfc674791f13404ad73f955fe942d2a964c0db3c12cabe2c37faeb94b9a71350"},
-    {url = "https://files.pythonhosted.org/packages/8f/24/a60bea4e65bdf29aad41da843cbab7bca05579723db3f00c6f4f0b911d70/planetary-computer-0.4.7.tar.gz", hash = "sha256:fcac7bd119f3efc8e5f808d6ff014e0c3aed2b4af9a9621604aebf0f867ab65c"},
+"planetary-computer 0.4.9" = [
+    {url = "https://files.pythonhosted.org/packages/1b/db/6de887fbb29c62da2db3c4d69318a4fe2cf3ff9af29fd88b27e4ba0c04c9/planetary_computer-0.4.9-py3-none-any.whl", hash = "sha256:2b3b8faeeb595fce9e7f5252851eb6aa47c590007bf42c072d86bd560511c586"},
+    {url = "https://files.pythonhosted.org/packages/33/1d/76754835d017667e62e73b822b3e1b1f0d0cc047285d026996008f25a113/planetary-computer-0.4.9.tar.gz", hash = "sha256:f25030aa5b1fc3e44bd0d48300325ffbdbbabbed4a837dfcea55764359249720"},
 ]
 "platformdirs 2.5.2" = [
     {url = "https://files.pythonhosted.org/packages/ed/22/967181c94c3a4063fe64e15331b4cb366bdd7dfbf46fcb8ad89650026fec/platformdirs-2.5.2-py3-none-any.whl", hash = "sha256:027d8e83a2d7de06bbac4e5ef7e023c02b863d7ea5d079477e722bb41ab25788"},
@@ -3270,9 +3270,9 @@ content_hash = "sha256:c11dbfcbb620186cb38cde6570dd54793e77eb20359d7adae393dd43a
     {url = "https://files.pythonhosted.org/packages/27/f8/ac7d847a6ebb6a2344daccc9594d40aacb44d1ee00a4b871a1c6e13ba049/pystac-1.6.1.tar.gz", hash = "sha256:95ef493d6a6df4d982385c1d376c8aa0d967730e8ffeeda0f78cd7372faf066a"},
     {url = "https://files.pythonhosted.org/packages/32/f5/f13450a68cfdcad503889b875e45cc4cf7a8f671b493c74e9e4f1a03b74d/pystac-1.6.1-py3-none-any.whl", hash = "sha256:4c40e6d3a832b9992e9dc2aa9c276322fbd851e441888b5fc2024397477abec8"},
 ]
-"pystac-client 0.5.0" = [
-    {url = "https://files.pythonhosted.org/packages/8d/bd/4f7428b5049d3ddc59b9424ff146310f726a6fc28e3169dc1bd4279fa21a/pystac_client-0.5.0-py3-none-any.whl", hash = "sha256:c4094222004ea369fd40a3c97bc85088bfea6c386d653678c673c4c2f6904155"},
-    {url = "https://files.pythonhosted.org/packages/e7/fb/d221db2e450815a4ea68022a0a98298cd87fdaabc8b79ba99f3443fef3c7/pystac-client-0.5.0.tar.gz", hash = "sha256:cc45075c9fe6ae4c01db8099bf7ce70da9461d148c0dabe7e7e4a96ff2c82774"},
+"pystac-client 0.5.1" = [
+    {url = "https://files.pythonhosted.org/packages/a6/cb/0385fe4fadbd5ec4fe346ef03b9bc7ded60c375406ce154e48ce24901406/pystac-client-0.5.1.tar.gz", hash = "sha256:f585bd9bcd52ee399c8a292dbb7e0405c0da359a73bc07c1ef82a65c17124d94"},
+    {url = "https://files.pythonhosted.org/packages/df/c6/9ffa4d823a628a1addc1718cb0bd37352c17c6365637a62c7bcf46d741f2/pystac_client-0.5.1-py3-none-any.whl", hash = "sha256:f181c5d078e3c0b0769d492c79b213afb673666c6d0dc89c5f194dde0a8bcbb4"},
 ]
 "pytest 6.2.5" = [
     {url = "https://files.pythonhosted.org/packages/40/76/86f886e750b81a4357b6ed606b2bcf0ce6d6c27ad3c09ebf63ed674fc86e/pytest-6.2.5-py3-none-any.whl", hash = "sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134"},
