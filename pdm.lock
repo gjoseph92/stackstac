@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "dask-labextension"
-version = "5.3.0"
+version = "6.0.0"
 requires_python = ">=3.6"
 summary = "A JupyterLab extension for Dask."
 dependencies = [
@@ -772,18 +772,19 @@ dependencies = [
 
 [[package]]
 name = "jupyterlab"
-version = "3.4.6"
+version = "3.5.0"
 requires_python = ">=3.7"
 summary = "JupyterLab computational environment"
 dependencies = [
     "ipython",
     "jinja2>=2.1",
     "jupyter-core",
-    "jupyter-server~=1.16",
+    "jupyter-server<3,>=1.16.0",
     "jupyterlab-server~=2.10",
     "nbclassic",
     "notebook<7",
     "packaging",
+    "tomli",
     "tornado>=6.1.0",
 ]
 
@@ -2241,9 +2242,9 @@ content_hash = "sha256:c11dbfcbb620186cb38cde6570dd54793e77eb20359d7adae393dd43a
     {url = "https://files.pythonhosted.org/packages/06/e6/0ecc6e4d2fb0af64771fbcfe04eca98b14a62772bb4455ddb895cf047451/dask-2022.11.1.tar.gz", hash = "sha256:18e5c442778cdbb177041dadf9950546884c0f1ce1ac25c98aa2cade2a9d83f0"},
     {url = "https://files.pythonhosted.org/packages/c8/73/b8da0c6c3fde1cd477b820522439e8993aa564ceab69afe6f50659680cf3/dask-2022.11.1-py3-none-any.whl", hash = "sha256:89e3772c30072c7dacd83846164eca6bc0a8b347df7bc0ab2ce69f7effdc03bd"},
 ]
-"dask-labextension 5.3.0" = [
-    {url = "https://files.pythonhosted.org/packages/0b/4c/cd2503196d7e06e482935860f1c9a7f3641407ef922c132d0b6a0ebb3bf1/dask_labextension-5.3.0-py3-none-any.whl", hash = "sha256:ce25890f57eb36621bd866747799ca135aeadbe50fc346bd8f99ed2b97a393a8"},
-    {url = "https://files.pythonhosted.org/packages/b2/90/26f62a197fae9de778689b8c17f79660b8c75db259dd7aff32a2fa09ce6d/dask_labextension-5.3.0.tar.gz", hash = "sha256:ff722654e6e23baaad0f8b97216a25b1fad668fd86ec02088a1222a225d1ce80"},
+"dask-labextension 6.0.0" = [
+    {url = "https://files.pythonhosted.org/packages/2f/65/914f29fd0b007869dbbeb3747b67c522f73351253630b86c47ccee812a1f/dask_labextension-6.0.0-py3-none-any.whl", hash = "sha256:6b9e6a66fec891d6533314b03a57e121eb9822aaf98c94139c913e7c30212002"},
+    {url = "https://files.pythonhosted.org/packages/a3/79/0175fb48bcf5486bc46a42815acab13288b7c87fc655df8903b300c45db9/dask_labextension-6.0.0.tar.gz", hash = "sha256:516d1faccd0b172d07f794250a5c3427b082d70954ebe8d3f9c92dc08cb79f7e"},
 ]
 "dask-pyspy 0.4.0" = [
     {url = "https://files.pythonhosted.org/packages/17/5a/0cb25ba2b9aab8832b700c74ac81825d4d8d499ab46fb7f6b37626121b33/dask_pyspy-0.4.0.tar.gz", hash = "sha256:f93dc8837e0a219e6d83b868760084f5223254831b59803777ab4901dc0341c3"},
@@ -2486,9 +2487,9 @@ content_hash = "sha256:c11dbfcbb620186cb38cde6570dd54793e77eb20359d7adae393dd43a
     {url = "https://files.pythonhosted.org/packages/1b/3f/d2f319be5f1c6d32b27d0c84701c425586cf5cc504d5b2b92d7260579e40/jupyter_sphinx-0.4.0-py3-none-any.whl", hash = "sha256:32ad3c32900bb5cc4db300ed54c3798f2264bd2d9a8cb7c04c01b6004f063da1"},
     {url = "https://files.pythonhosted.org/packages/33/55/9f6643c7ab182ed6f0b645ea8ff57d3b801fc3a0f99ce9c11d5ad6e14841/jupyter_sphinx-0.4.0.tar.gz", hash = "sha256:0c11a38f1343138f2c5051c0d34c4c545f4480174c1bd41c0256fe826e0baa55"},
 ]
-"jupyterlab 3.4.6" = [
-    {url = "https://files.pythonhosted.org/packages/4a/7f/fca4eb3866343ff992a84deeeb7fad1be7a6952ec3446e541d65e6225378/jupyterlab-3.4.6.tar.gz", hash = "sha256:e3599c8bc74cee064115f96e388cd27a2a7251b1dc02f4ad1bf8a7ff5270f179"},
-    {url = "https://files.pythonhosted.org/packages/85/89/87162c076589f5db6c911077e79f263582c095fbca6cb73c60c4831eeb47/jupyterlab-3.4.6-py3-none-any.whl", hash = "sha256:dfe0234af957bfc8c5bb487cffe31d427cc9fd6de5760d226c382fac56529828"},
+"jupyterlab 3.5.0" = [
+    {url = "https://files.pythonhosted.org/packages/2b/d4/e0627f216bfb451e807cb8c2c8a0fc27e47cc76e483e539e8e213b95518e/jupyterlab-3.5.0-py3-none-any.whl", hash = "sha256:f433059fe0e12d75ea90a81a0b6721113bb132857e3ec2197780b6fe84cbcbde"},
+    {url = "https://files.pythonhosted.org/packages/b8/49/a874b9ac68ea2b973071695cdeabd694bf221c03a0c6006b693104d70114/jupyterlab-3.5.0.tar.gz", hash = "sha256:e02556c8ea1b386963c4b464e4618aee153c5416b07ab481425c817a033323a2"},
 ]
 "jupyterlab-geojson 3.2.0" = [
     {url = "https://files.pythonhosted.org/packages/37/9c/52ad85538be34e27e163327f6ea0943246086d7b314bf5797b3d31b85811/jupyterlab_geojson-3.2.0-py3-none-any.whl", hash = "sha256:3ce611d9b0c586bc353c46a90e0350f30f3f59e0feaaec909fef47a5eb293718"},
