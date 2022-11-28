@@ -325,10 +325,11 @@ summary = "Composable style cycles"
 
 [[package]]
 name = "dask"
-version = "2022.9.0"
+version = "2022.11.1"
 requires_python = ">=3.8"
 summary = "Parallel PyData with Task Scheduling"
 dependencies = [
+    "click>=7.0",
     "cloudpickle>=1.1.1",
     "fsspec>=0.6.0",
     "packaging>=20.0",
@@ -361,23 +362,23 @@ dependencies = [
 
 [[package]]
 name = "dask"
-version = "2022.9.0"
+version = "2022.11.1"
 extras = ["array"]
 requires_python = ">=3.8"
 summary = "Parallel PyData with Task Scheduling"
 dependencies = [
-    "dask==2022.9.0",
+    "dask==2022.11.1",
     "numpy>=1.18",
 ]
 
 [[package]]
 name = "dask"
-version = "2022.9.0"
+version = "2022.11.1"
 extras = ["delayed"]
 requires_python = ">=3.8"
 summary = "Parallel PyData with Task Scheduling"
 dependencies = [
-    "dask==2022.9.0",
+    "dask==2022.11.1",
 ]
 
 [[package]]
@@ -400,13 +401,13 @@ summary = "XML bomb protection for Python stdlib modules"
 
 [[package]]
 name = "distributed"
-version = "2022.9.0"
+version = "2022.11.1"
 requires_python = ">=3.8"
 summary = "Distributed scheduler for Dask"
 dependencies = [
-    "click>=6.6",
+    "click>=7.0",
     "cloudpickle>=1.5.0",
-    "dask==2022.9.0",
+    "dask==2022.11.1",
     "jinja2",
     "locket>=1.0.0",
     "msgpack>=0.6.0",
@@ -415,7 +416,7 @@ dependencies = [
     "pyyaml",
     "sortedcontainers!=2.0.0,!=2.0.1",
     "tblib>=1.6.0",
-    "toolz>=0.8.2",
+    "toolz>=0.10.0",
     "tornado<6.2,>=6.0.3",
     "urllib3",
     "zict>=0.1.3",
@@ -2236,9 +2237,9 @@ content_hash = "sha256:c11dbfcbb620186cb38cde6570dd54793e77eb20359d7adae393dd43a
     {url = "https://files.pythonhosted.org/packages/34/45/a7caaacbfc2fa60bee42effc4bcc7d7c6dbe9c349500e04f65a861c15eb9/cycler-0.11.0.tar.gz", hash = "sha256:9c87405839a19696e837b3b818fed3f5f69f16f1eec1a1ad77e043dcea9c772f"},
     {url = "https://files.pythonhosted.org/packages/5c/f9/695d6bedebd747e5eb0fe8fad57b72fdf25411273a39791cde838d5a8f51/cycler-0.11.0-py3-none-any.whl", hash = "sha256:3a27e95f763a428a739d2add979fa7494c912a32c17c4c38c4d5f082cad165a3"},
 ]
-"dask 2022.9.0" = [
-    {url = "https://files.pythonhosted.org/packages/15/8c/3e3f6309dee946b70339b2f0acc5cb4d24196fddfed4e52650ade79baac8/dask-2022.9.0.tar.gz", hash = "sha256:0c3d23638c6b3b03d6eb5de0bcdd5bb8a386965eb1691c19f9d14595d9e5eaac"},
-    {url = "https://files.pythonhosted.org/packages/43/36/d9e9987cfa9299ef185b40e7d170651dbab93171185bcf67e31bffbbdcbe/dask-2022.9.0-py3-none-any.whl", hash = "sha256:9238deb870ee9132b375f7892c4a9c5a919118f3c0025af27e633b9cb33ce195"},
+"dask 2022.11.1" = [
+    {url = "https://files.pythonhosted.org/packages/06/e6/0ecc6e4d2fb0af64771fbcfe04eca98b14a62772bb4455ddb895cf047451/dask-2022.11.1.tar.gz", hash = "sha256:18e5c442778cdbb177041dadf9950546884c0f1ce1ac25c98aa2cade2a9d83f0"},
+    {url = "https://files.pythonhosted.org/packages/c8/73/b8da0c6c3fde1cd477b820522439e8993aa564ceab69afe6f50659680cf3/dask-2022.11.1-py3-none-any.whl", hash = "sha256:89e3772c30072c7dacd83846164eca6bc0a8b347df7bc0ab2ce69f7effdc03bd"},
 ]
 "dask-labextension 5.3.0" = [
     {url = "https://files.pythonhosted.org/packages/0b/4c/cd2503196d7e06e482935860f1c9a7f3641407ef922c132d0b6a0ebb3bf1/dask_labextension-5.3.0-py3-none-any.whl", hash = "sha256:ce25890f57eb36621bd866747799ca135aeadbe50fc346bd8f99ed2b97a393a8"},
@@ -2276,9 +2277,9 @@ content_hash = "sha256:c11dbfcbb620186cb38cde6570dd54793e77eb20359d7adae393dd43a
     {url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
     {url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69"},
 ]
-"distributed 2022.9.0" = [
-    {url = "https://files.pythonhosted.org/packages/11/cb/aa13625f1a83fd551acc69f0fd8795c066ce1473727a6e00af895d7ae0f4/distributed-2022.9.0-py3-none-any.whl", hash = "sha256:7d0a385d154a28d3a1a3e5a34a9dae13e83fb9e498068f9de8d815dd7895c76d"},
-    {url = "https://files.pythonhosted.org/packages/df/46/e8ef41f8dfd553327b6a12f4ab78d9351b54299596fe5b8b165ba40b1550/distributed-2022.9.0.tar.gz", hash = "sha256:b915f05a059b5555bc07dea0cf057059f751e9e4e7fb55c54776383ca0e361bf"},
+"distributed 2022.11.1" = [
+    {url = "https://files.pythonhosted.org/packages/83/4a/cec3a04a3bc27ce586a720db3ed50c2299dc5f654b0c94e9701adf77a57c/distributed-2022.11.1.tar.gz", hash = "sha256:ca89a7d56588b0a95b8fabe783541f514cbe22d5b62a2e4260849c75b4475cea"},
+    {url = "https://files.pythonhosted.org/packages/87/d9/c968d9ff717c8fd452b0a2271cfc911e1639a0c67ef5dd3ddb82d9bfd4e1/distributed-2022.11.1-py3-none-any.whl", hash = "sha256:e167447cbd11eec2759cb19fd39ea8cd2d353373e099db51b107ab120b880f55"},
 ]
 "docutils 0.19" = [
     {url = "https://files.pythonhosted.org/packages/6b/5c/330ea8d383eb2ce973df34d1239b3b21e91cd8c865d21ff82902d952f91f/docutils-0.19.tar.gz", hash = "sha256:33995a6753c30b7f577febfc2c50411fec6aac7f7ffeb7c4cfe5991072dcf9e6"},
