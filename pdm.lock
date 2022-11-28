@@ -1815,13 +1815,13 @@ summary = "Module for decorators, wrappers and monkey patching."
 
 [[package]]
 name = "xarray"
-version = "2022.6.0"
+version = "2022.11.0"
 requires_python = ">=3.8"
 summary = "N-D labeled arrays and datasets in Python"
 dependencies = [
-    "numpy>=1.19",
-    "packaging>=20.0",
-    "pandas>=1.2",
+    "numpy>=1.20",
+    "packaging>=21.0",
+    "pandas>=1.3",
 ]
 
 [[package]]
@@ -3761,9 +3761,9 @@ content_hash = "sha256:c11dbfcbb620186cb38cde6570dd54793e77eb20359d7adae393dd43a
     {url = "https://files.pythonhosted.org/packages/f9/3c/110e52b9da396a4ef3a0521552a1af9c7875a762361f48678c1ac272fd7e/wrapt-1.14.1-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:34aa51c45f28ba7f12accd624225e2b1e5a3a45206aa191f6f9aac931d9d56fe"},
     {url = "https://files.pythonhosted.org/packages/fd/70/8a133c88a394394dd57159083b86a564247399440b63f2da0ad727593570/wrapt-1.14.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:257fd78c513e0fb5cdbe058c27a0624c9884e735bbd131935fd49e9fe719d310"},
 ]
-"xarray 2022.6.0" = [
-    {url = "https://files.pythonhosted.org/packages/1c/d1/610e339230c7c1e9088b63fc62c6d642bb81efd41e06865805a7ba3e936a/xarray-2022.6.0-py3-none-any.whl", hash = "sha256:c052208afc3f261984049f28b962d64eb6741a7967898315642f5da85448b6b0"},
-    {url = "https://files.pythonhosted.org/packages/6d/42/d9958c0efdd555f2f21742ad0b92a5d512ac8395d00f57b6a85932eda5bc/xarray-2022.6.0.tar.gz", hash = "sha256:1028d198493f66bb15bd35dcfdd11defd831cbee3af6589fff16f41bddd67e84"},
+"xarray 2022.11.0" = [
+    {url = "https://files.pythonhosted.org/packages/47/26/53b4d9ce691f73ab17abaeb66c53dcda5a799ba1b1f32f21fb84440e7acf/xarray-2022.11.0.tar.gz", hash = "sha256:3008a302877f87a0f9043b1f01a4ad4e85b668bbdd38d488764098624632f527"},
+    {url = "https://files.pythonhosted.org/packages/ff/64/0e77f335d33bc30f8b35ea291b3408df262f46646c65d04215a2f3e427b6/xarray-2022.11.0-py3-none-any.whl", hash = "sha256:228ed50ab3f1f7e2ba66670ded05f0bee46c69c4f902f346947b5723479af97f"},
 ]
 "xyzservices 2022.6.0" = [
     {url = "https://files.pythonhosted.org/packages/02/ab/86164ae766f39feaeee48c8daeffe1e1df23532ad239368c5421cfe6d910/xyzservices-2022.6.0.tar.gz", hash = "sha256:1fbd37d7f725bdceefe857b3b1f8121e50a038bbae496944668c67fffd54dd0f"},
