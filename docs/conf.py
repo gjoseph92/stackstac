@@ -96,15 +96,10 @@ nbsphinx_prolog = f"""
 
 {{% set docname = env.doc2path(env.docname, base=False) %}}
 .. note::
-    You can run this notebook interactively: |Binder|, or view & download the original
+    You can view & download the original notebook
     `on GitHub <https://github.com/gjoseph92/stackstac/blob/v{version}/docs/{{{{
         "../" + docname if docname.startswith("examples") else docname
     }}}}>`_.
-
-.. |Binder| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/gjoseph92/stackstac/v{version}?urlpath=lab/tree/docs/{{{{
-        "../" + docname if docname.startswith("examples") else docname
-    }}}}
 """
 
 
