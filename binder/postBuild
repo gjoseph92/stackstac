@@ -1,3 +1,0 @@
-set -ex
-
-VIRTUAL_ENV=$(dirname $(dirname $(which python))) pdm install -G viz -dG binder
