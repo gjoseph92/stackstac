@@ -35,7 +35,7 @@ viz = [
 ]
 
 [tool.pdm.dev-dependencies]
-binder = [
+docs-examples = [
     "Bottleneck>=1.3.2",
     "coiled>=0.2.50",
     "geogif>=0",
