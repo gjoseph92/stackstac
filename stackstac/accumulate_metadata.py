@@ -171,7 +171,7 @@ def dict_to_coords(
                 dtype="object"
                 if (
                     isinstance(props, _ourlist)
-                    and len(set(len(x) for x in props if isinstance(x, (list, tuple))))
+                    and len(set(len(x) if isinstance(x, (list, tuple)) else type(x) for x in props))
                     > 1
                 )
                 else None,
