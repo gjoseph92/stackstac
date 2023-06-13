@@ -132,6 +132,7 @@ def asset_table_to_reader_and_window(
         if url:
             asset_bounds: Bbox = asset_entry["bounds"]
             asset_window = windows.from_bounds(*asset_bounds, spec.transform)
+            asset_scale_offset = asset_entry["scale_offset"]
 
             entry: ReaderTableEntry = (
                 reader(
@@ -141,6 +142,7 @@ def asset_table_to_reader_and_window(
                     dtype=dtype,
                     fill_value=fill_value,
                     rescale=rescale,
+                    scale_offset=asset_scale_offset,
                     gdal_env=gdal_env,
                     errors_as_nodata=errors_as_nodata,
                 ),

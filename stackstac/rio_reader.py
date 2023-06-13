@@ -304,6 +304,7 @@ class AutoParallelRioReader:
         dtype: np.dtype,
         fill_value: Union[int, float],
         rescale: bool,
+        scale_offset: Tuple[float, float],
         gdal_env: Optional[LayeredEnv] = None,
         errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
@@ -312,6 +313,7 @@ class AutoParallelRioReader:
         self.resampling = resampling
         self.dtype = dtype
         self.rescale = rescale
+        self.scale_offset = scale_offset
         self.fill_value = fill_value
         self.gdal_env = gdal_env or DEFAULT_GDAL_ENV
         self.errors_as_nodata = errors_as_nodata
@@ -400,7 +402,11 @@ class AutoParallelRioReader:
             raise RuntimeError(msg) from e
 
         if self.rescale:
-            scale, offset = reader.scale_offset
+            scale, offset = self.scale_offset
+
+            if np.isnan(scale) and np.isnan(offset):
+                scale, offset = reader.scale_offset
+
             if scale != 1:
                 result *= scale
             if offset != 0:

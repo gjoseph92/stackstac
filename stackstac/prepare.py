@@ -26,7 +26,7 @@ from .raster_spec import IntFloat, Bbox, Resolutions, RasterSpec
 from .stac_types import ItemSequence
 from . import accumulate_metadata, geom_utils
 
-ASSET_TABLE_DT = np.dtype([("url", object), ("bounds", "float64", 4)])
+ASSET_TABLE_DT = np.dtype([("url", object), ("bounds", "float64", 4), ("scale_offset", "float64", 2)])
 
 
 class Mimetype(NamedTuple):
@@ -143,6 +143,15 @@ def prepare_items(
             asset_bbox = asset.get("proj:bbox", item_bbox)
             asset_shape = asset.get("proj:shape", item_shape)
             asset_transform = asset.get("proj:transform", item_transform)
+            raster_bands = asset.get('raster:bands')
+            if raster_bands is not None:
+                try:
+                    assert len(raster_bands) == 1
+                    asset_scale = raster_bands[0].get('scale', np.nan)
+                    asset_offset = raster_bands[0].get('offset', np.nan)
+                except AssertionError:
+                    raise ValueError(f'raster:bands has more than one element for asset {asset_id}.')
+
             asset_affine = None
 
             # Auto-compute CRS
@@ -322,7 +331,7 @@ def prepare_items(
                     continue
 
             # Phew, we figured out all the spatial stuff! Now actually store the information we care about.
-            asset_table[item_i, asset_i] = (asset["href"], asset_bbox_proj)
+            asset_table[item_i, asset_i] = (asset["href"], asset_bbox_proj, (asset_scale, asset_offset))
             # ^ NOTE: If `asset_bbox_proj` is None, NumPy automatically converts it to NaNs
 
     # At this point, everything has been set (or there was as error)
