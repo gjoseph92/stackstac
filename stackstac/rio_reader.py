@@ -401,6 +401,9 @@ class AutoParallelRioReader:
 
             raise RuntimeError(msg) from e
 
+        if result.dtype != self.dtype:
+            result = result.astype(self.dtype, copy=False)
+
         if self.rescale:
             scale, offset = self.scale_offset
 
@@ -412,7 +415,6 @@ class AutoParallelRioReader:
             if offset != 0:
                 result += offset
 
-        result = result.astype(self.dtype, copy=False)
         result = np.ma.filled(result, fill_value=self.fill_value)
         return result
 
