@@ -32,7 +32,6 @@ def _curthread():
 
 # /TODO
 
-
 # Default GDAL configuration options
 DEFAULT_GDAL_ENV = LayeredEnv(
     always=dict(
@@ -65,6 +64,7 @@ DEFAULT_GDAL_ENV = LayeredEnv(
 # https://github.com/pangeo-data/pangeo-example-notebooks/issues/21#issuecomment-432457955
 # https://gdal.org/drivers/raster/vrt.html#multi-threading-issues
 MULTITHREADED_DRIVER_ALLOWLIST = {"GTiff"}
+INTEGER_DTYPES = ['int', 'uint8', 'int8', 'uint16', 'int16']
 
 
 class ThreadsafeRioDataset(Protocol):
@@ -411,6 +411,9 @@ class AutoParallelRioReader:
                 scale, offset = reader.scale_offset
 
             if scale != 1:
+                if self.dtype in INTEGER_DTYPES:
+                    raise ValueError(f'Requested asset dtype ({self.dtype}) is not compatible with '
+                                     f'asset scale value dtype ({scale.dtype}).')
                 result *= scale
             if offset != 0:
                 result += offset
