@@ -407,7 +407,7 @@ class AutoParallelRioReader:
         if self.rescale:
             scale, offset = self.scale_offset
 
-            if np.isnan(scale) and np.isnan(offset):
+            if np.isnan(scale) or np.isnan(offset):
                 scale, offset = reader.scale_offset
 
             if scale != 1:
