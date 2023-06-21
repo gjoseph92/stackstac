@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.4 (2023-06-21)
+- Resolve compatibility with NumPy >= 1.24.0 [@gjoseph92](https://github.com/gjoseph92)
+- Fix TypeError when no items overlap with the given `bounds` [@gjoseph92](https://github.com/gjoseph92)
+- Change timer logging to DEBUG level [@jorge-cervest](https://github.com/jorge-cervest)
+
 ## 0.4.3 (2022-09-14)
 - Support sequences of `Item`s [@gjoseph92](https://github.com/gjoseph92)
 - Fix compatibility with `pyproj>=3.4.0` [@gjoseph92](https://github.com/gjoseph92)
