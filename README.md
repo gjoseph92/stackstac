@@ -72,7 +72,7 @@ It's a good idea to use `conda` to handle installing rasterio on Windows. There'
 * Transfer the STAC metadata into [xarray coordinates](http://xarray.pydata.org/en/stable/data-structures.html#coordinates) for easy indexing, filtering, and provenance of metadata.
 * Efficiently generate a Dask graph for loading the data in parallel.
 * Mediate between Dask's parallelism and GDAL's aversion to it, allowing for fast, multi-threaded reads when possible, and at least preventing segfaults when not.
-* Mask nodata and rescale by dataset-level scales/offsets.
+* Mask nodata and rescale by STAC item asset scales/offsets.
 * Display data in interactive maps in a notebook, computed on the fly by Dask.
 
 ## Limitations:
