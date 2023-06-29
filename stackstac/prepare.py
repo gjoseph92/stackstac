@@ -23,6 +23,8 @@ import pandas as pd
 import xarray as xr
 
 from .raster_spec import IntFloat, Bbox, Resolutions, RasterSpec
+from .rio_reader import DEFAULT_SCALE, DEFAULT_OFFSET
+
 from .stac_types import ItemSequence
 from . import accumulate_metadata, geom_utils
 
@@ -144,13 +146,20 @@ def prepare_items(
             asset_shape = asset.get("proj:shape", item_shape)
             asset_transform = asset.get("proj:transform", item_transform)
             raster_bands = asset.get('raster:bands')
+
             if raster_bands is not None:
-                try:
-                    assert len(raster_bands) == 1
-                    asset_scale = raster_bands[0].get('scale', np.nan)
-                    asset_offset = raster_bands[0].get('offset', np.nan)
-                except AssertionError:
-                    raise ValueError(f'raster:bands has more than one element for asset {asset_id}.')
+                if len(raster_bands) != 1:
+                    raise ValueError(
+                        f"raster:bands has {len(raster_bands)} elements for asset {asset_id!r}. "
+                        "Multi-band rasters are not currently supported.\n"
+                        "If you don't care about this asset, you can skip it by giving a list "
+                        "of asset IDs you *do* want in `assets=`, and leaving this one out."
+                    )
+                asset_scale = raster_bands[0].get('scale', DEFAULT_SCALE)
+                asset_offset = raster_bands[0].get('offset', DEFAULT_OFFSET)
+            else:
+                asset_scale = DEFAULT_SCALE
+                asset_offset = DEFAULT_OFFSET
 
             asset_affine = None
 

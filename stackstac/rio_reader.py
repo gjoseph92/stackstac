@@ -63,8 +63,10 @@ DEFAULT_GDAL_ENV = LayeredEnv(
 # See `ThreadLocalRioDataset` for more.
 # https://github.com/pangeo-data/pangeo-example-notebooks/issues/21#issuecomment-432457955
 # https://gdal.org/drivers/raster/vrt.html#multi-threading-issues
+
 MULTITHREADED_DRIVER_ALLOWLIST = {"GTiff"}
-INTEGER_DTYPES = ['int', 'uint8', 'int8', 'uint16', 'int16']
+DEFAULT_SCALE = 1
+DEFAULT_OFFSET = 0
 
 
 class ThreadsafeRioDataset(Protocol):
@@ -280,7 +282,6 @@ class PickleState(TypedDict):
     resampling: Resampling
     dtype: np.dtype
     fill_value: Union[int, float]
-    rescale: bool
     gdal_env: Optional[LayeredEnv]
     errors_as_nodata: Tuple[Exception, ...]
 
@@ -303,7 +304,6 @@ class AutoParallelRioReader:
         resampling: Resampling,
         dtype: np.dtype,
         fill_value: Union[int, float],
-        rescale: bool,
         scale_offset: Tuple[float, float],
         gdal_env: Optional[LayeredEnv] = None,
         errors_as_nodata: Tuple[Exception, ...] = (),
@@ -312,7 +312,6 @@ class AutoParallelRioReader:
         self.spec = spec
         self.resampling = resampling
         self.dtype = dtype
-        self.rescale = rescale
         self.scale_offset = scale_offset
         self.fill_value = fill_value
         self.gdal_env = gdal_env or DEFAULT_GDAL_ENV
@@ -404,19 +403,12 @@ class AutoParallelRioReader:
         if result.dtype != self.dtype:
             result = result.astype(self.dtype, copy=False)
 
-        if self.rescale:
-            scale, offset = self.scale_offset
+        scale, offset = self.scale_offset
 
-            if np.isnan(scale) or np.isnan(offset):
-                scale, offset = reader.scale_offset
-
-            if scale != 1:
-                if self.dtype in INTEGER_DTYPES:
-                    raise ValueError(f'Requested asset dtype ({self.dtype}) is not compatible with '
-                                     f'asset scale value dtype ({scale.dtype}).')
-                result *= scale
-            if offset != 0:
-                result += offset
+        if scale != DEFAULT_SCALE:
+            result *= scale
+        if offset != DEFAULT_OFFSET:
+            result += offset
 
         result = np.ma.filled(result, fill_value=self.fill_value)
         return result
@@ -446,7 +438,6 @@ class AutoParallelRioReader:
             "resampling": self.resampling,
             "dtype": self.dtype,
             "fill_value": self.fill_value,
-            "rescale": self.rescale,
             "gdal_env": self.gdal_env,
             "errors_as_nodata": self.errors_as_nodata,
         }

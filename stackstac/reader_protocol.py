@@ -34,7 +34,7 @@ class Reader(Pickleable, Protocol):
         resampling: Resampling,
         dtype: np.dtype,
         fill_value: Union[int, float],
-        rescale: bool,
+        scale_offset: Tuple[float, float],
         gdal_env: Optional[LayeredEnv],
         errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
@@ -55,8 +55,6 @@ class Reader(Pickleable, Protocol):
         fill_value:
             Fill nodata pixels in the output array with this value.
             If None, whatever nodata value is set in the asset will be used.
-        rescale:
-            Rescale the output array according to any scales and offsets set in the asset.
         gdal_env:
             A `~.LayeredEnv` of GDAL configuration options to use while opening
             and reading datasets. If None (default), `~.DEFAULT_GDAL_ENV` is used.
