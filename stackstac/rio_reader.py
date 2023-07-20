@@ -68,7 +68,7 @@ MULTITHREADED_DRIVER_ALLOWLIST = {"GTiff"}
 
 
 class ThreadsafeRioDataset(Protocol):
-    scale_offset: Tuple[float, float]
+    scale_offset: Tuple[Union[int, float], Union[int, float]]
 
     def read(self, window: Window, **kwargs) -> np.ndarray:
         ...

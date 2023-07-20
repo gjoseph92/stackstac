@@ -34,7 +34,7 @@ class Reader(Pickleable, Protocol):
         resampling: Resampling,
         dtype: np.dtype,
         fill_value: Union[int, float],
-        scale_offset: Tuple[float, float],
+        scale_offset: Tuple[Union[int, float], Union[int, float]],
         gdal_env: Optional[LayeredEnv],
         errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
