@@ -14,7 +14,7 @@ from rasterio import windows
 from rasterio.enums import Resampling
 
 from .raster_spec import Bbox, RasterSpec
-from .rio_reader import AutoParallelRioReader, LayeredEnv, DEFAULT_SCALE, DEFAULT_OFFSET
+from .rio_reader import AutoParallelRioReader, LayeredEnv
 from .reader_protocol import Reader
 
 ChunkVal = Union[int, Literal["auto"], str, None]
@@ -135,7 +135,7 @@ def asset_table_to_reader_and_window(
             if rescale:
                 asset_scale_offset = asset_entry["scale_offset"]
             else:
-                asset_scale_offset = (DEFAULT_SCALE, DEFAULT_OFFSET)
+                asset_scale_offset = (1, 0)
 
             entry: ReaderTableEntry = (
                 reader(

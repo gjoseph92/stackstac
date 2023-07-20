@@ -65,8 +65,6 @@ DEFAULT_GDAL_ENV = LayeredEnv(
 # https://gdal.org/drivers/raster/vrt.html#multi-threading-issues
 
 MULTITHREADED_DRIVER_ALLOWLIST = {"GTiff"}
-DEFAULT_SCALE = 1
-DEFAULT_OFFSET = 0
 
 
 class ThreadsafeRioDataset(Protocol):
@@ -282,6 +280,7 @@ class PickleState(TypedDict):
     resampling: Resampling
     dtype: np.dtype
     fill_value: Union[int, float]
+    scale_offset: Tuple[Union[int, float], Union[int, float]]
     gdal_env: Optional[LayeredEnv]
     errors_as_nodata: Tuple[Exception, ...]
 
@@ -304,7 +303,7 @@ class AutoParallelRioReader:
         resampling: Resampling,
         dtype: np.dtype,
         fill_value: Union[int, float],
-        scale_offset: Tuple[float, float],
+        scale_offset: Tuple[Union[int, float], Union[int, float]],
         gdal_env: Optional[LayeredEnv] = None,
         errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
@@ -312,8 +311,8 @@ class AutoParallelRioReader:
         self.spec = spec
         self.resampling = resampling
         self.dtype = dtype
-        self.scale_offset = scale_offset
         self.fill_value = fill_value
+        self.scale_offset = scale_offset
         self.gdal_env = gdal_env or DEFAULT_GDAL_ENV
         self.errors_as_nodata = errors_as_nodata
 
@@ -405,9 +404,9 @@ class AutoParallelRioReader:
 
         scale, offset = self.scale_offset
 
-        if scale != DEFAULT_SCALE:
+        if scale != 1:
             result *= scale
-        if offset != DEFAULT_OFFSET:
+        if offset != 0:
             result += offset
 
         result = np.ma.filled(result, fill_value=self.fill_value)
@@ -438,6 +437,7 @@ class AutoParallelRioReader:
             "resampling": self.resampling,
             "dtype": self.dtype,
             "fill_value": self.fill_value,
+            "scale_offset": self.scale_offset,
             "gdal_env": self.gdal_env,
             "errors_as_nodata": self.errors_as_nodata,
         }

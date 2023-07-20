@@ -23,7 +23,6 @@ import pandas as pd
 import xarray as xr
 
 from .raster_spec import IntFloat, Bbox, Resolutions, RasterSpec
-from .rio_reader import DEFAULT_SCALE, DEFAULT_OFFSET
 
 from .stac_types import ItemSequence
 from . import accumulate_metadata, geom_utils
@@ -155,11 +154,11 @@ def prepare_items(
                         "If you don't care about this asset, you can skip it by giving a list "
                         "of asset IDs you *do* want in `assets=`, and leaving this one out."
                     )
-                asset_scale = raster_bands[0].get('scale', DEFAULT_SCALE)
-                asset_offset = raster_bands[0].get('offset', DEFAULT_OFFSET)
+                asset_scale = raster_bands[0].get('scale', 1)
+                asset_offset = raster_bands[0].get('offset', 0)
             else:
-                asset_scale = DEFAULT_SCALE
-                asset_offset = DEFAULT_OFFSET
+                asset_scale = 1
+                asset_offset = 0
 
             asset_affine = None
 
