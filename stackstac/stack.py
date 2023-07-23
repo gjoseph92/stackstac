@@ -202,7 +202,8 @@ def stack(
         be represented in a smaller data type (like ``uint16``), using a different ``fill_value``
         (like 0) and managing it yourself could save a lot of memory.
     rescale:
-        Whether to rescale pixel values by the scale and offset set on the dataset.
+        Whether to rescale pixel values by the scale and offset present in the ``raster:bands`` metadata
+        for each asset.
         Default: True. Note that this could produce floating-point data when the
         original values are ints, so set ``dtype`` accordingly. You will NOT be warned
         if the cast to ``dtype`` is losing information!
