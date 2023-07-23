@@ -323,9 +323,7 @@ class AutoParallelRioReader:
         with self.gdal_env.open:
             with time(f"Initial read for {self.url!r} on {_curthread()}: {{t}}"):
                 try:
-                    ds = SelfCleaningDatasetReader(
-                        self.url, sharing=False
-                    )
+                    ds = SelfCleaningDatasetReader(self.url, sharing=False)
                 except Exception as e:
                     msg = f"Error opening {self.url!r}: {e!r}"
                     if exception_matches(e, self.errors_as_nodata):
@@ -386,6 +384,7 @@ class AutoParallelRioReader:
         try:
             result = reader.read(
                 window=window,
+                out_dtype=self.dtype,
                 masked=True,
                 # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
                 # without potentially altering pixels that should have been the ``fill_value``
@@ -406,8 +405,10 @@ class AutoParallelRioReader:
             if offset != 0:
                 result += offset
 
-        result = result.astype(self.dtype, copy=False)
         result = np.ma.filled(result, fill_value=self.fill_value)
+        assert np.issubdtype(result.dtype, self.dtype), (
+            f"Expected result array with dtype {self.dtype!r}, got {result.dtype!r}"
+        )
         return result
 
     def close(self) -> None:
