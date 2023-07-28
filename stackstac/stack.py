@@ -294,6 +294,10 @@ def stack(
         bounds_latlon=bounds_latlon,
         snap_bounds=snap_bounds,
     )
+
+    if rescale:
+        assert "float" in np.dtype(dtype).name, "The requested dtype is incompatible with rescale=True, which requires a floating-point dtype."
+
     arr = items_to_dask(
         asset_table,
         spec,
