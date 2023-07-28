@@ -276,6 +276,9 @@ def stack(
         The size of ``y`` and ``x`` will be determined by ``resolution`` and ``bounds``, which in many cases are
         automatically computed from the items you pass in.
     """
+    if rescale:
+        assert "float" in np.dtype(dtype).name, "The requested dtype is incompatible with rescale=True, which requires a floating-point dtype."
+
     plain_items = items_to_plain(items)
 
     if sortby_date is not False:
@@ -294,9 +297,6 @@ def stack(
         bounds_latlon=bounds_latlon,
         snap_bounds=snap_bounds,
     )
-
-    if rescale:
-        assert "float" in np.dtype(dtype).name, "The requested dtype is incompatible with rescale=True, which requires a floating-point dtype."
 
     arr = items_to_dask(
         asset_table,
