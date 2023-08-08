@@ -403,12 +403,12 @@ class AutoParallelRioReader:
         if scale != 1:
             if not np.can_cast(scale, self.dtype):
                 raise ValueError(f"Safe casting cannot be completed between scale value {scale} "
-                                 f"and output dtype {self.dtype} during recale operation.")
+                                 f"and output dtype {self.dtype} during rescale operation.")
             result *= scale
         if offset != 0:
             if not np.can_cast(offset, self.dtype):
                 raise ValueError(f"Safe casting cannot be completed between offset value {offset} "
-                                 f"and output dtype {self.dtype} during recale operation.")
+                                 f"and output dtype {self.dtype} during rescale operation.")
             result += offset
 
         result = np.ma.filled(result, fill_value=self.fill_value)
