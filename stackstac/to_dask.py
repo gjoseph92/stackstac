@@ -137,7 +137,7 @@ def asset_table_to_reader_and_window(
                 for value in asset_scale_offset:
                     if not np.can_cast(value, dtype):
                         raise ValueError(f"Safe casting cannot be completed between scale/offset value {value} "
-                                        f"and output dtype {dtype} during recale operation.")
+                                         f"and output dtype {dtype} during recale operation.")
             else:
                 asset_scale_offset = (1, 0)
 
