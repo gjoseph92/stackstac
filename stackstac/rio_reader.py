@@ -399,6 +399,10 @@ class AutoParallelRioReader:
             raise RuntimeError(msg) from e
 
         scale, offset = self.scale_offset
+        for value in [scale, offset]:
+            if not np.can_cast(value, self.dtype):
+                raise ValueError("The requested dtype is incompatible with rescale=True given the dtype of "
+                                 "scale and offset values found in the item STAC metadata.")
 
         if scale != 1:
             result *= scale
