@@ -294,7 +294,6 @@ def stack(
         bounds_latlon=bounds_latlon,
         snap_bounds=snap_bounds,
     )
-
     arr = items_to_dask(
         asset_table,
         spec,
