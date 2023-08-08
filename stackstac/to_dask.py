@@ -134,10 +134,6 @@ def asset_table_to_reader_and_window(
             asset_window = windows.from_bounds(*asset_bounds, spec.transform)
             if rescale:
                 asset_scale_offset = asset_entry["scale_offset"]
-                for value in asset_scale_offset:
-                    if not np.can_cast(value, dtype):
-                        raise ValueError(f"Safe casting cannot be completed between scale/offset value {value} "
-                                         f"and output dtype {dtype} during recale operation.")
             else:
                 asset_scale_offset = (1, 0)
 
