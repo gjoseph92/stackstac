@@ -399,10 +399,6 @@ class AutoParallelRioReader:
             raise RuntimeError(msg) from e
 
         scale, offset = self.scale_offset
-        for value in [scale, offset]:
-            if not np.can_cast(value, self.dtype):
-                raise ValueError(f"Safe casting cannot be completed between scale/offset value {value} "
-                                 f"and output dtype {self.dtype}.")
 
         if scale != 1:
             result *= scale
