@@ -1,6 +1,7 @@
 __pycache__
 *.pyc
 .hypothesis
+.pdm-python
 
 dask-worker-space
 .ipynb_checkpoints
