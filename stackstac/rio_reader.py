@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, TypedDict, Un
 
 import numpy as np
 import rasterio as rio
+import rasterio.errors
 from rasterio.vrt import WarpedVRT
 
 from .rio_env import LayeredEnv
@@ -341,18 +342,30 @@ class AutoParallelRioReader:
                     "a separate STAC asset), so you'll need to exclude this asset from your analysis."
                 )
 
+            ds_epsg: int | None
+            try:
+                ds_epsg = ds.crs.to_epsg() if ds.crs is not None else None
+            except rasterio.errors.CRSError:
+                ds_epsg = None
+
             # Only make a VRT if the dataset doesn't match the spatial spec we want
-            if self.spec.vrt_params != {
-                "crs": ds.crs.to_epsg(),
+            if ds_epsg is None or self.spec.vrt_params != {
+                "crs": ds_epsg,
                 "transform": ds.transform,
                 "height": ds.height,
                 "width": ds.width,
             }:
+                # Set source crs from ground control points (gcps) if present
+                src_crs = (
+                    ds.gcps[-1] if ds.crs is None and ds.gcps is not None else None
+                )
+
                 with self.gdal_env.open_vrt:
                     vrt = WarpedVRT(
                         ds,
                         sharing=False,
                         resampling=self.resampling,
+                        src_crs=src_crs,
                         **self.spec.vrt_params,
                     )
             else:
