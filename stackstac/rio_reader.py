@@ -103,7 +103,7 @@ class SingleThreadedRioDataset:
         "Acquire the lock, then read from the dataset"
         reader = self.vrt or self.ds
         with self._lock, self.env.read:
-            return reader.read(1, window=window, **kwargs)
+            return reader.read(window=window, **kwargs)
 
     def close(self) -> None:
         "Acquire the lock, then close the dataset"
@@ -173,6 +173,7 @@ class ThreadLocalRioDataset:
                 transform=vrt.transform,
                 dtype=vrt.working_dtype,
                 warp_extras=vrt.warp_extras,
+                add_alpha=vrt.nodata is None,  # see `AutoParallelRioReader.read`
             )
             # ^ copied from rioxarray
             # https://github.com/corteva/rioxarray/blob/0804791a44f65ac4f303dd286e94b3eaee81f72b/rioxarray/_io.py#L720-L734
@@ -224,7 +225,7 @@ class ThreadLocalRioDataset:
         "Read from the current thread's dataset, opening a new copy of the dataset on first access from each thread."
         with time(f"Read {self._url!r} in {_curthread()}: {{t}}"):
             with self._env.read:
-                return self.dataset.read(1, window=window, **kwargs)
+                return self.dataset.read(window=window, **kwargs)
 
     def close(self) -> None:
         """
@@ -353,6 +354,7 @@ class AutoParallelRioReader:
                         ds,
                         sharing=False,
                         resampling=self.resampling,
+                        add_alpha=ds.nodata is None,
                         **self.spec.vrt_params,
                     )
             else:
@@ -397,6 +399,17 @@ class AutoParallelRioReader:
                 return nodata_for_window(window, self.fill_value, self.dtype)
 
             raise RuntimeError(msg) from e
+
+        # When the GeoTIFF doesn't have a nodata value, and we're using a VRT, pixels
+        # outside the dataset don't get properly masked (they're just 0). Using `add_alpha`
+        # in the `WarpedVRT`, we get an explicit alpha channel, which we use as a mask instead.
+        # See https://github.com/gjoseph92/stackstac/issues/217.
+        if result.shape[0] == 2:
+            result = np.ma.masked_array(result[0], mask=result[1] == 0)
+        elif result.shape[0] == 1:
+            result = result[0]
+        else:
+            raise RuntimeError(f"Unexpected shape {result.shape}, expected exactly 1 band.")
 
         scale, offset = self.scale_offset
 
