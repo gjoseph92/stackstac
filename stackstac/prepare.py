@@ -380,7 +380,6 @@ def to_coords(
 
     times = pd.to_datetime(
         [item["properties"]["datetime"] for item in items],
-        infer_datetime_format=True,
         errors="coerce",
     )
     if times.tz is not None:
