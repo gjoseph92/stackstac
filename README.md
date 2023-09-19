@@ -10,12 +10,12 @@ For more information and examples, please [see the documentation](https://stacks
 import stackstac
 import pystac_client
 
-URL = "https://earth-search.aws.element84.com/v0"
+URL = "https://earth-search.aws.element84.com/v1"
 catalog = pystac_client.Client.open(URL)
 
 stac_items = catalog.search(
     intersects=dict(type="Point", coordinates=[-105.78, 35.79]),
-    collections=["sentinel-s2-l2a-cogs"],
+    collections=["sentinel-2-l2a"],
     datetime="2020-04-01/2020-05-01"
 ).get_all_items()
 
