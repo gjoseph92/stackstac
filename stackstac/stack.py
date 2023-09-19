@@ -293,6 +293,8 @@ def stack(
         bounds=bounds,
         bounds_latlon=bounds_latlon,
         snap_bounds=snap_bounds,
+        rescale=rescale,
+        dtype=dtype,
     )
     arr = items_to_dask(
         asset_table,

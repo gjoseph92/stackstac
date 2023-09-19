@@ -64,6 +64,8 @@ def prepare_items(
     bounds: Optional[Bbox] = None,
     bounds_latlon: Optional[Bbox] = None,
     snap_bounds: bool = True,
+    rescale: bool = True,
+    dtype: np.dtype = np.dtype("float64"),
 ) -> Tuple[np.ndarray, RasterSpec, List[str], ItemSequence]:
 
     if bounds is not None and bounds_latlon is not None:
@@ -159,6 +161,15 @@ def prepare_items(
             else:
                 asset_scale = 1
                 asset_offset = 0
+
+            if rescale:
+                if not np.can_cast(asset_scale, dtype):
+                    raise ValueError(f"rescale=True but safe casting cannot be completed between "
+                                     f"asset scale value {asset_scale} and output dtype {dtype}.")
+
+                if not np.can_cast(asset_offset, dtype):
+                    raise ValueError(f"rescale=True but safe casting cannot be completed between "
+                                     f"asset offset value {asset_offset} and output dtype {dtype}.")
 
             asset_affine = None
 
