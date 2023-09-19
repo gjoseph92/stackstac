@@ -6,7 +6,7 @@ groups = ["default", "style", "util", "docs-examples", "test", "viz", "docs"]
 cross_platform = true
 static_urls = false
 lock_version = "4.3"
-content_hash = "sha256:de9b9cfdea5f7b5286ae4eff70fdc033fb5e0b6f576c9ecb2cbee1d77164c071"
+content_hash = "sha256:661044947a135c2fd35f044894672183f425c2c57b03ca9c93abece419035faf"
 
 [[package]]
 name = "affine"
@@ -1299,17 +1299,18 @@ files = [
 
 [[package]]
 name = "jupyter-server-proxy"
-version = "3.2.2"
-requires_python = ">=3.6"
-summary = "Jupyter server extension to supervise and proxy web services"
+version = "4.0.0"
+requires_python = ">=3.8"
+summary = "A JupyterLab extension accompanying the PyPI package jupyter-server-proxy adding launcher items for configured server processes."
 dependencies = [
     "aiohttp",
+    "importlib-metadata>=4.8.3; python_version < \"3.10\"",
     "jupyter-server>=1.0",
     "simpervisor>=0.4",
 ]
 files = [
-    {file = "jupyter-server-proxy-3.2.2.tar.gz", hash = "sha256:54690ea9467035d187c930c599e76065017baf16e118e6eebae0d3a008c4d946"},
-    {file = "jupyter_server_proxy-3.2.2-py3-none-any.whl", hash = "sha256:9420814a2f0ef629bd343b4f4e971d6a5ebceb56eabefd6ba03f590fe698cb82"},
+    {file = "jupyter_server_proxy-4.0.0-py3-none-any.whl", hash = "sha256:8075afce3465a5e987e43ec837c307f9b9ac7398ebcff497abf1f51303d23470"},
+    {file = "jupyter_server_proxy-4.0.0.tar.gz", hash = "sha256:f5dc12dd204baca71b013df3522c14403692a2d37cb7adcd77851dbab71533b5"},
 ]
 
 [[package]]
