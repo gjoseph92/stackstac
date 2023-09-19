@@ -27,7 +27,9 @@ from .raster_spec import IntFloat, Bbox, Resolutions, RasterSpec
 from .stac_types import ItemSequence
 from . import accumulate_metadata, geom_utils
 
-ASSET_TABLE_DT = np.dtype([("url", object), ("bounds", "float64", 4), ("scale_offset", "float64", 2)])
+ASSET_TABLE_DT = np.dtype(
+    [("url", object), ("bounds", "float64", 4), ("scale_offset", "float64", 2)]
+)
 
 
 class Mimetype(NamedTuple):
@@ -146,7 +148,7 @@ def prepare_items(
             asset_bbox = asset.get("proj:bbox", item_bbox)
             asset_shape = asset.get("proj:shape", item_shape)
             asset_transform = asset.get("proj:transform", item_transform)
-            raster_bands = asset.get('raster:bands')
+            raster_bands = asset.get("raster:bands")
 
             if raster_bands is not None:
                 if len(raster_bands) != 1:
@@ -156,20 +158,24 @@ def prepare_items(
                         "If you don't care about this asset, you can skip it by giving a list "
                         "of asset IDs you *do* want in `assets=`, and leaving this one out."
                     )
-                asset_scale = raster_bands[0].get('scale', 1)
-                asset_offset = raster_bands[0].get('offset', 0)
+                asset_scale = raster_bands[0].get("scale", 1)
+                asset_offset = raster_bands[0].get("offset", 0)
             else:
                 asset_scale = 1
                 asset_offset = 0
 
             if rescale:
                 if not np.can_cast(asset_scale, dtype):
-                    raise ValueError(f"rescale=True but safe casting cannot be completed between "
-                                     f"asset scale value {asset_scale} and output dtype {dtype}.")
+                    raise ValueError(
+                        f"rescale=True but safe casting cannot be completed between "
+                        f"asset scale value {asset_scale} and output dtype {dtype}."
+                    )
 
                 if not np.can_cast(asset_offset, dtype):
-                    raise ValueError(f"rescale=True but safe casting cannot be completed between "
-                                     f"asset offset value {asset_offset} and output dtype {dtype}.")
+                    raise ValueError(
+                        f"rescale=True but safe casting cannot be completed between "
+                        f"asset offset value {asset_offset} and output dtype {dtype}."
+                    )
 
             asset_affine = None
 
@@ -350,7 +356,11 @@ def prepare_items(
                     continue
 
             # Phew, we figured out all the spatial stuff! Now actually store the information we care about.
-            asset_table[item_i, asset_i] = (asset["href"], asset_bbox_proj, (asset_scale, asset_offset))
+            asset_table[item_i, asset_i] = (
+                asset["href"],
+                asset_bbox_proj,
+                (asset_scale, asset_offset),
+            )
             # ^ NOTE: If `asset_bbox_proj` is None, NumPy automatically converts it to NaNs
 
     # At this point, everything has been set (or there was as error)
