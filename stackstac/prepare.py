@@ -396,6 +396,7 @@ def to_coords(
         "time": times,
         "id": xr.Variable("time", [item["id"] for item in items]),
         "band": asset_ids,
+        "epsg": spec.epsg
     }
 
     if xy_coords is not False:
@@ -436,100 +437,50 @@ def to_coords(
         coords["y"] = ys
 
     if properties:
-        coords.update(
-            accumulate_metadata.metadata_to_coords(
-                (item["properties"] for item in items),
-                "time",
-                fields=properties,
-                skip_fields={"datetime"},
-                # skip_fields={"datetime", "providers"},
-            )
-        )
+        # Converting to xarray dataset
+        properties = {time: item["properties"] for time, item in zip(times, items)}
+        properties_df = pd.DataFrame.from_dict(properties, orient="index")
+        properties_df.index = properties_df.index.set_names(["time"])
+        properties_ds = xr.Dataset.from_dataframe(properties_df)
 
-        # Property-merging code using awkward array. Slightly shorter, not sure if it's faster,
-        # probably not worth the dependency
+        properties_ds = accumulate_metadata.drop_allnull_vars(properties_ds)
 
-        #     import awkward as ak
-
-        #     awk_props = ak.Array([item._data for item in items]).properties
-        #     for field, props in zip(ak.fields(awk_props), ak.unzip(awk_props)):
-        #         if field == "datetime":
-        #             continue
-
-        #         # if all values are the same, collapse to a 0D coordinate
-        #         try:
-        #             if len(ak.run_lengths(props)) == 1:
-        #                 props = ak.to_list(props[0])
-        #                 # ^ NOTE: `to_list` because `ak.to_numpy` on string scalars (`ak.CharBehavior`)
-        #                 # turns them into an int array of the characters!
-        #         except NotImplementedError:
-        #             # generally because it's an OptionArray (so there's >1 value anyway)
-        #             pass
-
-        #         try:
-        #             props = np.squeeze(ak.to_numpy(props))
-        #         except ValueError:
-        #             continue
-
-        #         coords[field] = xr.Variable(
-        #             (("time",) + tuple(f"dim_{i}" for i in range(1, props.ndim)))
-        #             if np.ndim(props) > 0
-        #             else (),
-        #             props,
-        #         )
-        # else:
-        #     # For now don't use awkward when the field names are already known,
-        #     # mostly so users don't have to have it installed.
-        #     if isinstance(properties, str):
-        #         properties = (properties,)
-        #     for prop in properties:  # type: ignore (`properties` cannot be True at this point)
-        #         coords[prop] = xr.Variable(
-        #             "time", [item["properties"].get(prop) for item in items]
-        #         )
+        # Selecting properties coords that are constant
+        constant_properties_ds = accumulate_metadata.select_unique_vars(properties_ds, dim=["time"])
+        properties_ds = properties_ds.drop_vars(constant_properties_ds.keys())
 
     if band_coords:
-        flattened_metadata_by_asset = [
-            accumulate_metadata.accumulate_metadata_only_allsame(
-                (item["assets"].get(asset_id, {}) for item in items),
-                skip_fields={"href", "type", "roles"},
-            )
-            for asset_id in asset_ids
-        ]
+        # Converting to xarray dataset
+        assets = {(time, k): v for time, item in zip(times, items) for k, v in item["assets"].items() if k in asset_ids}
+        assets_df = pd.DataFrame.from_dict(assets, orient="index")
+        assets_df.index = assets_df.index.set_names(["time", "band"])
+        assets_ds = xr.Dataset.from_dataframe(assets_df)
 
-        eo_by_asset = []
-        for meta in flattened_metadata_by_asset:
-            # NOTE: we look for `eo:bands` in each Asset's metadata, not as an Item-level list.
-            # This only became available in STAC 1.0.0-beta.1, so we'll fail on older collections.
-            # See https://github.com/radiantearth/stac-spec/tree/master/extensions/eo#item-fields
-            eo = meta.pop("eo:bands", {})
-            if isinstance(eo, list):
-                eo = eo[0] if len(eo) == 1 else {}
-                # ^ `eo:bands` should be a list when present, but >1 item means it's probably a multi-band asset,
-                # which we can't currently handle, so we ignore it. we don't error here, because
-                # as long as you don't actually _use_ that asset, everything will be fine. we could
-                # warn, but that would probably just get annoying.
-            eo_by_asset.append(eo)
-            try:
-                meta["polarization"] = meta.pop("sar:polarizations")
-            except KeyError:
-                pass
+        assets_ds = accumulate_metadata.drop_allnull_vars(assets_ds)
 
-        coords.update(
-            accumulate_metadata.metadata_to_coords(
-                flattened_metadata_by_asset,
-                "band",
-                skip_fields={"href"},
-                # skip_fields={"href", "title", "description", "type", "roles"},
-            )
-        )
-        if any(eo_by_asset):
-            coords.update(
-                accumulate_metadata.metadata_to_coords(
-                    eo_by_asset,
-                    "band",
-                    fields=["common_name", "center_wavelength", "full_width_half_max"],
-                )
-            )
+        # Selecting assets coords that are constant
+        constant_assets_ds = accumulate_metadata.select_unique_vars(assets_ds, dim=["time", "band"])
+        assets_ds = assets_ds.drop_vars(constant_assets_ds.keys())
+
+        # 'band' dependant assets coords
+        band_assets_ds = accumulate_metadata.select_unique_vars(assets_ds, dim=["time"])
+        assets_ds = assets_ds.drop_vars(band_assets_ds.keys())
+
+    else:
+        constant_assets_ds = {}
+        band_assets_ds = {}
+        assets_ds = {}
+
+    # Combining into 'coords_ds' to get a global view
+    coords_ds = xr.merge([
+        constant_assets_ds,
+        band_assets_ds,
+        assets_ds,  # leftovers - time and band dependant assets coords
+        constant_properties_ds,
+        properties_ds,  # leftovers - time dependant properties coords
+    ])
+
+    coords.update({var: coords_ds[var] for var in coords_ds.drop(["time", "band"])})
 
     # Add `epsg` last in case it's also a field in properties; our data model assumes it's a coordinate
     coords["epsg"] = spec.epsg
