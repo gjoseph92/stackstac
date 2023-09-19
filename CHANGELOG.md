@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 (2023-09-19)
+- **Breaking change in specific scenarios:** `rescale=True` now uses STAC metadata from `raster:bands`, instead of metadata set per GeoTIFF [@RSchueder](https://github.com/RSchueder)
+- Fix black stripes when mosaicing (introduced in 0.4.4) [@gjoseph92](https://github.com/gjoseph92) [@lhcorralo](https://github.com/lhcorralo)
+- Update examples to point to newer Sentinel-2 endpoint on AWS [@ljstrnadiii](https://github.com/ljstrnadiii)
+- Ensure `jupyter-server-proxy` is installed with `pip install 'stackstac[viz]'` [@gjoseph92](https://github.com/gjoseph92)
+
 ## 0.4.4 (2023-06-21)
 - Resolve compatibility with NumPy >= 1.24.0 [@gjoseph92](https://github.com/gjoseph92)
 - Fix TypeError when no items overlap with the given `bounds` [@gjoseph92](https://github.com/gjoseph92)
