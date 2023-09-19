@@ -167,14 +167,20 @@ def prepare_items(
             if rescale:
                 if not np.can_cast(asset_scale, dtype):
                     raise ValueError(
-                        f"rescale=True but safe casting cannot be completed between "
-                        f"asset scale value {asset_scale} and output dtype {dtype}."
+                        f"`rescale=True`, but safe casting cannot be completed between "
+                        f"asset scale value {asset_scale} and output dtype {dtype}.\n"
+                        f"To continue using `{dtype=}`, pass `rescale=False` to retrieve "
+                        "data in its raw, unscaled values. Or, if you want rescaled "
+                        "values, pass a different `dtype=` (typically `float`)."
                     )
 
                 if not np.can_cast(asset_offset, dtype):
                     raise ValueError(
-                        f"rescale=True but safe casting cannot be completed between "
-                        f"asset offset value {asset_offset} and output dtype {dtype}."
+                        f"`rescale=True`, but safe casting cannot be completed between "
+                        f"asset offset value {asset_offset} and output dtype {dtype}.\n"
+                        f"To continue using `{dtype=}`, pass `rescale=False` to retrieve "
+                        "data in its raw, unscaled values. Or, if you want rescaled "
+                        "values, pass a different `dtype=` (typically `float`)."
                     )
 
             asset_affine = None
