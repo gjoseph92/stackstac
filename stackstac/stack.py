@@ -205,8 +205,10 @@ def stack(
         Whether to rescale pixel values by the scale and offset present in the ``raster:bands`` metadata
         for each asset.
         Default: True. Note that this could produce floating-point data when the
-        original values are ints, so set ``dtype`` accordingly. You will NOT be warned
-        if the cast to ``dtype`` is losing information!
+        original values are ints, so set ``dtype`` accordingly. Raises `ValueError` if the
+        ``dtype`` specified can't hold the data after rescaling: for example, if loading
+        data with ``dtype=int, rescale=True`` where the scaling factor is 1.5, the rescaled
+        data would be floating-point, and couldn't be stored as an integer.
     sortby_date:
         Whether to pre-sort the items by date (from the ``properties["datetime"]`` field).
         One of ``"asc"``, ``"desc"``, or False to disable sorting. Default: ``"asc"``.
@@ -293,6 +295,8 @@ def stack(
         bounds=bounds,
         bounds_latlon=bounds_latlon,
         snap_bounds=snap_bounds,
+        rescale=rescale,
+        dtype=dtype,
     )
     arr = items_to_dask(
         asset_table,
