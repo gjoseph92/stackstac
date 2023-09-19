@@ -44,7 +44,6 @@ docs-examples = [
     "jupyterlab-system-monitor>=0.8.0",
     "planetary-computer>=0.4.3",
     "pystac-client>=0.3",
-    "sat-search>=0.3.0",
     "dask-labextension>=5.0.1",
     "jupyterlab>=3.0.14",
 ]
