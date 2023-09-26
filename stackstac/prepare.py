@@ -437,50 +437,10 @@ def to_coords(
         coords["y"] = ys
 
     if properties:
-        # Converting to xarray dataset
-        properties = {time: item["properties"] for time, item in zip(times, items)}
-        properties_df = pd.DataFrame.from_dict(properties, orient="index")
-        properties_df.index = properties_df.index.set_names(["time"])
-        properties_ds = xr.Dataset.from_dataframe(properties_df)
-
-        properties_ds = accumulate_metadata.drop_allnull_vars(properties_ds)
-
-        # Selecting properties coords that are constant
-        constant_properties_ds = accumulate_metadata.select_unique_vars(properties_ds, dim=["time"])
-        properties_ds = properties_ds.drop_vars(constant_properties_ds.keys())
+        coords.update(accumulate_metadata.accumulate_properties_coords(items, coords))
 
     if band_coords:
-        # Converting to xarray dataset
-        assets = {(time, k): v for time, item in zip(times, items) for k, v in item["assets"].items() if k in asset_ids}
-        assets_df = pd.DataFrame.from_dict(assets, orient="index")
-        assets_df.index = assets_df.index.set_names(["time", "band"])
-        assets_ds = xr.Dataset.from_dataframe(assets_df)
-
-        assets_ds = accumulate_metadata.drop_allnull_vars(assets_ds)
-
-        # Selecting assets coords that are constant
-        constant_assets_ds = accumulate_metadata.select_unique_vars(assets_ds, dim=["time", "band"])
-        assets_ds = assets_ds.drop_vars(constant_assets_ds.keys())
-
-        # 'band' dependant assets coords
-        band_assets_ds = accumulate_metadata.select_unique_vars(assets_ds, dim=["time"])
-        assets_ds = assets_ds.drop_vars(band_assets_ds.keys())
-
-    else:
-        constant_assets_ds = {}
-        band_assets_ds = {}
-        assets_ds = {}
-
-    # Combining into 'coords_ds' to get a global view
-    coords_ds = xr.merge([
-        constant_assets_ds,
-        band_assets_ds,
-        assets_ds,  # leftovers - time and band dependant assets coords
-        constant_properties_ds,
-        properties_ds,  # leftovers - time dependant properties coords
-    ])
-
-    coords.update({var: coords_ds[var] for var in coords_ds.drop(["time", "band"])})
+        coords.update(accumulate_metadata.accumulate_assets_coords(items, asset_ids, coords))
 
     # Add `epsg` last in case it's also a field in properties; our data model assumes it's a coordinate
     coords["epsg"] = spec.epsg
