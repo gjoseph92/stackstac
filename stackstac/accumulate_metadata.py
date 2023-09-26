@@ -93,9 +93,11 @@ def accumulate_assets_coords(items, asset_ids, coords):
         is_time_dependant = is_constant(time_oriented_coords.tolist())
 
         if is_time_dependant and is_band_dependant:
-            assets_coords[asset_key] = time_oriented_coords[
-                0, 0
-            ]  # same than band_oriented_coords[0, 0]
+            # same than band_oriented_coords[0, 0]
+            constant = time_oriented_coords[0, 0]
+            # xarray doesn't support passing a list as a constant coords for now
+            assets_coords[asset_key] = str(constant) if isinstance(constant, list) else constant
+            
         elif is_time_dependant:
             assets_coords[asset_key] = xr.Variable(["band"], time_oriented_coords[0])
         elif is_band_dependant:
@@ -156,6 +158,8 @@ def accumulate_properties_coords(items, coords):
             )
         else:
             # rioxarray convention is ordered: time, band, y, x
-            properties_coords[properties_key] = time_oriented_coords[0]
+            constant = time_oriented_coords[0]
+            # xarray doesn't support passing a list as a constant coords for now
+            properties_coords[properties_key] = str(constant) if isinstance(constant, list) else constant
 
     return properties_coords
