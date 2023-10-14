@@ -8,7 +8,8 @@ import dask
 from rasterio import RasterioIOError
 from rasterio.enums import Resampling
 
-from .prepare import prepare_items, to_attrs, to_coords
+from .prepare import prepare_items
+from .coordinates import spec_to_attrs, to_coords
 from .raster_spec import Bbox, IntFloat, Resolutions
 from .reader_protocol import Reader
 from .rio_env import LayeredEnv
@@ -321,6 +322,6 @@ def stack(
             properties=properties,
             band_coords=band_coords,
         ),
-        attrs=to_attrs(spec),
+        attrs=spec_to_attrs(spec),
         name="stackstac-" + dask.base.tokenize(arr),
     )

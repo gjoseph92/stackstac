@@ -3,29 +3,23 @@ from __future__ import annotations
 import collections
 from typing import (
     AbstractSet,
-    Literal,
     NamedTuple,
-    Sequence,
     Optional,
     Set,
     Union,
     Tuple,
     List,
-    Dict,
-    Any,
 )
 import warnings
 
 
 import affine
 import numpy as np
-import pandas as pd
-import xarray as xr
 
 from .raster_spec import IntFloat, Bbox, Resolutions, RasterSpec
 
 from .stac_types import ItemSequence
-from . import accumulate_metadata, geom_utils
+from . import geom_utils
 
 ASSET_TABLE_DT = np.dtype(
     [("url", object), ("bounds", "float64", 4), ("scale_offset", "float64", 2)]
@@ -394,182 +388,3 @@ def prepare_items(
         items = [item for item, isnan in zip(items, item_isnan) if not isnan]
 
     return asset_table, spec, asset_ids, items
-
-
-def to_coords(
-    items: ItemSequence,
-    asset_ids: List[str],
-    spec: RasterSpec,
-    xy_coords: Literal["center", "topleft", False] = "topleft",
-    properties: Union[bool, str, Sequence[str]] = True,
-    band_coords: bool = True,
-) -> Tuple[Dict[str, Union[pd.Index, np.ndarray, list]], List[str]]:
-
-    times = pd.to_datetime(
-        [item["properties"]["datetime"] for item in items],
-        infer_datetime_format=True,
-        errors="coerce",
-    )
-    if times.tz is not None:
-        # xarray can't handle tz-aware DatetimeIndexes, so we convert to UTC and drop the timezone
-        # https://github.com/pydata/xarray/issues/3291.
-        # The `tz is None` case is typically a manifestation of https://github.com/pandas-dev/pandas/issues/41047.
-        # Since all STAC timestamps should be UTC (https://github.com/radiantearth/stac-spec/issues/1095),
-        # we feel safe assuming that any tz-naive datetimes are already in UTC.
-        times = times.tz_convert(None)
-
-    dims = ["time", "band", "y", "x"]
-    coords = {
-        "time": times,
-        "id": xr.Variable("time", [item["id"] for item in items]),
-        "band": asset_ids,
-    }
-
-    if xy_coords is not False:
-        if xy_coords == "center":
-            pixel_center = True
-        elif xy_coords == "topleft":
-            pixel_center = False
-        else:
-            raise ValueError(
-                f"xy_coords must be 'center', 'topleft', or False, not {xy_coords!r}"
-            )
-
-        transform = spec.transform
-        # We generate the transform ourselves in `RasterSpec`, and it's always constructed to be rectilinear.
-        # Someday, this should not always be the case, in order to support non-rectilinear data without warping.
-        assert (
-            transform.is_rectilinear
-        ), f"Non-rectilinear transform generated: {transform}"
-        minx, miny, maxx, maxy = spec.bounds
-        xres, yres = spec.resolutions_xy
-
-        if pixel_center:
-            half_xpixel, half_ypixel = xres / 2, yres / 2
-            minx, miny, maxx, maxy = (
-                minx + half_xpixel,
-                miny - half_ypixel,
-                maxx + half_xpixel,
-                maxy - half_ypixel,
-            )
-
-        height, width = spec.shape
-        # Wish pandas had an RangeIndex that supported floats...
-        # https://github.com/pandas-dev/pandas/issues/46484
-        xs = pd.Index(np.linspace(minx, maxx, width, endpoint=False), dtype="float64")
-        ys = pd.Index(np.linspace(maxy, miny, height, endpoint=False), dtype="float64")
-
-        coords["x"] = xs
-        coords["y"] = ys
-
-    if properties:
-        coords.update(
-            accumulate_metadata.metadata_to_coords(
-                (item["properties"] for item in items),
-                "time",
-                fields=properties,
-                skip_fields={"datetime"},
-                # skip_fields={"datetime", "providers"},
-            )
-        )
-
-        # Property-merging code using awkward array. Slightly shorter, not sure if it's faster,
-        # probably not worth the dependency
-
-        #     import awkward as ak
-
-        #     awk_props = ak.Array([item._data for item in items]).properties
-        #     for field, props in zip(ak.fields(awk_props), ak.unzip(awk_props)):
-        #         if field == "datetime":
-        #             continue
-
-        #         # if all values are the same, collapse to a 0D coordinate
-        #         try:
-        #             if len(ak.run_lengths(props)) == 1:
-        #                 props = ak.to_list(props[0])
-        #                 # ^ NOTE: `to_list` because `ak.to_numpy` on string scalars (`ak.CharBehavior`)
-        #                 # turns them into an int array of the characters!
-        #         except NotImplementedError:
-        #             # generally because it's an OptionArray (so there's >1 value anyway)
-        #             pass
-
-        #         try:
-        #             props = np.squeeze(ak.to_numpy(props))
-        #         except ValueError:
-        #             continue
-
-        #         coords[field] = xr.Variable(
-        #             (("time",) + tuple(f"dim_{i}" for i in range(1, props.ndim)))
-        #             if np.ndim(props) > 0
-        #             else (),
-        #             props,
-        #         )
-        # else:
-        #     # For now don't use awkward when the field names are already known,
-        #     # mostly so users don't have to have it installed.
-        #     if isinstance(properties, str):
-        #         properties = (properties,)
-        #     for prop in properties:  # type: ignore (`properties` cannot be True at this point)
-        #         coords[prop] = xr.Variable(
-        #             "time", [item["properties"].get(prop) for item in items]
-        #         )
-
-    if band_coords:
-        flattened_metadata_by_asset = [
-            accumulate_metadata.accumulate_metadata_only_allsame(
-                (item["assets"].get(asset_id, {}) for item in items),
-                skip_fields={"href", "type", "roles"},
-            )
-            for asset_id in asset_ids
-        ]
-
-        eo_by_asset = []
-        for meta in flattened_metadata_by_asset:
-            # NOTE: we look for `eo:bands` in each Asset's metadata, not as an Item-level list.
-            # This only became available in STAC 1.0.0-beta.1, so we'll fail on older collections.
-            # See https://github.com/radiantearth/stac-spec/tree/master/extensions/eo#item-fields
-            eo = meta.pop("eo:bands", {})
-            if isinstance(eo, list):
-                eo = eo[0] if len(eo) == 1 else {}
-                # ^ `eo:bands` should be a list when present, but >1 item means it's probably a multi-band asset,
-                # which we can't currently handle, so we ignore it. we don't error here, because
-                # as long as you don't actually _use_ that asset, everything will be fine. we could
-                # warn, but that would probably just get annoying.
-            eo_by_asset.append(eo)
-            try:
-                meta["polarization"] = meta.pop("sar:polarizations")
-            except KeyError:
-                pass
-
-        coords.update(
-            accumulate_metadata.metadata_to_coords(
-                flattened_metadata_by_asset,
-                "band",
-                skip_fields={"href"},
-                # skip_fields={"href", "title", "description", "type", "roles"},
-            )
-        )
-        if any(eo_by_asset):
-            coords.update(
-                accumulate_metadata.metadata_to_coords(
-                    eo_by_asset,
-                    "band",
-                    fields=["common_name", "center_wavelength", "full_width_half_max"],
-                )
-            )
-
-    # Add `epsg` last in case it's also a field in properties; our data model assumes it's a coordinate
-    coords["epsg"] = spec.epsg
-
-    return coords, dims
-
-
-def to_attrs(spec: RasterSpec) -> Dict[str, Any]:
-    attrs = {"spec": spec, "crs": f"epsg:{spec.epsg}", "transform": spec.transform}
-
-    resolutions = spec.resolutions_xy
-    if resolutions[0] == resolutions[1]:
-        attrs["resolution"] = resolutions[0]
-    else:
-        attrs["resolution_xy"] = resolutions
-    return attrs
