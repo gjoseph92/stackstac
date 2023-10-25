@@ -151,6 +151,8 @@ def prepare_items(
                         "Multi-band rasters are not currently supported.\n"
                         "If you don't care about this asset, you can skip it by giving a list "
                         "of asset IDs you *do* want in `assets=`, and leaving this one out."
+                        "For example:\n"
+                        f"`assets={[x for x in asset_ids if x != id]!r}`"
                     )
                 asset_scale = raster_bands[0].get("scale", 1)
                 asset_offset = raster_bands[0].get("offset", 0)
