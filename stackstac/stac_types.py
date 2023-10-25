@@ -91,7 +91,7 @@ AssetDict = TypedDict(
             Tuple[int, int, int, int, int, int],
             Tuple[int, int, int, int, int, int, int, int, int],
         ],
-        "eo:bands": EOBand,
+        "eo:bands": List[EOBand],
         "sar:polarizations": List[str],
     },
     total=False,
