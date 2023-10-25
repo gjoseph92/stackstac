@@ -299,45 +299,47 @@ def items_to_band_coords_simple(
     return ds.variables
 
 
-# def items_to_band_locality(
-#     items: ItemSequence,
-#     asset_ids: List[str],
-# ) -> Coordinates:
-#     # Maybe a way to improve locality and not iterate over all items many times.
-#     # TODO: benchmark
-#     # {field: [
-#     #     [v_asset_0, v_asset_1, ...],  # item 0
-#     #     [v_asset_0, v_asset_1, ...],  # item 1
-#     # ]}
-#     coords_lists = {}
-#     for ii, item in enumerate(items):
-#         # {field: [v_asset_0, v_asset_1, ...]} for just this item.
-#         field_values = {}
-#         for ai, id in enumerate(asset_ids):
-#             asset = item.get(id, {})
-#             for field, value in asset.items():
-#                 if not (values := field_values.get(field)):
-#                     field_values[field] = values = [None] * ai
+def items_to_band_locality(
+    items: ItemSequence,
+    asset_ids: List[str],
+) -> Coordinates:
+    # Maybe a way to improve locality and not iterate over all items many times.
+    # TODO: benchmark
+    # {field: [
+    #     [v_asset_0, v_asset_1, ...],  # item 0
+    #     [v_asset_0, v_asset_1, ...],  # item 1
+    # ]}
+    coords_lists = {}
 
-#                 # TODO: un-nest `value` if a dict
-#                 values.append(scalar_sequence(value))
+    for ii, item in enumerate(items):
+        # {field: [v_asset_0, v_asset_1, ...]} for just this item.
+        field_values = {}
+        for ai, id in enumerate(asset_ids):
+            asset = item.get(id, {})
+            for field, value in asset.items():
+                if not (values := field_values.get(field)):
+                    field_values[field] = values = [None] * len(asset_ids)
 
-#             for missing_field in field_values.keys() - asset.keys():
-#                 field_values[missing_field].append(None)
+                # TODO: un-nest `value` if a dict
+                values[ai] = scalar_sequence(value)
 
-#             # At the end of each asset, all field values should be the same length
-#             lens = {k: len(vs) for k, vs, in field_values.items()}
-#             assert len(set(lens.values())) == 1, lens
+            # for missing_field in field_values.keys() - asset.keys():
+            #     field_values[missing_field].append(None)
 
-#         # TODO got to here
-#         for field, values in field_values.items():
-#             if not (all_values := coords_lists.get(field)):
-#                 coords_lists[field] = values = [None] * ai
+            # At the end of each asset, all field values should be the same length
+            lens = {k: len(vs) for k, vs, in field_values.items()}
+            assert len(set(lens.values())) == 1, lens
+            assert all(len(vs) for vs in field_values.values()) == len(asset_ids), (lens, len(asset_ids))
 
-#             coords_lists[k].append(v)
+        for field, values in field_values.items():
+            if not (all_values := coords_lists.get(field)):
+                # TODO got to here
+                coords_lists[field] = values = [None] * len(asset_ids)
 
-#         for missing_field in coords_lists.keys() - asset.keys():
-#             field_values[missing_field].append(None)
+            coords_lists[k].append(v)
+
+        for missing_field in coords_lists.keys() - asset.keys():
+            field_values[missing_field].append(None)
 
 
 def spec_to_attrs(spec: RasterSpec) -> Dict[str, Any]:
