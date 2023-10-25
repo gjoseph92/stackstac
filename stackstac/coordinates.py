@@ -1,16 +1,6 @@
 from __future__ import annotations
 
-from typing import (
-    Literal,
-    Mapping,
-    Sequence,
-    Union,
-    Tuple,
-    List,
-    Dict,
-    Any,
-)
-
+from typing import Any, Dict, List, Literal, Mapping, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -21,17 +11,27 @@ from stackstac.coordinates_utils import (
     descalar_obj_array,
     scalar_sequence,
     unnest_dicts,
+    unpack_per_band_asset_fields,
 )
 
-from .raster_spec import RasterSpec
-
-from .stac_types import ItemSequence
 from . import accumulate_metadata
+from .raster_spec import RasterSpec
+from .stac_types import ItemSequence
 
 ASSET_TABLE_DT = np.dtype(
     [("url", object), ("bounds", "float64", 4), ("scale_offset", "float64", 2)]
 )
 Coordinates = Mapping[str, Union[pd.Index, np.ndarray, xr.Variable, list]]
+
+# Asset fields which are a list with one item per band in the asset.
+# For one-band assets, they should be a list of length 1.
+# We'll unpack those 1-length lists, so the subfields can be flattened into
+# top-level coordinates.
+# This is how we get `eo:bands_common_name` or `raster:bands_scale` coordinates.
+PER_BAND_ASSET_FIELDS = {
+    "eo:bands",
+    "raster:bands",
+}
 
 
 def to_coords(
@@ -201,32 +201,16 @@ def items_to_band_coords2(
 ) -> Coordinates:
 
     unnested_assets = [
-        {k: unnest_dicts(v) for k, v in item["assets"].items() if k in asset_ids}
+        {
+            k: unnest_dicts(unpack_per_band_asset_fields(v, PER_BAND_ASSET_FIELDS))
+            for k, v in item["assets"].items()
+            if k in asset_ids
+        }
         for item in items
     ]
     all_fields = sorted(
         set().union(*(asset.keys() for ia in unnested_assets for asset in ia.values()))
     )
-
-    # Simplest/most high-level might would be
-    # asset_arr = [
-    # [
-    #         [ia[aid][f] for f in all_fields]
-    #         for aid in asset_ids
-    #     ]
-    #     for ia in unnested_assets
-    # ]
-    # da = xr.DataArray(
-    #     asset_arr,
-    #     coords={
-    #         "asset": assets_ids,
-    #         "field": asset_fields,
-    #     },
-    #     dims=["time", "asset", "field"],
-    # )
-    # ds = da.to_dataset("field")
-    # ds.map(deduplicate)
-    # return ds.variables
 
     # Building up arrays like:
     # {
@@ -276,6 +260,84 @@ def items_to_band_coords2(
         field: xr.Variable(["time", "band"], arr).squeeze()
         for field, arr in deduped.items()
     }
+
+
+def items_to_band_coords_simple(
+    items: ItemSequence,
+    asset_ids: List[str],
+) -> Coordinates:
+    # Interestingly this is slightly faster in benchmarking than `items_to_band_coords2`
+    unnested_assets = [
+        {
+            k: unnest_dicts(unpack_per_band_asset_fields(v, PER_BAND_ASSET_FIELDS))
+            for k, v in item["assets"].items()
+            if k in asset_ids
+        }
+        for item in items
+    ]
+    all_fields = sorted(
+        set().union(*(asset.keys() for ia in unnested_assets for asset in ia.values()))
+    )
+
+    asset_arr = [
+        [[ia.get(aid, {}).get(f) for f in all_fields] for aid in asset_ids]
+        for ia in unnested_assets
+    ]
+    da = xr.DataArray(
+        asset_arr,
+        coords={
+            "band": asset_ids,
+            "field": all_fields,
+        },
+        dims=["time", "band", "field"],
+    )
+    ds = da.to_dataset("field")
+    ds = ds.map(
+        # TODO better way?
+        lambda da: xr.DataArray(deduplicate_axes(da.data), dims=da.dims).squeeze()
+    )
+    return ds.variables
+
+
+# def items_to_band_locality(
+#     items: ItemSequence,
+#     asset_ids: List[str],
+# ) -> Coordinates:
+#     # Maybe a way to improve locality and not iterate over all items many times.
+#     # TODO: benchmark
+#     # {field: [
+#     #     [v_asset_0, v_asset_1, ...],  # item 0
+#     #     [v_asset_0, v_asset_1, ...],  # item 1
+#     # ]}
+#     coords_lists = {}
+#     for ii, item in enumerate(items):
+#         # {field: [v_asset_0, v_asset_1, ...]} for just this item.
+#         field_values = {}
+#         for ai, id in enumerate(asset_ids):
+#             asset = item.get(id, {})
+#             for field, value in asset.items():
+#                 if not (values := field_values.get(field)):
+#                     field_values[field] = values = [None] * ai
+
+#                 # TODO: un-nest `value` if a dict
+#                 values.append(scalar_sequence(value))
+
+#             for missing_field in field_values.keys() - asset.keys():
+#                 field_values[missing_field].append(None)
+
+#             # At the end of each asset, all field values should be the same length
+#             lens = {k: len(vs) for k, vs, in field_values.items()}
+#             assert len(set(lens.values())) == 1, lens
+
+#         # TODO got to here
+#         for field, values in field_values.items():
+#             if not (all_values := coords_lists.get(field)):
+#                 coords_lists[field] = values = [None] * ai
+
+#             coords_lists[k].append(v)
+
+#         for missing_field in coords_lists.keys() - asset.keys():
+#             field_values[missing_field].append(None)
 
 
 def spec_to_attrs(spec: RasterSpec) -> Dict[str, Any]:

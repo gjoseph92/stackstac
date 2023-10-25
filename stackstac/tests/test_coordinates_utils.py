@@ -1,15 +1,16 @@
 from string import printable
-import pytest
 
-import numpy as np
-from hypothesis import given
 import hypothesis.strategies as st
+import numpy as np
+import pytest
+from hypothesis import given
 
 from stackstac.coordinates_utils import (
-    descalar_obj_array,
     deduplicate_axes,
+    descalar_obj_array,
     scalar_sequence,
     unnest_dicts,
+    unpack_per_band_asset_fields,
 )
 
 
@@ -83,7 +84,7 @@ jsons = st.recursive(
     | st.text(printable),
     lambda children: st.lists(children) | st.dictionaries(st.text(printable), children),
 )
-# Modified from https://hypothesis.readthedocs.io/en/latest/data.html#recursive-data
+# ^ modified from https://hypothesis.readthedocs.io/en/latest/data.html#recursive-data
 
 
 @given(jsons)
@@ -93,3 +94,42 @@ def test_scalar_sequence_roundtrip(x):
     assert arr.shape == (1,)
     descalared = descalar_obj_array(arr)
     assert descalared[0] == x
+
+
+@pytest.mark.parametrize(
+    "input, fields, expected",
+    [
+        # No fields
+        ({"a": None}, [], {"a": None}),
+        # `None` value is dropped
+        ({"a": None}, ["a"], {}),
+        # Not a sequence
+        ({"a": 1}, ["a"], {"a": 1}),
+        # Dropped: not 1-length
+        ({"a": []}, ["a"], {}),
+        # Unpacked: 1-length
+        ({"a": [1]}, ["a"], {"a": 1}),
+        # Dropped: not 1-length
+        ({"a": [1, 2]}, ["a"], {}),
+        # No fields match
+        ({"a": None}, ["b"], {"a": None}),
+        # No fields match
+        ({"a": [1]}, ["b"], {"a": [1]}),
+        # Unpacked: 1-length, with extraneous fields
+        ({"a": [1]}, ["a", "b"], {"a": 1}),
+        # Dropped: not 1-length, with extraneous fields
+        ({"a": [1, 2]}, ["a", "b"], {}),
+        # Multiple fields: unpacked, not sequence
+        ({"a": [1], "b": 2}, ["a", "b"], {"a": 1, "b": 2}),
+        # Multiple fields: unpacked, dropped
+        ({"a": [1], "b": ()}, ["a", "b"], {"a": 1}),
+        # Multiple fields: unpacked, not matched
+        ({"a": [1], "c": ()}, ["a", "b"], {"a": 1, "c": ()}),
+        # Multiple fields: unpacked, unpacked
+        ({"a": [1], "b": (2,)}, ["a", "b"], {"a": 1, "b": 2}),
+    ],
+)
+def test_unpack_per_band_asset_fields(input, fields, expected):
+    result = unpack_per_band_asset_fields(input, fields)
+    assert result is not input
+    assert result == expected

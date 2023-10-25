@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Iterable
+
 import numpy as np
 
 
@@ -48,9 +50,6 @@ def unnest_dicts(item, prefix=(), sep="_"):
             else:
                 result[sep.join(sub_prefix)] = unnested
         return result
-
-    if isinstance(item, (list, tuple)) and len(item) == 1:
-        return unnest_dicts(item[0], prefix=prefix, sep=sep)
 
     # Note that we don't descend into lists/tuples. For the purposes of STAC metadata,
     # there'd be no reason to do this: we're not going to make an xarray coordinate like
@@ -120,3 +119,36 @@ def descalar_obj_array(arr: np.ndarray) -> np.ndarray:
         if isinstance(x, np.ndarray) and x.shape == ():
             arr[idx] = x.item()
     return arr
+
+
+def unpack_per_band_asset_fields(asset: dict, fields: Iterable) -> dict:
+    """
+    Unpack 1-length list/tuple values for the given ``fields``.
+
+    For keys of ``asset`` in ``fields``, if the value is a 1-length
+    list or tuple, use its single value. Otherwise, use an empty dict.
+    """
+    # NOTE: this will have to change a lot when we support multi-band assets;
+    # this is predicated on each asset having exactly 1 band.
+    asset = asset.copy()
+    # ^ modifying in-place would be nicer, but user may have passed in
+    # their own dict of STAC items.
+    for field in fields:
+        try:
+            v = asset[field]
+        except KeyError:
+            continue
+        if isinstance(v, (list, tuple)):
+            if len(v) == 1:
+                asset[field] = v[0]
+            else:
+                # For >1 band, drop metadata entirely (you can't use the data anyway).
+                # Otherwise, coordinates would be a mess: both unpacked `eo:bands`
+                # fields like `eo:bands_common_name`, and plain `eo:bands` which would
+                # be None for all 1-band assets, and contain the dicts for multi-band
+                # assets.
+                v = None
+
+        if v is None:
+            del asset[field]
+    return asset
