@@ -2,11 +2,13 @@ import json
 
 import pytest
 import xarray as xr
+import numpy as np
 
 from stackstac.coordinates import (
     items_to_band_coords,
     items_to_band_coords2,
     items_to_band_coords_simple,
+    items_to_band_coords_locality,
 )
 from stackstac.coordinates_utils import scalar_sequence
 
@@ -20,7 +22,7 @@ def landsat_c2_l2_json():
 def test_band_coords(landsat_c2_l2_json):
     ids = ["red", "green", "qa_pixel", "qa_radsat"]
     # coords = items_to_band_coords(landsat_c2_l2_json, ids)
-    coords = items_to_band_coords_simple(landsat_c2_l2_json, ids)
+    coords = items_to_band_coords_locality(landsat_c2_l2_json, ids)
     # print(coords)
 
     # 0D coordinate
@@ -28,10 +30,12 @@ def test_band_coords(landsat_c2_l2_json):
     assert isinstance(type, xr.Variable)
     assert type.shape == ()
     assert type.item() == "image/tiff; application=geotiff; profile=cloud-optimized"
+    assert np.issubdtype(type.dtype, str)  # shouldn't be `O`, should be `U56`
 
     # 1D coordinate along bands
     title = coords["title"]
     assert isinstance(title, xr.Variable)
+    assert np.issubdtype(title.dtype, str)  # also shouldn't be `O`
     assert (
         title
         == [
@@ -76,6 +80,7 @@ def test_band_coords(landsat_c2_l2_json):
     common_name = coords["eo:bands_common_name"]
     assert isinstance(common_name, xr.Variable)
     assert common_name.dims == ("band",)
+    assert (common_name == ['red', 'green', None, None]).all()
 
     # `raster:bands` is also unpacked
     assert "raster:bands" not in coords
@@ -107,6 +112,7 @@ def test_band_coords(landsat_c2_l2_json):
         items_to_band_coords,
         items_to_band_coords2,
         items_to_band_coords_simple,
+        items_to_band_coords_locality
     ],
 )
 def test_benchmark_band_coords(func, landsat_c2_l2_json, benchmark):

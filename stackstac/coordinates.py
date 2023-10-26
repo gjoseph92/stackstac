@@ -299,47 +299,47 @@ def items_to_band_coords_simple(
     return ds.variables
 
 
-def items_to_band_locality(
+def items_to_band_coords_locality(
     items: ItemSequence,
     asset_ids: List[str],
 ) -> Coordinates:
-    # Maybe a way to improve locality and not iterate over all items many times.
-    # TODO: benchmark
-    # {field: [
-    #     [v_asset_0, v_asset_1, ...],  # item 0
-    #     [v_asset_0, v_asset_1, ...],  # item 1
-    # ]}
-    coords_lists = {}
-
+    # {field:
+    #   [
+    #       [v_asset_0, v_asset_1, ...],  # item 0
+    #       [v_asset_0, v_asset_1, ...],  # item 1
+    #   ]
+    # }
+    fields = {}
     for ii, item in enumerate(items):
-        # {field: [v_asset_0, v_asset_1, ...]} for just this item.
-        field_values = {}
         for ai, id in enumerate(asset_ids):
-            asset = item.get(id, {})
-            for field, value in asset.items():
-                if not (values := field_values.get(field)):
-                    field_values[field] = values = [None] * len(asset_ids)
+            try:
+                asset = item["assets"][id]
+            except KeyError:
+                continue
 
-                # TODO: un-nest `value` if a dict
-                values[ai] = scalar_sequence(value)
+            # todo un-nest better? just un-nest values?
+            unpacked = unnest_dicts(
+                unpack_per_band_asset_fields(asset, PER_BAND_ASSET_FIELDS)
+            )
+            for field, value in unpacked.items():
 
-            # for missing_field in field_values.keys() - asset.keys():
-            #     field_values[missing_field].append(None)
+                try:
+                    values = fields[field]
+                except KeyError:
+                    values = fields[field] = np.empty(
+                        (len(items), len(asset_ids)), dtype=object
+                    )
 
-            # At the end of each asset, all field values should be the same length
-            lens = {k: len(vs) for k, vs, in field_values.items()}
-            assert len(set(lens.values())) == 1, lens
-            assert all(len(vs) for vs in field_values.values()) == len(asset_ids), (lens, len(asset_ids))
+                values[ii, ai] = value
 
-        for field, values in field_values.items():
-            if not (all_values := coords_lists.get(field)):
-                # TODO got to here
-                coords_lists[field] = values = [None] * len(asset_ids)
+    # TODO un-object-ify each field
+    # fields = {field: np.array(arr.tolist()) for field, arr in fields.items()}
+    deduped = {field: deduplicate_axes(arr) for field, arr in fields.items()}
 
-            coords_lists[k].append(v)
-
-        for missing_field in coords_lists.keys() - asset.keys():
-            field_values[missing_field].append(None)
+    return {
+        field: xr.Variable(["time", "band"], arr).squeeze()
+        for field, arr in deduped.items()
+    }
 
 
 def spec_to_attrs(spec: RasterSpec) -> Dict[str, Any]:
