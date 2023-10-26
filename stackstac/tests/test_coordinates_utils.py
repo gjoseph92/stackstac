@@ -91,6 +91,8 @@ def test_unnest_dicts(input, expected):
             {"a": 1, "b": {"a": "foo", "b": {"x": 0}}},
             {"a": 1, "b_a": "foo", "b_b_x": 0},
         ),
+        # Empty dicts are preserved
+        ({"a": {}, "b": {"c": {}}}, {"a": {}, "b_c": {}})
         # (
         #     # Sequences are _not_ traversed
         #     [{"a": {"b": "c"}}, {"a2": {"b2": "c2"}}],
@@ -105,7 +107,7 @@ def test_unnest_dicts(input, expected):
     ],
 )
 def test_unnested_items(input, expected):
-    assert list(unnested_items(input)) == list(expected.items())
+    assert list(unnested_items(input.items())) == list(expected.items())
 
 
 jsons = st.recursive(

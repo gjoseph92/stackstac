@@ -86,7 +86,7 @@ def unnested_items(
     ]
     """
     for k, v in items:
-        if isinstance(v, dict):
+        if isinstance(v, dict) and v:
             yield from unnested_items(v.items(), prefix=prefix + (k,), sep=sep)
         else:
             yield sep.join(prefix + (k,)) if prefix else k, v
