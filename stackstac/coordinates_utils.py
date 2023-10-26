@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Iterator, Mapping, TypeVar
 
 import numpy as np
 
@@ -54,11 +54,50 @@ def unnest_dicts(item, prefix=(), sep="_"):
     # Note that we don't descend into lists/tuples. For the purposes of STAC metadata,
     # there'd be no reason to do this: we're not going to make an xarray coordinate like
     # `classification:bitfields_0_name`, `classification:bitfields_0_fill`, ...,
-    # `classification:bitfields_8_name`, `classification:bitfields_0_fill`
+    # `classification:bitfields_8_name`, `classification:bitfields_8_fill`
     # and unpack a separate coordinate for every field in a sequence. Rather, we rely on
     # `scalar_sequence` to preserve anything that's a sequence into a single coordinate.
 
     return item
+
+
+VT = TypeVar("VT")
+
+
+def unnested_dict_items(
+    item: Mapping[str, VT], prefix: tuple[str, ...] = (), sep: str = "_"
+) -> Iterator[tuple[str, VT]]:
+    """
+    Iterate over flattened dicts, prefixing sub-keys with the name of their parent key.
+
+    Example
+    -------
+    >>> list(unnested_dict_items({
+    ...     "foo": 1,
+    ...     "bar": {
+    ...         "a": 2,
+    ...         "foo": 3,
+    ...     },
+    ... }))
+    [
+        ("foo", 1),
+        ("bar_a", 2),
+        ("bar_foo", 3),
+    ]
+    """
+    assert isinstance(item, dict)
+    for k, v in item.items():
+        if isinstance(v, dict):
+            yield from unnested_dict_items(v, prefix=prefix + (k,), sep=sep)
+        else:
+            yield sep.join(prefix + (k,)) if prefix else k, v
+
+    # Note that we don't descend into lists/tuples. For the purposes of STAC metadata,
+    # there'd be no reason to do this: we're not going to make an xarray coordinate like
+    # `classification:bitfields_0_name`, `classification:bitfields_0_fill`, ...,
+    # `classification:bitfields_8_name`, `classification:bitfields_8_fill`
+    # and unpack a separate coordinate for every field in a sequence. Rather, we rely on
+    # `scalar_sequence` to preserve anything that's a sequence into a single coordinate.
 
 
 def scalar_sequence(x):

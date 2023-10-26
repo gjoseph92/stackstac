@@ -11,6 +11,7 @@ from stackstac.coordinates_utils import (
     descalar_obj_array,
     scalar_sequence,
     unnest_dicts,
+    unnested_dict_items,
     unpack_per_band_asset_fields,
 )
 
@@ -317,12 +318,9 @@ def items_to_band_coords_locality(
             except KeyError:
                 continue
 
-            # todo un-nest better? just un-nest values?
-            unpacked = unnest_dicts(
-                unpack_per_band_asset_fields(asset, PER_BAND_ASSET_FIELDS)
-            )
-            for field, value in unpacked.items():
-
+            # TODO unpack in generator as well
+            unpacked = unpack_per_band_asset_fields(asset, PER_BAND_ASSET_FIELDS)
+            for field, value in unnested_dict_items(unpacked):
                 try:
                     values = fields[field]
                 except KeyError:
@@ -333,7 +331,7 @@ def items_to_band_coords_locality(
                 values[ii, ai] = value
 
     # TODO un-object-ify each field
-    # fields = {field: np.array(arr.tolist()) for field, arr in fields.items()}
+    fields = {field: np.array(arr.tolist()) for field, arr in fields.items()}
     deduped = {field: deduplicate_axes(arr) for field, arr in fields.items()}
 
     return {
