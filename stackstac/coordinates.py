@@ -11,8 +11,9 @@ from stackstac.coordinates_utils import (
     descalar_obj_array,
     scalar_sequence,
     unnest_dicts,
-    unnested_dict_items,
+    unnested_items,
     unpack_per_band_asset_fields,
+    unpacked_per_band_asset_fields,
 )
 
 from . import accumulate_metadata
@@ -318,9 +319,9 @@ def items_to_band_coords_locality(
             except KeyError:
                 continue
 
-            # TODO unpack in generator as well
-            unpacked = unpack_per_band_asset_fields(asset, PER_BAND_ASSET_FIELDS)
-            for field, value in unnested_dict_items(unpacked):
+            for field, value in unnested_items(
+                unpacked_per_band_asset_fields(asset.items(), PER_BAND_ASSET_FIELDS)
+            ):
                 try:
                     values = fields[field]
                 except KeyError:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Mapping, TypeVar
+from typing import Any, Container, Iterable, Iterator, TypeVar
 
 import numpy as np
 
@@ -64,8 +64,8 @@ def unnest_dicts(item, prefix=(), sep="_"):
 VT = TypeVar("VT")
 
 
-def unnested_dict_items(
-    item: Mapping[str, VT], prefix: tuple[str, ...] = (), sep: str = "_"
+def unnested_items(
+    items: Iterable[tuple[str, VT]], prefix: tuple[str, ...] = (), sep: str = "_"
 ) -> Iterator[tuple[str, VT]]:
     """
     Iterate over flattened dicts, prefixing sub-keys with the name of their parent key.
@@ -78,17 +78,16 @@ def unnested_dict_items(
     ...         "a": 2,
     ...         "foo": 3,
     ...     },
-    ... }))
+    ... }.items()))
     [
         ("foo", 1),
         ("bar_a", 2),
         ("bar_foo", 3),
     ]
     """
-    assert isinstance(item, dict)
-    for k, v in item.items():
+    for k, v in items:
         if isinstance(v, dict):
-            yield from unnested_dict_items(v, prefix=prefix + (k,), sep=sep)
+            yield from unnested_items(v.items(), prefix=prefix + (k,), sep=sep)
         else:
             yield sep.join(prefix + (k,)) if prefix else k, v
 
@@ -191,3 +190,32 @@ def unpack_per_band_asset_fields(asset: dict, fields: Iterable) -> dict:
         if v is None:
             del asset[field]
     return asset
+
+
+def unpacked_per_band_asset_fields(
+    asset: Iterable[tuple[str, Any]], fields: Container
+) -> Iterator[tuple[str, Any]]:
+    """
+    Unpack 1-length list/tuple values for the given ``fields``.
+
+    For keys of ``asset`` in ``fields``, if the value is a 1-length
+    list or tuple, use its single value. Otherwise, use an empty dict.
+    """
+    # NOTE: this will have to change a lot when we support multi-band assets;
+    # this is predicated on each asset having exactly 1 band.
+    for k, v in asset:
+        if k in fields:
+            if isinstance(v, (list, tuple)):
+                if len(v) == 1:
+                    v = v[0]
+                else:
+                    # For >1 band, drop metadata entirely (you can't use the data anyway).
+                    # Otherwise, coordinates would be a mess: both unpacked `eo:bands`
+                    # fields like `eo:bands_common_name`, and plain `eo:bands` which would
+                    # be None for all 1-band assets, and contain the dicts for multi-band
+                    # assets.
+                    continue
+            elif v is None:
+                continue
+
+        yield k, v

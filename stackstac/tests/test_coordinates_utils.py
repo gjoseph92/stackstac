@@ -10,8 +10,9 @@ from stackstac.coordinates_utils import (
     descalar_obj_array,
     scalar_sequence,
     unnest_dicts,
-    unnested_dict_items,
+    unnested_items,
     unpack_per_band_asset_fields,
+    unpacked_per_band_asset_fields,
 )
 
 
@@ -103,8 +104,8 @@ def test_unnest_dicts(input, expected):
         # ({"a": 1, "b": "foo"}, {"a": 1, "b": "foo"}),
     ],
 )
-def test_unnested_dict_items(input, expected):
-    assert list(unnested_dict_items(input)) == list(expected.items())
+def test_unnested_items(input, expected):
+    assert list(unnested_items(input)) == list(expected.items())
 
 
 jsons = st.recursive(
@@ -165,3 +166,41 @@ def test_unpack_per_band_asset_fields(input, fields, expected):
     result = unpack_per_band_asset_fields(input, fields)
     assert result is not input
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    "input, fields, expected",
+    [
+        # No fields
+        ({"a": None}, [], {"a": None}),
+        # `None` value is dropped
+        ({"a": None}, ["a"], {}),
+        # Not a sequence
+        ({"a": 1}, ["a"], {"a": 1}),
+        # Dropped: not 1-length
+        ({"a": []}, ["a"], {}),
+        # Unpacked: 1-length
+        ({"a": [1]}, ["a"], {"a": 1}),
+        # Dropped: not 1-length
+        ({"a": [1, 2]}, ["a"], {}),
+        # No fields match
+        ({"a": None}, ["b"], {"a": None}),
+        # No fields match
+        ({"a": [1]}, ["b"], {"a": [1]}),
+        # Unpacked: 1-length, with extraneous fields
+        ({"a": [1]}, ["a", "b"], {"a": 1}),
+        # Dropped: not 1-length, with extraneous fields
+        ({"a": [1, 2]}, ["a", "b"], {}),
+        # Multiple fields: unpacked, not sequence
+        ({"a": [1], "b": 2}, ["a", "b"], {"a": 1, "b": 2}),
+        # Multiple fields: unpacked, dropped
+        ({"a": [1], "b": ()}, ["a", "b"], {"a": 1}),
+        # Multiple fields: unpacked, not matched
+        ({"a": [1], "c": ()}, ["a", "b"], {"a": 1, "c": ()}),
+        # Multiple fields: unpacked, unpacked
+        ({"a": [1], "b": (2,)}, ["a", "b"], {"a": 1, "b": 2}),
+    ],
+)
+def test_unpacked_per_band_asset_fields(input, fields, expected):
+    result = list(unpacked_per_band_asset_fields(input.items(), fields))
+    assert result == list(expected.items())
