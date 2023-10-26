@@ -305,13 +305,13 @@ def items_to_band_coords_locality(
     items: ItemSequence,
     asset_ids: List[str],
 ) -> Coordinates:
+    fields = {}
     # {field:
     #   [
     #       [v_asset_0, v_asset_1, ...],  # item 0
     #       [v_asset_0, v_asset_1, ...],  # item 1
     #   ]
     # }
-    fields = {}
     for ii, item in enumerate(items):
         for ai, id in enumerate(asset_ids):
             try:
@@ -325,14 +325,42 @@ def items_to_band_coords_locality(
                 try:
                     values = fields[field]
                 except KeyError:
-                    values = fields[field] = np.empty(
-                        (len(items), len(asset_ids)), dtype=object
+                    # Haven't seen this field before, so create the array of its values.
+                    # We guess whether the dtype will be numeric, or str/object, based
+                    # on this first value.
+                    if isinstance(value, (int, float)):
+                        dtype = float
+                        fill = np.nan
+                        # NOTE: we don't use int64, even for ints, because there'd be no
+                        # way to represent missing values. Using pandas nullable arrays
+                        # could be interesting at some point.
+                    else:
+                        dtype = object
+                        fill = None
+
+                    values = fields[field] = np.full(
+                        (len(items), len(asset_ids)), fill, dtype=dtype
                     )
 
-                values[ii, ai] = value
+                try:
+                    values[ii, ai] = value
+                except (TypeError, ValueError):
+                    # If our dtype guess was wrong, or a field has values of multiple types,
+                    # promote the whole array to a more generic dtype.
+                    # A `ValueError` might be "could not convert string to float".
+                    # (so if there did happen to be string values that could be parsed as numbers,
+                    # we'd do that, which is probably ok?)
+                    try:
+                        new_dtype = np.result_type(value, values)
+                    except TypeError:
+                        # Thrown when "no common DType exists for the given inputs.
+                        # For example they cannot be stored in a single array unless the
+                        # dtype is `object`"
+                        new_dtype = object
 
-    # TODO un-object-ify each field
-    fields = {field: np.array(arr.tolist()) for field, arr in fields.items()}
+                    values = fields[field] = values.astype(new_dtype)
+                    values[ii, ai] = value
+
     deduped = {field: deduplicate_axes(arr) for field, arr in fields.items()}
 
     return {

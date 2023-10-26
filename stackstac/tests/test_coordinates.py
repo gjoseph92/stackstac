@@ -30,12 +30,10 @@ def test_band_coords(landsat_c2_l2_json):
     assert isinstance(type, xr.Variable)
     assert type.shape == ()
     assert type.item() == "image/tiff; application=geotiff; profile=cloud-optimized"
-    assert np.issubdtype(type.dtype, str)  # shouldn't be `O`, should be `U56`
 
     # 1D coordinate along bands
     title = coords["title"]
     assert isinstance(title, xr.Variable)
-    assert np.issubdtype(title.dtype, str)  # also shouldn't be `O`
     assert (
         title
         == [
@@ -80,7 +78,7 @@ def test_band_coords(landsat_c2_l2_json):
     common_name = coords["eo:bands_common_name"]
     assert isinstance(common_name, xr.Variable)
     assert common_name.dims == ("band",)
-    assert (common_name == ['red', 'green', None, None]).all()
+    assert (common_name == ["red", "green", None, None]).all()
 
     # `raster:bands` is also unpacked
     assert "raster:bands" not in coords
@@ -106,13 +104,81 @@ def test_band_coords(landsat_c2_l2_json):
     assert all([isinstance(c, dict) for c in c2])
 
 
+def test_band_coords_type_promotion():
+    stac = [
+        {
+            "assets": {
+                "foo": {
+                    "complex_field": 0,
+                    "numeric": 0,
+                    "mixed_numeric_object": 0,
+                    "mixed_numeric_str": 0,
+                }
+            }
+        },
+        {
+            "assets": {
+                "foo": {
+                    "complex_field": 2 - 4.0j,
+                    "numeric": None,
+                    "mixed_numeric_object": [],
+                    "mixed_numeric_str": "baz",
+                    "partially_missing_str": "woof",
+                    "partially_missing_numeric": -1,
+                    "partially_missing_object": {},
+                }
+            }
+        },
+    ]
+    coords = items_to_band_coords_locality(stac, ["foo"])
+
+    complex = coords["complex_field"]
+    assert isinstance(complex, xr.Variable)
+    assert complex.dtype.kind == "c"
+    assert (complex == [0, 2 - 4.0j]).all()
+
+    numeric = coords["numeric"]
+    assert isinstance(numeric, xr.Variable)
+    assert numeric.dtype == np.dtype(float)
+    assert numeric[0] == 0
+    assert np.isnan(numeric[1])
+
+    mixed_numeric_object = coords["mixed_numeric_object"]
+    assert isinstance(mixed_numeric_object, xr.Variable)
+    assert mixed_numeric_object.dtype == np.dtype(object)
+    assert (mixed_numeric_object == [0, []]).all()
+
+    mixed_numeric_str = coords["mixed_numeric_str"]
+    assert isinstance(mixed_numeric_str, xr.Variable)
+    assert mixed_numeric_str.dtype == np.dtype(object)
+    assert (mixed_numeric_str == np.array([0.0, "baz"], dtype=object)).all()
+    # ^ without explicitly specifying `dtype=object`, NumPy would weirdly have
+    # turned our list into a string array (`<U32`), which would fail equality.
+
+    partially_missing_str = coords["partially_missing_str"]
+    assert isinstance(partially_missing_str, xr.Variable)
+    assert partially_missing_str.dtype == np.dtype(object)
+    assert (partially_missing_str == [None, "woof"]).all()
+
+    partially_missing_numeric = coords["partially_missing_numeric"]
+    assert isinstance(partially_missing_numeric, xr.Variable)
+    assert partially_missing_numeric.dtype == np.dtype(float)
+    assert np.isnan(partially_missing_numeric[0])
+    assert partially_missing_numeric[1] == -1
+
+    partially_missing_object = coords["partially_missing_object"]
+    assert isinstance(partially_missing_object, xr.Variable)
+    assert partially_missing_object.dtype == np.dtype(object)
+    assert (partially_missing_object == [None, {}]).all()
+
+
 @pytest.mark.parametrize(
     "func",
     [
         items_to_band_coords,
         items_to_band_coords2,
         items_to_band_coords_simple,
-        items_to_band_coords_locality
+        items_to_band_coords_locality,
     ],
 )
 def test_benchmark_band_coords(func, landsat_c2_l2_json, benchmark):
