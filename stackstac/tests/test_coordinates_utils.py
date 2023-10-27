@@ -8,6 +8,7 @@ from hypothesis import given
 from stackstac.coordinates_utils import (
     deduplicate_axes,
     descalar_obj_array,
+    items_to_coords,
     scalar_sequence,
     unnested_items,
     unpacked_per_band_asset_fields,
@@ -134,3 +135,174 @@ def test_scalar_sequence_roundtrip(x):
 def test_unpacked_per_band_asset_fields(input, fields, expected):
     result = list(unpacked_per_band_asset_fields(input.items(), fields))
     assert result == list(expected.items())
+
+
+def test_items_to_coords_3d():
+    data = [
+        {
+            "smallsat": {
+                "red": {
+                    "type": "geotiff",
+                    "desc": "red-ish",
+                    "resolution": 15,
+                    "id": "smallsat-red-00",
+                    "cloud_fraction": 0.2,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "desc": "near infrared",
+                    "resolution": 30,
+                    "id": "smallsat-nir-00",
+                    "cloud_fraction": 0.2,
+                },
+            },
+            "bigsat": {
+                "red": {
+                    "type": "geotiff",
+                    "desc": "red-ish",
+                    "resolution": 5,
+                    "id": "bigsat-red-00",
+                    "cloud_fraction": 0.1,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "desc": "near infrared",
+                    "resolution": 10,
+                    "id": "bigsat-nir-00",
+                    "cloud_fraction": 0.1,
+                },
+                "cloud": {
+                    "type": "geotiff",
+                    "desc": "cloud mask",
+                    "id": "bigsat-cloud-00",
+                },
+            },
+        },
+        {
+            "smallsat": {
+                "red": {
+                    "type": "geotiff",
+                    "desc": "red-ish",
+                    "resolution": 15,
+                    "id": "smallsat-red-01",
+                    "cloud_fraction": 0.6,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "desc": "near infrared",
+                    "resolution": 30,
+                    "id": "smallsat-nir-01",
+                    "cloud_fraction": 0.6,
+                },
+            },
+            "bigsat": {
+                "red": {
+                    "type": "geotiff",
+                    "desc": "red-ish",
+                    "resolution": 5,
+                    "id": "bigsat-red-01",
+                    "cloud_fraction": 0.3,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "desc": "near infrared",
+                    "resolution": 10,
+                    "id": "bigsat-nir-01",
+                    "cloud_fraction": 0.3,
+                },
+                "cloud": {
+                    "type": "geotiff",
+                    "desc": "cloud mask",
+                    "id": "bigsat-cloud-01",
+                },
+            },
+        },
+        {
+            "smallsat": {
+                "red": {
+                    "type": "geotiff",
+                    "desc": "red-ish",
+                    "resolution": 15,
+                    "id": "smallsat-red-02",
+                    "cloud_fraction": 0.0,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "desc": "near infrared",
+                    "resolution": 30,
+                    "id": "smallsat-nir-02",
+                    "cloud_fraction": 0.0,
+                },
+            },
+            "bigsat": {
+                "red": {
+                    "type": "geotiff",
+                    "desc": "red-ish",
+                    "resolution": 5,
+                    "id": "bigsat-red-02",
+                    "cloud_fraction": 0.0,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "desc": "near infrared",
+                    "resolution": 10,
+                    "id": "bigsat-nir-02",
+                    "cloud_fraction": 0.0,
+                },
+                "cloud": {
+                    "type": "geotiff",
+                    "desc": "cloud mask",
+                    "id": "bigsat-cloud-02",
+                },
+            },
+        },
+    ]
+
+    coords = items_to_coords(
+        (
+            ((i, j, k), field, value)
+            for i, item in enumerate(data)
+            for j, (sat_key, assets) in enumerate(item.items())
+            for k, (asset_id, asset) in enumerate(assets.items())
+            for field, value in asset.items()
+        ),
+        shape=(len(data), 2, 3),
+        dims=("time", "platform", "band"),
+    )
+
+    assert coords.keys() == {"type", "desc", "resolution", "id", "cloud_fraction"}
+
+    ids = coords["id"]
+    assert ids.dims == ("time", "platform", "band")
+    assert ids.shape == (len(data), 2, 3)
+    assert ids[0, 0, 0] == "smallsat-red-00"
+    assert ids[-1, -1, -1] == "bigsat-cloud-02"
+
+    desc = coords["desc"]
+    assert desc.dims == ("platform", "band")
+    assert (
+        desc
+        == [
+            ["red-ish", "near infrared", None],
+            ["red-ish", "near infrared", "cloud mask"],
+        ]
+    ).all()
+
+    # TODO handle NaNs while deduplicating
+
+    # resolution = coords["resolution"]
+    # assert resolution.dims == ("platform", "band")
+    # assert (resolution == [[15, 30], [5, 10]]).all()
+
+    # TODO because there's no cloud mask band for smallsat,
+    # it's None, which I suppose is correct/fair, but slightly annoying.
+
+    # type_ = coords["type"]
+    # assert type_.dims == ()
+    # assert type_ == "geotiff"
+
+    # TODO handle NaNs while deduplicating
+
+    # cloud_fraction = coords["cloud_fraction"]
+    # assert cloud_fraction.dims == ("time", "platform")
+    # assert (cloud_fraction == [[0.2, 0.1], [0.6, 0.3], [0.0, 0.0]]).all()

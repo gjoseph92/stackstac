@@ -14,7 +14,7 @@ def items_to_coords(
     *,
     shape: tuple[int, ...],
     dims: tuple[str, ...],
-) -> Coordinates:
+) -> dict[str, xr.Variable]:
     assert len(shape) == len(
         dims
     ), f"{shape=} has {len(shape)} dimensions; {dims=} has {len(dims)}"
@@ -74,6 +74,7 @@ def items_to_coords(
 
 def deduplicate_axes(arr: np.ndarray) -> np.ndarray:
     "Flatten dimensions to length 1 where all values are duplicated"
+    # TODO: handle NaNs
     if arr.size <= 1:
         return arr
     for axis in range(arr.ndim):
