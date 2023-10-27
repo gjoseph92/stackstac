@@ -88,46 +88,6 @@ def deduplicate_axes(arr: np.ndarray) -> np.ndarray:
     return arr
 
 
-def unnest_dicts(item, prefix=(), sep="_"):
-    """
-    Flatten nested dicts, prefixing sub-keys with the name of their parent key.
-
-    Example
-    -------
-    >>> unnest_dicts({
-    ...     "foo": 1,
-    ...     "bar": {
-    ...         "a": 2,
-    ...         "foo": 3,
-    ...     },
-    ... })
-    {
-        "foo": 1,
-        "bar_a": 2,
-        "bar_foo": 3,
-    }
-    """
-    if isinstance(item, dict):
-        result = {}
-        for k, v in item.items():
-            sub_prefix = prefix + (k,)
-            unnested = unnest_dicts(v, prefix=sub_prefix, sep=sep)
-            if isinstance(unnested, dict):
-                result.update(unnested)
-            else:
-                result[sep.join(sub_prefix)] = unnested
-        return result
-
-    # Note that we don't descend into lists/tuples. For the purposes of STAC metadata,
-    # there'd be no reason to do this: we're not going to make an xarray coordinate like
-    # `classification:bitfields_0_name`, `classification:bitfields_0_fill`, ...,
-    # `classification:bitfields_8_name`, `classification:bitfields_8_fill`
-    # and unpack a separate coordinate for every field in a sequence. Rather, we rely on
-    # `scalar_sequence` to preserve anything that's a sequence into a single coordinate.
-
-    return item
-
-
 VT = TypeVar("VT")
 
 
@@ -224,39 +184,6 @@ def descalar_obj_array(arr: np.ndarray) -> np.ndarray:
         if isinstance(x, np.ndarray) and x.shape == ():
             arr[idx] = x.item()
     return arr
-
-
-def unpack_per_band_asset_fields(asset: dict, fields: Iterable) -> dict:
-    """
-    Unpack 1-length list/tuple values for the given ``fields``.
-
-    For keys of ``asset`` in ``fields``, if the value is a 1-length
-    list or tuple, use its single value. Otherwise, use an empty dict.
-    """
-    # NOTE: this will have to change a lot when we support multi-band assets;
-    # this is predicated on each asset having exactly 1 band.
-    asset = asset.copy()
-    # ^ modifying in-place would be nicer, but user may have passed in
-    # their own dict of STAC items.
-    for field in fields:
-        try:
-            v = asset[field]
-        except KeyError:
-            continue
-        if isinstance(v, (list, tuple)):
-            if len(v) == 1:
-                asset[field] = v[0]
-            else:
-                # For >1 band, drop metadata entirely (you can't use the data anyway).
-                # Otherwise, coordinates would be a mess: both unpacked `eo:bands`
-                # fields like `eo:bands_common_name`, and plain `eo:bands` which would
-                # be None for all 1-band assets, and contain the dicts for multi-band
-                # assets.
-                v = None
-
-        if v is None:
-            del asset[field]
-    return asset
 
 
 def unpacked_per_band_asset_fields(

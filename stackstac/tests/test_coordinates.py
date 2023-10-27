@@ -6,8 +6,6 @@ import numpy as np
 
 from stackstac.coordinates import (
     items_to_band_coords,
-    items_to_band_coords2,
-    items_to_band_coords_simple,
     items_to_band_coords_locality,
 )
 from stackstac.coordinates_utils import scalar_sequence
@@ -176,8 +174,6 @@ def test_band_coords_type_promotion():
     "func",
     [
         items_to_band_coords,
-        items_to_band_coords2,
-        items_to_band_coords_simple,
         items_to_band_coords_locality,
     ],
 )

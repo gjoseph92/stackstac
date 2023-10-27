@@ -8,13 +8,8 @@ import xarray as xr
 
 from stackstac.coordinates_utils import (
     Coordinates,
-    deduplicate_axes,
-    descalar_obj_array,
     items_to_coords,
-    scalar_sequence,
-    unnest_dicts,
     unnested_items,
-    unpack_per_band_asset_fields,
     unpacked_per_band_asset_fields,
 )
 
@@ -104,10 +99,10 @@ def to_coords(
         coords["y"] = ys
 
     if properties:
-        coords.update(items_to_property_coords(items, properties))
+        coords.update(items_to_property_coords_locality(items, properties))
 
     if band_coords:
-        coords.update(items_to_band_coords2(items, asset_ids))
+        coords.update(items_to_band_coords_locality(items, asset_ids))
 
     # Add `epsg` last in case it's also a field in properties; our data model assumes it's a coordinate
     coords["epsg"] = spec.epsg
@@ -172,134 +167,6 @@ def items_to_band_coords(
             )
         )
     return coords
-
-
-# TODO
-def items_to_property_coords2(
-    items: ItemSequence, properties: Union[str, Sequence[str], Literal[True]]
-) -> Coordinates:
-    # How to factor out into shared code?
-    # TODO use `properties` arg
-
-    unnested_props = [unnest_dicts(item["properties"]) for item in items]
-    all_fields = set().union(*(p.keys() for p in unnested_props))
-
-    coords_arrs = {
-        field: descalar_obj_array(
-            np.array([scalar_sequence(prop.get(field)) for prop in unnested_props])
-        )
-        for field in all_fields
-    }
-
-    deduped = {field: deduplicate_axes(arr) for field, arr in coords_arrs.items()}
-
-    return {
-        field: xr.Variable(["time"], arr).squeeze() for field, arr in deduped.items()
-    }
-
-
-def items_to_band_coords2(
-    items: ItemSequence,
-    asset_ids: List[str],
-) -> Coordinates:
-
-    unnested_assets = [
-        {
-            k: unnest_dicts(unpack_per_band_asset_fields(v, PER_BAND_ASSET_FIELDS))
-            for k, v in item["assets"].items()
-            if k in asset_ids
-        }
-        for item in items
-    ]
-    all_fields = sorted(
-        set().union(*(asset.keys() for ia in unnested_assets for asset in ia.values()))
-    )
-
-    # Building up arrays like:
-    # {
-    #     "field 0": np.array([
-    #         [  # item 0
-    #             value_for_asset_0, value_for_asset_1, ...
-    #         ],
-    #         [  # item 1
-    #             value_for_asset_0, value_for_asset_1, ...
-    #         ],
-    #         ...
-    #     ])
-    #     ...
-    # }
-    coords_arrs = {
-        field: descalar_obj_array(
-            np.array(
-                [
-                    [
-                        scalar_sequence(assets.get(id, {}).get(field))
-                        for id in asset_ids
-                        # desequence because if the field contains a list, we want to
-                        # treat that as though it's a scalar value.
-                    ]
-                    for assets in unnested_assets
-                ]
-            )
-        )
-        for field in all_fields
-    }
-
-    # # Maybe a way to improve locality and not iterate over all items many times.
-    # # TODO: benchmark
-    # coords_lists = collections.defaultdict(list)
-    # for assets in unnested_assets:
-    #     values = collections.defaultdict(list)
-    #     for id in asset_ids:
-    #         asset = assets.get(id, {})
-    #         for field in all_fields:
-    #             values[field].append(desequence(asset.get(field)))
-    #     for k, v in values.items():
-    #         coords_lists[k].append(v)
-
-    deduped = {field: deduplicate_axes(arr) for field, arr in coords_arrs.items()}
-
-    return {
-        field: xr.Variable(["time", "band"], arr).squeeze()
-        for field, arr in deduped.items()
-    }
-
-
-def items_to_band_coords_simple(
-    items: ItemSequence,
-    asset_ids: List[str],
-) -> Coordinates:
-    # Interestingly this is slightly faster in benchmarking than `items_to_band_coords2`
-    unnested_assets = [
-        {
-            k: unnest_dicts(unpack_per_band_asset_fields(v, PER_BAND_ASSET_FIELDS))
-            for k, v in item["assets"].items()
-            if k in asset_ids
-        }
-        for item in items
-    ]
-    all_fields = sorted(
-        set().union(*(asset.keys() for ia in unnested_assets for asset in ia.values()))
-    )
-
-    asset_arr = [
-        [[ia.get(aid, {}).get(f) for f in all_fields] for aid in asset_ids]
-        for ia in unnested_assets
-    ]
-    da = xr.DataArray(
-        asset_arr,
-        coords={
-            "band": asset_ids,
-            "field": all_fields,
-        },
-        dims=["time", "band", "field"],
-    )
-    ds = da.to_dataset("field")
-    ds = ds.map(
-        # TODO better way?
-        lambda da: xr.DataArray(deduplicate_axes(da.data), dims=da.dims).squeeze()
-    )
-    return ds.variables
 
 
 def items_to_band_coords_locality(
