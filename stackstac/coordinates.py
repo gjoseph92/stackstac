@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Mapping, Sequence, Tuple, Union
+from typing import Any, Dict, List, Literal, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from stackstac.coordinates_utils import (
+    Coordinates,
     deduplicate_axes,
     descalar_obj_array,
+    items_to_coords,
     scalar_sequence,
     unnest_dicts,
     unnested_items,
@@ -23,7 +25,6 @@ from .stac_types import ItemSequence
 ASSET_TABLE_DT = np.dtype(
     [("url", object), ("bounds", "float64", 4), ("scale_offset", "float64", 2)]
 )
-Coordinates = Mapping[str, Union[pd.Index, np.ndarray, xr.Variable, list]]
 
 # Asset fields which are a list with one item per band in the asset.
 # For one-band assets, they should be a list of length 1.
@@ -305,68 +306,40 @@ def items_to_band_coords_locality(
     items: ItemSequence,
     asset_ids: List[str],
 ) -> Coordinates:
-    fields = {}
-    # {field:
-    #   [
-    #       [v_asset_0, v_asset_1, ...],  # item 0
-    #       [v_asset_0, v_asset_1, ...],  # item 1
-    #   ]
-    # }
-    for ii, item in enumerate(items):
-        for ai, id in enumerate(asset_ids):
-            try:
-                asset = item["assets"][id]
-            except KeyError:
-                continue
-
-            for field, value in unnested_items(
-                unpacked_per_band_asset_fields(asset.items(), PER_BAND_ASSET_FIELDS)
-            ):
+    def fields_values_generator():
+        for ii, item in enumerate(items):
+            for ai, id in enumerate(asset_ids):
                 try:
-                    values = fields[field]
+                    asset = item["assets"][id]
                 except KeyError:
-                    # Haven't seen this field before, so create the array of its values.
-                    # We guess whether the dtype will be numeric, or str/object, based
-                    # on this first value.
-                    if isinstance(value, (int, float)):
-                        dtype = float
-                        fill = np.nan
-                        # NOTE: we don't use int64, even for ints, because there'd be no
-                        # way to represent missing values. Using pandas nullable arrays
-                        # could be interesting at some point.
-                    else:
-                        dtype = object
-                        fill = None
+                    continue
 
-                    values = fields[field] = np.full(
-                        (len(items), len(asset_ids)), fill, dtype=dtype
-                    )
+                for field, value in unnested_items(
+                    unpacked_per_band_asset_fields(asset.items(), PER_BAND_ASSET_FIELDS)
+                ):
+                    yield (ii, ai), field, value
 
-                try:
-                    values[ii, ai] = value
-                except (TypeError, ValueError):
-                    # If our dtype guess was wrong, or a field has values of multiple types,
-                    # promote the whole array to a more generic dtype.
-                    # A `ValueError` might be "could not convert string to float".
-                    # (so if there did happen to be string values that could be parsed as numbers,
-                    # we'd do that, which is probably ok?)
-                    try:
-                        new_dtype = np.result_type(value, values)
-                    except TypeError:
-                        # Thrown when "no common DType exists for the given inputs.
-                        # For example they cannot be stored in a single array unless the
-                        # dtype is `object`"
-                        new_dtype = object
+    return items_to_coords(
+        fields_values_generator(),
+        shape=(len(items), len(asset_ids)),
+        dims=("time", "band"),
+    )
 
-                    values = fields[field] = values.astype(new_dtype)
-                    values[ii, ai] = value
 
-    deduped = {field: deduplicate_axes(arr) for field, arr in fields.items()}
-
-    return {
-        field: xr.Variable(["time", "band"], arr).squeeze()
-        for field, arr in deduped.items()
-    }
+def items_to_property_coords_locality(
+    items: ItemSequence, properties: Union[str, Sequence[str], Literal[True]]
+) -> Coordinates:
+    assert properties is True
+    return items_to_coords(
+        (
+            ((i,), k, v)
+            for i, item in enumerate(items)
+            # TODO: should we unnest items?
+            for k, v in item["properties"].items()
+        ),
+        shape=(len(items),),
+        dims=("time",),
+    )
 
 
 def spec_to_attrs(spec: RasterSpec) -> Dict[str, Any]:

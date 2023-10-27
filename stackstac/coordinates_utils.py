@@ -1,8 +1,75 @@
 from __future__ import annotations
 
-from typing import Any, Container, Iterable, Iterator, TypeVar
+from typing import Any, Container, Iterable, Iterator, Mapping, TypeVar, Union
 
 import numpy as np
+import pandas as pd
+import xarray as xr
+
+Coordinates = Mapping[str, Union[pd.Index, np.ndarray, xr.Variable, list]]
+
+
+def items_to_coords(
+    items: Iterable[tuple[tuple[int, ...], str, object]],
+    *,
+    shape: tuple[int, ...],
+    dims: tuple[str, ...],
+) -> Coordinates:
+    assert len(shape) == len(
+        dims
+    ), f"{shape=} has {len(shape)} dimensions; {dims=} has {len(dims)}"
+
+    fields = {}
+    # {field:
+    #   [
+    #       [v_asset_0, v_asset_1, ...],  # item 0
+    #       [v_asset_0, v_asset_1, ...],  # item 1
+    #   ]
+    # }
+    for idx, field, value in items:
+        assert len(idx) == len(
+            shape
+        ), f"Expected {len(shape)}-dimensional index, got {idx}"
+        try:
+            values = fields[field]
+        except KeyError:
+            # Haven't seen this field before, so create the array of its values.
+            # We guess whether the dtype will be numeric, or str/object, based
+            # on this first value.
+            if isinstance(value, (int, float)):
+                dtype = float
+                fill = np.nan
+                # NOTE: we don't use int64, even for ints, because there'd be no
+                # way to represent missing values. Using pandas nullable arrays
+                # could be interesting at some point.
+            else:
+                dtype = object
+                fill = None
+
+            values = fields[field] = np.full(shape, fill, dtype=dtype)
+
+        try:
+            values[idx] = value
+        except (TypeError, ValueError):
+            # If our dtype guess was wrong, or a field has values of multiple types,
+            # promote the whole array to a more generic dtype.
+            # A `ValueError` might be "could not convert string to float".
+            # (so if there did happen to be string values that could be parsed as numbers,
+            # we'd do that, which is probably ok?)
+            try:
+                new_dtype = np.result_type(value, values)
+            except TypeError:
+                # Thrown when "no common DType exists for the given inputs.
+                # For example they cannot be stored in a single array unless the
+                # dtype is `object`"
+                new_dtype = object
+
+            values = fields[field] = values.astype(new_dtype)
+            values[idx] = value
+
+    deduped = {field: deduplicate_axes(arr) for field, arr in fields.items()}
+
+    return {field: xr.Variable(dims, arr).squeeze() for field, arr in deduped.items()}
 
 
 def deduplicate_axes(arr: np.ndarray) -> np.ndarray:
