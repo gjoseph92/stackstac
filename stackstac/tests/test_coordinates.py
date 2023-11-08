@@ -20,8 +20,10 @@ def landsat_c2_l2_json():
 def test_band_coords(landsat_c2_l2_json):
     ids = ["red", "green", "qa_pixel", "qa_radsat"]
     # coords = items_to_band_coords(landsat_c2_l2_json, ids)
-    coords = items_to_band_coords_locality(landsat_c2_l2_json, ids)
-    # print(coords)
+    coords = items_to_band_coords_locality(landsat_c2_l2_json, ids, skip_fields=set())
+
+    # Note that we intentionally keep some coordinates that would normally be dropped,
+    # since they're handy for testing
 
     # 0D coordinate
     type = coords["type"]

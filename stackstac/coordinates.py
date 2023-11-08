@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Sequence, Tuple, Union
+from typing import Any, Collection, Dict, List, Literal, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -129,7 +129,7 @@ def items_to_band_coords(
     flattened_metadata_by_asset = [
         accumulate_metadata.accumulate_metadata(
             (item["assets"].get(asset_id, {}) for item in items),
-            # skip_fields={"href", "type", "roles"},
+            skip_fields={"href", "type", "roles"},
         )
         for asset_id in asset_ids
     ]
@@ -172,6 +172,7 @@ def items_to_band_coords(
 def items_to_band_coords_locality(
     items: ItemSequence,
     asset_ids: List[str],
+    skip_fields: Collection[str] = frozenset(["href", "type"]),
 ) -> Coordinates:
     def fields_values_generator():
         for ii, item in enumerate(items):
@@ -184,7 +185,8 @@ def items_to_band_coords_locality(
                 for field, value in unnested_items(
                     unpacked_per_band_asset_fields(asset.items(), PER_BAND_ASSET_FIELDS)
                 ):
-                    yield (ii, ai), field, value
+                    if field not in skip_fields:
+                        yield (ii, ai), field, value
 
     return items_to_coords(
         fields_values_generator(),
@@ -194,15 +196,18 @@ def items_to_band_coords_locality(
 
 
 def items_to_property_coords_locality(
-    items: ItemSequence, properties: Union[str, Sequence[str], Literal[True]]
+    items: ItemSequence,
+    properties: Union[str, Sequence[str], Literal[True]],
+    skip_fields: Collection[str] = frozenset(["datetime", "id"]),
 ) -> Coordinates:
     assert properties is True
     return items_to_coords(
         (
             ((i,), k, v)
             for i, item in enumerate(items)
-            # TODO: should we unnest items?
+            # TODO: should we unnest properties?
             for k, v in item["properties"].items()
+            if k not in skip_fields
         ),
         shape=(len(items),),
         dims=("time",),
