@@ -15,6 +15,70 @@ def items_to_coords(
     shape: tuple[int, ...],
     dims: tuple[str, ...],
 ) -> dict[str, xr.Variable]:
+    """
+    Create coordinates from ``(index, field, value)`` tuples.
+
+    Say you want to make coordinates for a 2x2 DataArray with dimensions ``time, band``.
+    Your metadata might look like::
+
+        ((0, 0), "color", "red"),
+        ((0, 0), "day", "mon"),
+        ((0, 0), "href", "0/red"),
+
+        ((0, 1), "color", "green"),
+        ((0, 1), "day", "mon"),
+        ((0, 1), "href", "0/green"),
+
+        ((1, 0), "color", "red"),
+        ((1, 0), "day", "tues"),
+        ((1, 0), "href", "1/red"),
+
+        ((1, 1), "color", "green"),
+        ((1, 1), "day", "tues"),
+        # ((1, 1), "href", "1/green") skip this to see how missing values are handled
+
+    This would produce a dict of coordinates like::
+
+        {
+            "color": xr.Variable(
+                dims=["band"], data=["red", "green"],
+            ),
+            "day": xr.Variable(
+                dims=["time"], data=["mon", "tues"],
+            ),
+            "href": xr.Variable(
+                dims=["time", "band"],
+                data=[
+                    ["0/red", "0/green"],
+                    ["1/red", None],
+                ],
+            ),
+        }
+
+    Each ``item`` in the iterator gives the value for a particular field at a particular
+    coordinate in the array. Per field, those are combined and de-duplicated: you can
+    see how "color" only labels the "band" dimension, because it's the same across all
+    times; "day" only labels the time dimension, because it's the same across all bands,
+    and "href" labels both, because it varies across both dimensions.
+
+    Parameters
+    ----------
+    items:
+        Iterable of ``(index, field, value)`` tuples. ``index`` is a tuple of
+        integers for the position in the array that this item labels.
+        ``field`` is the name of a coordinate, and ``value`` is its value.
+    shape:
+        The shape of the data being labeled. If a coordinate covered all of the
+        dimensions, this is the shape it would have. Each ``index`` in ``items``
+        must be the same length (same number of dimensions) as ``shape``.
+    dims:
+        Dimension names corresponding to ``shape``. Must be the same length
+        as ``shape``.
+
+    Returns
+    -------
+    coords: dict of xarray Variables, one per unique ``field`` in the items.
+    """
     assert len(shape) == len(
         dims
     ), f"{shape=} has {len(shape)} dimensions; {dims=} has {len(dims)}"
