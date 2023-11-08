@@ -3,3 +3,4 @@ max-line-length = 120
 exclude =
     .pyi
     typings
+ignore = E203, W503
