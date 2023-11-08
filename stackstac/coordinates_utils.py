@@ -74,9 +74,16 @@ def items_to_coords(
 
 def deduplicate_axes(arr: np.ndarray) -> np.ndarray:
     "Flatten dimensions to length 1 where all values are duplicated"
-    # TODO: handle NaNs
+    if arr.dtype.kind in ("f", "c"):
+        arr_nan = np.isnan(arr)
+        return _nandeduplicate_axes(arr, arr_nan, np.where(arr_nan, True, arr))
+    return _deduplicate_axes(arr)
+
+
+def _deduplicate_axes(arr: np.ndarray) -> np.ndarray:
     if arr.size <= 1:
         return arr
+
     for axis in range(arr.ndim):
         if arr.shape[axis] <= 1:
             continue
@@ -86,6 +93,29 @@ def deduplicate_axes(arr: np.ndarray) -> np.ndarray:
         allsame = (arr == first).all(axis=axis)
         if allsame.all():
             return deduplicate_axes(first)
+    return arr
+
+
+def _nandeduplicate_axes(
+    arr: np.ndarray, arr_nan: np.ndarray, arr_filled: np.ndarray
+) -> np.ndarray:
+    if arr.size <= 1:
+        return arr
+
+    for axis in range(arr.ndim):
+        if arr.shape[axis] <= 1:
+            continue
+        first_nan = arr_nan.take([0], axis=axis)
+        first_filled = arr_filled.take([0], axis=axis)
+        # ^ note `[0]` instead of `0`: that keeps the dimension
+        # as length 1 instead of dropping it
+        allsame = (arr_filled == first_filled).all(axis=axis) & (
+            arr_nan == first_nan
+        ).all(axis=axis)
+        if allsame.all():
+            return _nandeduplicate_axes(
+                arr.take([0], axis=axis), first_nan, first_filled
+            )
     return arr
 
 

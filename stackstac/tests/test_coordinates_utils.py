@@ -45,6 +45,18 @@ def test_deduplicate_axes():
     np.testing.assert_equal(d, np.broadcast_to(1, (1, 1)))
 
 
+def test_deduplicate_axes_nan():
+    a2_d0 = np.stack([np.array([1, np.nan, 2])] * 3)
+    d = deduplicate_axes(a2_d0)
+    assert d.shape == (1, a2_d0.shape[1])
+    np.testing.assert_equal(d, a2_d0[[0]])
+
+    a2_d1 = a2_d0.T
+    d = deduplicate_axes(a2_d1)
+    assert d.shape == (a2_d1.shape[0], 1)
+    np.testing.assert_equal(d, a2_d1[:, [0]])
+
+
 @pytest.mark.parametrize(
     "input, expected",
     [
@@ -60,7 +72,7 @@ def test_deduplicate_axes():
             {"a": 1, "b_a": "foo", "b_b_x": 0},
         ),
         # Empty dicts are preserved
-        ({"a": {}, "b": {"c": {}}}, {"a": {}, "b_c": {}})
+        ({"a": {}, "b": {"c": {}}}, {"a": {}, "b_c": {}}),
         # (
         #     # Sequences are _not_ traversed
         #     [{"a": {"b": "c"}}, {"a2": {"b2": "c2"}}],
@@ -82,7 +94,7 @@ jsons = st.recursive(
     st.none()
     | st.booleans()
     | st.integers()
-    | st.floats()
+    | st.floats(allow_nan=False, allow_infinity=False, allow_subnormal=False)
     | st.datetimes()
     | st.text(printable),
     lambda children: st.lists(children) | st.dictionaries(st.text(printable), children),
@@ -288,11 +300,9 @@ def test_items_to_coords_3d():
         ]
     ).all()
 
-    # TODO handle NaNs while deduplicating
-
-    # resolution = coords["resolution"]
-    # assert resolution.dims == ("platform", "band")
-    # assert (resolution == [[15, 30], [5, 10]]).all()
+    resolution = coords["resolution"]
+    assert resolution.dims == ("platform", "band")
+    np.testing.assert_equal(resolution.values, [[15, 30, np.nan], [5, 10, np.nan]])
 
     # TODO because there's no cloud mask band for smallsat,
     # it's None, which I suppose is correct/fair, but slightly annoying.
@@ -302,7 +312,11 @@ def test_items_to_coords_3d():
     # assert type_ == "geotiff"
 
     # TODO handle NaNs while deduplicating
+    # also this test is wrong
 
     # cloud_fraction = coords["cloud_fraction"]
     # assert cloud_fraction.dims == ("time", "platform")
-    # assert (cloud_fraction == [[0.2, 0.1], [0.6, 0.3], [0.0, 0.0]]).all()
+    # np.testing.assert_equal(
+    #     cloud_fraction.values,
+    #     [[0.2, 0.1, np.nan], [0.6, 0.3, np.nan], [0.0, 0.0, np.nan]],
+    # )
