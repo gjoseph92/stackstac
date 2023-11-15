@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import AbstractSet, List, Literal, Optional, Sequence, Tuple, Type, Union
+from typing import AbstractSet, List, Literal, Optional, Tuple, Type, Union
 
 import numpy as np
 import xarray as xr
-import dask
+import dask.base
 from rasterio import RasterioIOError
 from rasterio.enums import Resampling
 
@@ -15,19 +15,14 @@ from .reader_protocol import Reader
 from .rio_env import LayeredEnv
 from .rio_reader import AutoParallelRioReader
 from .stac_types import (
-    ItemCollectionIsh,
-    ItemIsh,
-    PystacItem,
-    SatstacItem,
+    ItemsIsh,
     items_to_plain,
 )
 from .to_dask import items_to_dask, ChunksParam
 
 
 def stack(
-    items: Union[
-        ItemCollectionIsh, ItemIsh, Sequence[PystacItem], Sequence[SatstacItem]
-    ],
+    items: ItemsIsh,
     assets: Optional[Union[List[str], AbstractSet[str]]] = frozenset(
         ["image/tiff", "image/x.geotiff", "image/vnd.stac.geotiff", "image/jp2"]
     ),
