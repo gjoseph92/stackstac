@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Collection, Dict, List, Literal, Sequence, Tuple, Union
+from typing import Any, Collection, Dict, List, Literal, Tuple
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,6 @@ from stackstac.coordinates_utils import (
     unpacked_per_band_asset_fields,
 )
 
-from . import accumulate_metadata
 from .raster_spec import RasterSpec
 from .stac_types import ItemSequence
 
@@ -37,10 +36,9 @@ def to_coords(
     asset_ids: List[str],
     spec: RasterSpec,
     xy_coords: Literal["center", "topleft", False] = "topleft",
-    properties: Union[bool, str, Sequence[str]] = True,
+    properties: bool = True,
     band_coords: bool = True,
 ) -> Tuple[Coordinates, List[str]]:
-
     times = pd.to_datetime(
         [item["properties"]["datetime"] for item in items],
         infer_datetime_format=True,
@@ -99,10 +97,15 @@ def to_coords(
         coords["y"] = ys
 
     if properties:
-        coords.update(items_to_property_coords_locality(items, properties))
+        assert properties is True, (
+            "Passing specific properties is no longer supported. "
+            "The `properties` argument must only be True or False. "
+            "If you have a use case for this, please open an issue."
+        )
+        coords.update(items_to_property_coords(items))
 
     if band_coords:
-        coords.update(items_to_band_coords_locality(items, asset_ids))
+        coords.update(items_to_band_coords(items, asset_ids))
 
     # Add `epsg` last in case it's also a field in properties; our data model assumes it's a coordinate
     coords["epsg"] = spec.epsg
@@ -111,65 +114,23 @@ def to_coords(
 
 
 def items_to_property_coords(
-    items: ItemSequence, properties: Union[str, Sequence[str], Literal[True]]
+    items: ItemSequence,
+    skip_fields: Collection[str] = frozenset(["datetime", "id"]),
 ) -> Coordinates:
-    return accumulate_metadata.metadata_to_coords(
-        (item["properties"] for item in items),
-        "time",
-        fields=properties,
-        skip_fields={"datetime"},
-        # skip_fields={"datetime", "providers"},
+    return items_to_coords(
+        (
+            ((i,), k, v)
+            for i, item in enumerate(items)
+            # TODO: should we unnest properties?
+            for k, v in item["properties"].items()
+            if k not in skip_fields
+        ),
+        shape=(len(items),),
+        dims=("time",),
     )
 
 
 def items_to_band_coords(
-    items: ItemSequence,
-    asset_ids: List[str],
-) -> Coordinates:
-    flattened_metadata_by_asset = [
-        accumulate_metadata.accumulate_metadata(
-            (item["assets"].get(asset_id, {}) for item in items),
-            skip_fields={"href", "type", "roles"},
-        )
-        for asset_id in asset_ids
-    ]
-
-    eo_by_asset = []
-    for meta in flattened_metadata_by_asset:
-        # NOTE: we look for `eo:bands` in each Asset's metadata, not as an Item-level list.
-        # This only became available in STAC 1.0.0-beta.1, so we'll fail on older collections.
-        # See https://github.com/radiantearth/stac-spec/tree/master/extensions/eo#item-fields
-        eo = meta.pop("eo:bands", {})
-        if isinstance(eo, list):
-            eo = eo[0] if len(eo) == 1 else {}
-            # ^ `eo:bands` should be a list when present, but >1 item means it's probably a multi-band asset,
-            # which we can't currently handle, so we ignore it. we don't error here, because
-            # as long as you don't actually _use_ that asset, everything will be fine. we could
-            # warn, but that would probably just get annoying.
-        eo_by_asset.append(eo)
-        try:
-            meta["polarization"] = meta.pop("sar:polarizations")
-        except KeyError:
-            pass
-
-    coords = accumulate_metadata.metadata_to_coords(
-        flattened_metadata_by_asset,
-        "band",
-        # skip_fields={"href"},
-        # skip_fields={"href", "title", "description", "type", "roles"},
-    )
-    if any(eo_by_asset):
-        coords.update(
-            accumulate_metadata.metadata_to_coords(
-                eo_by_asset,
-                "band",
-                fields=["common_name", "center_wavelength", "full_width_half_max"],
-            )
-        )
-    return coords
-
-
-def items_to_band_coords_locality(
     items: ItemSequence,
     asset_ids: List[str],
     skip_fields: Collection[str] = frozenset(["href", "type"]),
@@ -206,25 +167,6 @@ def rename_some_band_fields(field: str) -> str:
     if field == "sar:polarizations":
         return "polarization"
     return field.removeprefix("eo:bands_")
-
-
-def items_to_property_coords_locality(
-    items: ItemSequence,
-    properties: Union[str, Sequence[str], Literal[True]],
-    skip_fields: Collection[str] = frozenset(["datetime", "id"]),
-) -> Coordinates:
-    assert properties is True
-    return items_to_coords(
-        (
-            ((i,), k, v)
-            for i, item in enumerate(items)
-            # TODO: should we unnest properties?
-            for k, v in item["properties"].items()
-            if k not in skip_fields
-        ),
-        shape=(len(items),),
-        dims=("time",),
-    )
 
 
 def spec_to_attrs(spec: RasterSpec) -> Dict[str, Any]:

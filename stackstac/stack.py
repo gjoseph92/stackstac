@@ -43,7 +43,7 @@ def stack(
     rescale: bool = True,
     sortby_date: Literal["asc", "desc", False] = "asc",
     xy_coords: Literal["center", "topleft", False] = "topleft",
-    properties: Union[bool, str, Sequence[str]] = True,
+    properties: bool = True,
     band_coords: bool = True,
     gdal_env: Optional[LayeredEnv] = None,
     errors_as_nodata: Tuple[Exception, ...] = (
@@ -229,18 +229,14 @@ def stack(
         If False, ``x`` and ``y`` will just be indexed by row/column numbers, saving a small amount of time
         and local memory.
     properties:
-        Which fields from each STAC Item's ``properties`` to add as coordinates to the DataArray, indexing the "time"
-        dimension.
+        Whether to use each STAC Item's ``properties`` as coordinates for the DataArray, indexing the "time" dimension.
 
-        If None (default), all properties will be used. If a string or sequence of strings, only those fields
-        will be used. For each Item missing a particular field, its value for that Item will be None.
-
-        If False, no properties will be added.
+        If False, only ``time`` and ``id`` will be added.
     band_coords:
         Whether to include Asset-level metadata as coordinates for the ``bands`` dimension.
 
-        If True (default), for each asset ID, the field(s) that have the same value across all Items
-        will be added as coordinates.
+        Fields that have the same value across all Assets in an Item, or all Items, will be
+        deduplicated and collapsed down as appropriate.
 
         The ``eo:bands`` field is also unpacked if present, and ``sar:polarizations`` is renamed to
         ``polarization`` for convenience.

@@ -6,7 +6,7 @@ import numpy as np
 
 from stackstac.coordinates import (
     items_to_band_coords,
-    items_to_band_coords_locality,
+    items_to_band_coords,
     rename_some_band_fields,
 )
 from stackstac.coordinates_utils import scalar_sequence
@@ -21,7 +21,7 @@ def landsat_c2_l2_json():
 def test_band_coords(landsat_c2_l2_json):
     ids = ["red", "green", "qa_pixel", "qa_radsat"]
     # coords = items_to_band_coords(landsat_c2_l2_json, ids)
-    coords = items_to_band_coords_locality(landsat_c2_l2_json, ids, skip_fields=set())
+    coords = items_to_band_coords(landsat_c2_l2_json, ids, skip_fields=set())
 
     # Note that we intentionally keep some coordinates that would normally be dropped,
     # since they're handy for testing
@@ -133,7 +133,7 @@ def test_band_coords_type_promotion():
             }
         },
     ]
-    coords = items_to_band_coords_locality(stac, ["foo"])
+    coords = items_to_band_coords(stac, ["foo"])
 
     complex = coords["complex_field"]
     assert isinstance(complex, xr.Variable)
@@ -192,34 +192,3 @@ def test_band_coords_type_promotion():
 )
 def test_rename_band_fields(input: str, expected: str):
     assert rename_some_band_fields(input) == expected
-
-
-@pytest.mark.parametrize(
-    "func",
-    [
-        items_to_band_coords,
-        items_to_band_coords_locality,
-    ],
-)
-def test_benchmark_band_coords(func, landsat_c2_l2_json, benchmark):
-    ids = [
-        "ang",
-        "red",
-        "blue",
-        "green",
-        "nir08",
-        "swir16",
-        "swir22",
-        "coastal",
-        "mtl.txt",
-        "mtl.xml",
-        "mtl.json",
-        "qa_pixel",
-        "qa_radsat",
-        "qa_aerosol",
-        "tilejson",
-        "rendered_preview",
-    ]
-    bigger = landsat_c2_l2_json * 10  # 200 items
-    benchmark(func, bigger, ids)
-    # print(benchmark.stats)
