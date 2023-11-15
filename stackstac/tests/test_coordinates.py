@@ -6,7 +6,6 @@ import numpy as np
 
 from stackstac.coordinates import (
     items_to_band_coords,
-    items_to_band_coords,
     rename_some_band_fields,
 )
 from stackstac.coordinates_utils import scalar_sequence
@@ -20,7 +19,6 @@ def landsat_c2_l2_json():
 
 def test_band_coords(landsat_c2_l2_json):
     ids = ["red", "green", "qa_pixel", "qa_radsat"]
-    # coords = items_to_band_coords(landsat_c2_l2_json, ids)
     coords = items_to_band_coords(landsat_c2_l2_json, ids, skip_fields=set())
 
     # Note that we intentionally keep some coordinates that would normally be dropped,
@@ -30,20 +28,22 @@ def test_band_coords(landsat_c2_l2_json):
     type = coords["type"]
     assert isinstance(type, xr.Variable)
     assert type.shape == ()
-    assert type.item() == "image/tiff; application=geotiff; profile=cloud-optimized"
+    assert (
+        type.values.item() == "image/tiff; application=geotiff; profile=cloud-optimized"
+    )
 
     # 1D coordinate along bands
     title = coords["title"]
     assert isinstance(title, xr.Variable)
-    assert (
-        title
-        == [
+    np.testing.assert_equal(
+        title.values,
+        [
             "Red Band",
             "Green Band",
             "Pixel Quality Assessment Band",
             "Radiometric Saturation and Terrain Occlusion Quality Assessment Band",
-        ]
-    ).all()
+        ],
+    )
 
     # 1D coordinate along bands, where each element is a variable-length list
     roles = coords["roles"]
@@ -81,7 +81,7 @@ def test_band_coords(landsat_c2_l2_json):
     common_name = coords["common_name"]
     assert isinstance(common_name, xr.Variable)
     assert common_name.dims == ("band",)
-    assert (common_name == ["red", "green", None, None]).all()
+    np.testing.assert_equal(common_name.values, ["red", "green", None, None])
 
     # `raster:bands` is also unpacked
     assert "raster:bands" not in coords
@@ -93,15 +93,15 @@ def test_band_coords(landsat_c2_l2_json):
     # missing values in `raster:bands_unit` are imputed with None
     unit = coords["raster:bands_unit"]
     assert isinstance(unit, xr.Variable)
-    assert (unit == [None, None, "bit index", "bit index"]).all()
+    np.testing.assert_equal(unit.values, [None, None, "bit index", "bit index"])
 
     # `classification:bitfields` contains scalar sequences of dicts.
     # Again, quite awkward to work with in xarray, but at least it's properly there?
     bitfields = coords["classification:bitfields"]
     assert isinstance(bitfields, xr.Variable)
     assert bitfields.dims == ("band",)
-    assert bitfields[0] == None
-    c2 = bitfields[2].item()
+    assert bitfields[0].values.item() is None
+    c2 = bitfields[2].values.item()
     assert isinstance(c2, list)
     assert len(c2) == 12
     assert all([isinstance(c, dict) for c in c2])
@@ -138,7 +138,7 @@ def test_band_coords_type_promotion():
     complex = coords["complex_field"]
     assert isinstance(complex, xr.Variable)
     assert complex.dtype.kind == "c"
-    assert (complex == [0, 2 - 4.0j]).all()
+    np.testing.assert_equal(complex.values, [0, 2 - 4.0j])
 
     numeric = coords["numeric"]
     assert isinstance(numeric, xr.Variable)
@@ -149,19 +149,21 @@ def test_band_coords_type_promotion():
     mixed_numeric_object = coords["mixed_numeric_object"]
     assert isinstance(mixed_numeric_object, xr.Variable)
     assert mixed_numeric_object.dtype == np.dtype(object)
-    assert (mixed_numeric_object == [0, []]).all()
+    np.testing.assert_equal(mixed_numeric_object.values, [0, []])
 
     mixed_numeric_str = coords["mixed_numeric_str"]
     assert isinstance(mixed_numeric_str, xr.Variable)
     assert mixed_numeric_str.dtype == np.dtype(object)
-    assert (mixed_numeric_str == np.array([0.0, "baz"], dtype=object)).all()
+    np.testing.assert_equal(
+        mixed_numeric_str.values, np.array([0.0, "baz"], dtype=object)
+    )
     # ^ without explicitly specifying `dtype=object`, NumPy would weirdly have
     # turned our list into a string array (`<U32`), which would fail equality.
 
     partially_missing_str = coords["partially_missing_str"]
     assert isinstance(partially_missing_str, xr.Variable)
     assert partially_missing_str.dtype == np.dtype(object)
-    assert (partially_missing_str == [None, "woof"]).all()
+    np.testing.assert_equal(partially_missing_str.values, [None, "woof"])
 
     partially_missing_numeric = coords["partially_missing_numeric"]
     assert isinstance(partially_missing_numeric, xr.Variable)
@@ -172,7 +174,7 @@ def test_band_coords_type_promotion():
     partially_missing_object = coords["partially_missing_object"]
     assert isinstance(partially_missing_object, xr.Variable)
     assert partially_missing_object.dtype == np.dtype(object)
-    assert (partially_missing_object == [None, {}]).all()
+    np.testing.assert_equal(partially_missing_object.values, [None, {}])
 
 
 @pytest.mark.parametrize(
