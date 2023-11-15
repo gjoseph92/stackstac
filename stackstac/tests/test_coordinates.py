@@ -7,6 +7,7 @@ import numpy as np
 from stackstac.coordinates import (
     items_to_band_coords,
     items_to_band_coords_locality,
+    rename_some_band_fields,
 )
 from stackstac.coordinates_utils import scalar_sequence
 
@@ -72,10 +73,12 @@ def test_band_coords(landsat_c2_l2_json):
     assert href.shape == (len(landsat_c2_l2_json), len(ids))
 
     # `eo:bands` should be unpacked
-    # TODO: for backwards compatibility, we should de-prefix `eo:bands` and `sar:`
+    # NOTE: for backwards compatibility, we de-prefix `eo:bands`.
+    # I'd like to remove this; `eo:bands` doesn't deserve more special
+    # treatment than `raster:bands`, for instance.
     assert "eo:bands" not in coords
-    assert "eo:bands_description" in coords
-    common_name = coords["eo:bands_common_name"]
+    assert "description" in coords
+    common_name = coords["common_name"]
     assert isinstance(common_name, xr.Variable)
     assert common_name.dims == ("band",)
     assert (common_name == ["red", "green", None, None]).all()
@@ -170,6 +173,25 @@ def test_band_coords_type_promotion():
     assert isinstance(partially_missing_object, xr.Variable)
     assert partially_missing_object.dtype == np.dtype(object)
     assert (partially_missing_object == [None, {}]).all()
+
+
+@pytest.mark.parametrize(
+    "input, expected",
+    [
+        ("sar:polarizations", "polarization"),
+        ("eo:bands_common_name", "common_name"),
+        ("eo:bands_foobar", "foobar"),
+        ("sar:frequency_band", "sar:frequency_band"),
+        ("eo:cloud_cover", "eo:cloud_cover"),
+        (
+            "somethingsomething_sar:polarizations",
+            "somethingsomething_sar:polarizations",
+        ),
+        ("somethingsomething_eo:bands_name", "somethingsomething_eo:bands_name"),
+    ],
+)
+def test_rename_band_fields(input: str, expected: str):
+    assert rename_some_band_fields(input) == expected
 
 
 @pytest.mark.parametrize(

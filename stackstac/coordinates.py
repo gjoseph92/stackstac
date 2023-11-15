@@ -185,6 +185,7 @@ def items_to_band_coords_locality(
                 for field, value in unnested_items(
                     unpacked_per_band_asset_fields(asset.items(), PER_BAND_ASSET_FIELDS)
                 ):
+                    field = rename_some_band_fields(field)
                     if field not in skip_fields:
                         yield (ii, ai), field, value
 
@@ -193,6 +194,18 @@ def items_to_band_coords_locality(
         shape=(len(items), len(asset_ids)),
         dims=("time", "band"),
     )
+
+
+def rename_some_band_fields(field: str) -> str:
+    """
+    Apply renamings to band fields for "convenience".
+
+    This is just for backwards compatibility.
+    These renamings should probably be removed for simplicity and consistency.
+    """
+    if field == "sar:polarizations":
+        return "polarization"
+    return field.removeprefix("eo:bands_")
 
 
 def items_to_property_coords_locality(
