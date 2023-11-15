@@ -67,17 +67,6 @@ def test_deduplicate_axes_nan():
         ),
         # Empty dicts are preserved
         ({"a": {}, "b": {"c": {}}}, {"a": {}, "b_c": {}}),
-        # (
-        #     # Sequences are _not_ traversed
-        #     [{"a": {"b": "c"}}, {"a2": {"b2": "c2"}}],
-        #     [{"a": {"b": "c"}}, {"a2": {"b2": "c2"}}],
-        # ),
-        # # Basics are unchanged
-        # ("abc", "abc"),
-        # (1, 1),
-        # (None, None),
-        # ([1, 2, "foo", True], [1, 2, "foo", True]),
-        # ({"a": 1, "b": "foo"}, {"a": 1, "b": "foo"}),
     ],
 )
 def test_unnested_items(input, expected):
