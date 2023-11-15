@@ -85,10 +85,11 @@ def items_to_coords(
 
     fields = {}
     # {field:
-    #   [
+    #   np.array([
     #       [v_asset_0, v_asset_1, ...],  # item 0
     #       [v_asset_0, v_asset_1, ...],  # item 1
-    #   ]
+    #       ...,
+    #   ])
     # }
     for idx, field, value in items:
         assert len(idx) == len(
@@ -217,8 +218,8 @@ def unnested_items(
     # there'd be no reason to do this: we're not going to make an xarray coordinate like
     # `classification:bitfields_0_name`, `classification:bitfields_0_fill`, ...,
     # `classification:bitfields_8_name`, `classification:bitfields_8_fill`
-    # and unpack a separate coordinate for every field in a sequence. Rather, we rely on
-    # `scalar_sequence` to preserve anything that's a sequence into a single coordinate.
+    # and unpack a separate coordinate for every field in a sequence. Rather, we
+    # `preserve anything that's a sequence as a single element in an object array.
 
 
 def scalar_sequence(x):
