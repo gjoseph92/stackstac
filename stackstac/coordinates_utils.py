@@ -254,34 +254,6 @@ def scalar_sequence(x):
     return scalar
 
 
-def descalar_obj_array(arr: np.ndarray) -> np.ndarray:
-    """
-    In an object array containing NumPy object scalars, unpack the scalars.
-
-    Note that this may mutate the array.
-
-    Example
-    -------
-    >>> s = scalar_sequence([1, 2])
-    >>> arr = np.array([s])
-    >>> arr[0]
-    array(list([1, 2]), dtype=object)
-    >>> # remove the indirection of the NumPy scalar
-    >>> unpacked = descalar_obj_array(arr)
-    >>> unpacked[0]
-    >>> [1, 2]
-
-    """
-    if arr.dtype.kind != "O":
-        return arr
-
-    for idx in np.ndindex(arr.shape):
-        x = arr[idx]
-        if isinstance(x, np.ndarray) and x.shape == ():
-            arr[idx] = x.item()
-    return arr
-
-
 def unpacked_per_band_asset_fields(
     asset: Iterable[tuple[str, Any]], fields: Container
 ) -> Iterator[tuple[str, Any]]:

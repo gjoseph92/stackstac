@@ -1,15 +1,9 @@
-from string import printable
-
-import hypothesis.strategies as st
 import numpy as np
 import pytest
-from hypothesis import given
 
 from stackstac.coordinates_utils import (
     deduplicate_axes,
-    descalar_obj_array,
     items_to_coords,
-    scalar_sequence,
     unnested_items,
     unpacked_per_band_asset_fields,
 )
@@ -88,27 +82,6 @@ def test_deduplicate_axes_nan():
 )
 def test_unnested_items(input, expected):
     assert list(unnested_items(input.items())) == list(expected.items())
-
-
-jsons = st.recursive(
-    st.none()
-    | st.booleans()
-    | st.integers()
-    | st.floats(allow_nan=False, allow_infinity=False, allow_subnormal=False)
-    | st.datetimes()
-    | st.text(printable),
-    lambda children: st.lists(children) | st.dictionaries(st.text(printable), children),
-)
-# ^ modified from https://hypothesis.readthedocs.io/en/latest/data.html#recursive-data
-
-
-@given(jsons)
-def test_scalar_sequence_roundtrip(x):
-    wrapped = scalar_sequence(x)
-    arr = np.array([wrapped])
-    assert arr.shape == (1,)
-    descalared = descalar_obj_array(arr)
-    assert descalared[0] == x
 
 
 @pytest.mark.parametrize(
