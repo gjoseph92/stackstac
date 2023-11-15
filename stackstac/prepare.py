@@ -147,7 +147,7 @@ def prepare_items(
             if raster_bands is not None:
                 if len(raster_bands) != 1:
                     raise ValueError(
-                        f"raster:bands has {len(raster_bands)} elements for asset {asset_id!r}. "
+                        f"raster:bands has {len(raster_bands)} elements for asset {id!r}. "
                         "Multi-band rasters are not currently supported.\n"
                         "If you don't care about this asset, you can skip it by giving a list "
                         "of asset IDs you *do* want in `assets=`, and leaving this one out."
