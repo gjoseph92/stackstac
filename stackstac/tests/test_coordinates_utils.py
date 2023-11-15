@@ -149,42 +149,135 @@ def test_unpacked_per_band_asset_fields(input, fields, expected):
     assert result == list(expected.items())
 
 
-def test_items_to_coords_3d():
+def test_items_to_coords_3d_same_bands():
+    # 3D coordinates don't actually happen in stackstac, but this is a nice stress test that the logic is correct.
     data = [
         {
             "smallsat": {
                 "red": {
                     "type": "geotiff",
-                    "desc": "red-ish",
-                    "resolution": 15,
-                    "id": "smallsat-red-00",
                     "cloud_fraction": 0.2,
                 },
                 "nir": {
                     "type": "geotiff",
-                    "desc": "near infrared",
-                    "resolution": 30,
-                    "id": "smallsat-nir-00",
                     "cloud_fraction": 0.2,
                 },
             },
             "bigsat": {
                 "red": {
                     "type": "geotiff",
-                    "desc": "red-ish",
-                    "resolution": 5,
-                    "id": "bigsat-red-00",
                     "cloud_fraction": 0.1,
                 },
                 "nir": {
                     "type": "geotiff",
+                    "cloud_fraction": 0.1,
+                },
+            },
+        },
+        {
+            "smallsat": {
+                "red": {
+                    "type": "geotiff",
+                    "cloud_fraction": 0.6,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "cloud_fraction": 0.6,
+                },
+            },
+            "bigsat": {
+                "red": {
+                    "type": "geotiff",
+                    "cloud_fraction": 0.3,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "cloud_fraction": 0.3,
+                },
+            },
+        },
+        {
+            "smallsat": {
+                "red": {
+                    "type": "geotiff",
+                    "cloud_fraction": 0.0,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    "cloud_fraction": 0.0,
+                },
+            },
+            "bigsat": {
+                "red": {
+                    "type": "geotiff",
+                    # "cloud_fraction": 0.0,
+                },
+                "nir": {
+                    "type": "geotiff",
+                    # "cloud_fraction": 0.0,
+                },
+            },
+        },
+    ]
+
+    coords = items_to_coords(
+        (
+            ((i, j, k), field, value)
+            for i, item in enumerate(data)
+            for j, (sat_key, assets) in enumerate(item.items())
+            for k, (asset_id, asset) in enumerate(assets.items())
+            for field, value in asset.items()
+        ),
+        shape=(len(data), 2, 2),
+        dims=("time", "platform", "band"),
+    )
+
+    cloud_fraction = coords["cloud_fraction"]
+    assert cloud_fraction.dims == ("time", "platform")
+    np.testing.assert_equal(
+        cloud_fraction.values,
+        [
+            [0.2, 0.1],
+            [0.6, 0.3],
+            [0.0, np.nan],
+        ],
+    )
+
+    # TODO because there's no cloud mask band for smallsat,
+    # it's None, which I suppose is correct/fair, but slightly annoying.
+    type_ = coords["type"]
+    assert type_.dims == ()
+    assert type_ == "geotiff"
+
+
+def test_items_to_coords_3d_different_bands():
+    # similar to above, but `bigsat` has a band that `smallsat` doesn't.
+    data = [
+        {
+            "smallsat": {
+                "red": {
+                    "desc": "red-ish",
+                    "resolution": 15,
+                    "id": "smallsat-red-00",
+                },
+                "nir": {
+                    "desc": "near infrared",
+                    "resolution": 30,
+                    "id": "smallsat-nir-00",
+                },
+            },
+            "bigsat": {
+                "red": {
+                    "desc": "red-ish",
+                    "resolution": 5,
+                    "id": "bigsat-red-00",
+                },
+                "nir": {
                     "desc": "near infrared",
                     "resolution": 10,
                     "id": "bigsat-nir-00",
-                    "cloud_fraction": 0.1,
                 },
                 "cloud": {
-                    "type": "geotiff",
                     "desc": "cloud mask",
                     "id": "bigsat-cloud-00",
                 },
@@ -193,37 +286,28 @@ def test_items_to_coords_3d():
         {
             "smallsat": {
                 "red": {
-                    "type": "geotiff",
                     "desc": "red-ish",
                     "resolution": 15,
                     "id": "smallsat-red-01",
-                    "cloud_fraction": 0.6,
                 },
                 "nir": {
-                    "type": "geotiff",
                     "desc": "near infrared",
                     "resolution": 30,
                     "id": "smallsat-nir-01",
-                    "cloud_fraction": 0.6,
                 },
             },
             "bigsat": {
                 "red": {
-                    "type": "geotiff",
                     "desc": "red-ish",
                     "resolution": 5,
                     "id": "bigsat-red-01",
-                    "cloud_fraction": 0.3,
                 },
                 "nir": {
-                    "type": "geotiff",
                     "desc": "near infrared",
                     "resolution": 10,
                     "id": "bigsat-nir-01",
-                    "cloud_fraction": 0.3,
                 },
                 "cloud": {
-                    "type": "geotiff",
                     "desc": "cloud mask",
                     "id": "bigsat-cloud-01",
                 },
@@ -232,37 +316,28 @@ def test_items_to_coords_3d():
         {
             "smallsat": {
                 "red": {
-                    "type": "geotiff",
                     "desc": "red-ish",
                     "resolution": 15,
                     "id": "smallsat-red-02",
-                    "cloud_fraction": 0.0,
                 },
                 "nir": {
-                    "type": "geotiff",
                     "desc": "near infrared",
                     "resolution": 30,
                     "id": "smallsat-nir-02",
-                    "cloud_fraction": 0.0,
                 },
             },
             "bigsat": {
                 "red": {
-                    "type": "geotiff",
                     "desc": "red-ish",
                     "resolution": 5,
                     "id": "bigsat-red-02",
-                    "cloud_fraction": 0.0,
                 },
                 "nir": {
-                    "type": "geotiff",
                     "desc": "near infrared",
                     "resolution": 10,
                     "id": "bigsat-nir-02",
-                    "cloud_fraction": 0.0,
                 },
                 "cloud": {
-                    "type": "geotiff",
                     "desc": "cloud mask",
                     "id": "bigsat-cloud-02",
                 },
@@ -282,7 +357,7 @@ def test_items_to_coords_3d():
         dims=("time", "platform", "band"),
     )
 
-    assert coords.keys() == {"type", "desc", "resolution", "id", "cloud_fraction"}
+    assert coords.keys() == {"desc", "resolution", "id"}
 
     ids = coords["id"]
     assert ids.dims == ("time", "platform", "band")
@@ -292,31 +367,20 @@ def test_items_to_coords_3d():
 
     desc = coords["desc"]
     assert desc.dims == ("platform", "band")
-    assert (
-        desc
-        == [
+    np.testing.assert_equal(
+        desc.values,
+        [
             ["red-ish", "near infrared", None],
             ["red-ish", "near infrared", "cloud mask"],
-        ]
-    ).all()
+        ],
+    )
 
     resolution = coords["resolution"]
     assert resolution.dims == ("platform", "band")
-    np.testing.assert_equal(resolution.values, [[15, 30, np.nan], [5, 10, np.nan]])
-
-    # TODO because there's no cloud mask band for smallsat,
-    # it's None, which I suppose is correct/fair, but slightly annoying.
-
-    # type_ = coords["type"]
-    # assert type_.dims == ()
-    # assert type_ == "geotiff"
-
-    # TODO handle NaNs while deduplicating
-    # also this test is wrong
-
-    # cloud_fraction = coords["cloud_fraction"]
-    # assert cloud_fraction.dims == ("time", "platform")
-    # np.testing.assert_equal(
-    #     cloud_fraction.values,
-    #     [[0.2, 0.1, np.nan], [0.6, 0.3, np.nan], [0.0, 0.0, np.nan]],
-    # )
+    np.testing.assert_equal(
+        resolution.values,
+        [
+            [15, 30, np.nan],
+            [5, 10, np.nan],
+        ],
+    )
