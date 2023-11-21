@@ -320,11 +320,14 @@ class AutoParallelRioReader:
         self._dataset: Optional[ThreadsafeRioDataset] = None
         self._dataset_lock = threading.Lock()
 
+    def _get_ds(self) -> SelfCleaningDatasetReader:
+        return SelfCleaningDatasetReader(self.url, sharing=False)
+
     def _open(self) -> ThreadsafeRioDataset:
         with self.gdal_env.open:
             with time(f"Initial read for {self.url!r} on {_curthread()}: {{t}}"):
                 try:
-                    ds = SelfCleaningDatasetReader(self.url, sharing=False)
+                    ds = self._get_ds()
                 except Exception as e:
                     msg = f"Error opening {self.url!r}: {e!r}"
                     if exception_matches(e, self.errors_as_nodata):
@@ -381,10 +384,8 @@ class AutoParallelRioReader:
                 self._dataset = self._open()
             return self._dataset
 
-    def read(self, window: Window, **kwargs) -> np.ndarray:
-        reader = self.dataset
-        try:
-            result = reader.read(
+    def _reader_read(self, reader, window: Window, **kwargs):
+            return reader.read(
                 window=window,
                 out_dtype=self.dtype,
                 masked=True,
@@ -392,6 +393,11 @@ class AutoParallelRioReader:
                 # without potentially altering pixels that should have been the ``fill_value``
                 **kwargs,
             )
+
+    def read(self, window: Window, **kwargs) -> np.ndarray:
+        reader = self.dataset
+        try:
+            result = self._reader_read(reader, window, **kwargs)
         except Exception as e:
             msg = f"Error reading {window} from {self.url!r}: {e!r}"
             if exception_matches(e, self.errors_as_nodata):
