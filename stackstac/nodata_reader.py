@@ -16,10 +16,12 @@ class NodataReader:
     def __init__(
         self,
         *,
+        url: str,
         dtype: np.dtype,
         fill_value: Union[int, float],
         **kwargs,
     ) -> None:
+        self.url = url
         self.dtype = dtype
         self.fill_value = fill_value
 

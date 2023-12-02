@@ -45,6 +45,11 @@ def stack(
     properties: Union[bool, str, Sequence[str]] = True,
     band_coords: bool = True,
     gdal_env: Optional[LayeredEnv] = None,
+    retry_errors: Tuple[Exception, ...] = (
+        RasterioIOError(r"HTTP response code: (400|429|5\d\d)"),
+        RasterioIOError("Read or write failed"),
+        RasterioIOError("not recognized as a supported file format"),
+    ),
     errors_as_nodata: Tuple[Exception, ...] = (
         RasterioIOError("HTTP response code: 404"),
     ),
@@ -309,6 +314,7 @@ def stack(
         reader=reader,
         gdal_env=gdal_env,
         errors_as_nodata=errors_as_nodata,
+        retry_errors=retry_errors,
     )
 
     return xr.DataArray(

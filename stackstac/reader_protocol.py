@@ -25,6 +25,7 @@ class Reader(Pickleable, Protocol):
     """
     Protocol for a thread-safe, lazily-loaded object for reading data from a single-band STAC asset.
     """
+    url: str
 
     def __init__(
         self,
@@ -113,6 +114,7 @@ class FakeReader:
 
     def __init__(self, *, dtype: np.dtype, **kwargs) -> None:
         self.dtype = dtype
+        self.url = "fake"
 
     def read(self, window: Window, **kwargs) -> np.ndarray:
         return np.random.random((window.height, window.width)).astype(self.dtype)

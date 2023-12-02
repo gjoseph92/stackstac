@@ -13,7 +13,7 @@ from .rio_env import LayeredEnv
 from .timer import time
 from .reader_protocol import Reader
 from .raster_spec import RasterSpec
-from .nodata_reader import NodataReader, exception_matches, nodata_for_window
+from .nodata_reader import NodataReader, exception_matches
 
 if TYPE_CHECKING:
     from rasterio.enums import Resampling
@@ -42,7 +42,7 @@ DEFAULT_GDAL_ENV = LayeredEnv(
     open=dict(
         GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
         # ^ stop GDAL from requesting `.aux` and `.msk` files from the bucket (speeds up `open` time a lot)
-        VSI_CACHE=True
+        VSI_CACHE=True,
         # ^ cache HTTP requests for opening datasets. This is critical for `ThreadLocalRioDataset`,
         # which re-opens the same URL many times---having the request cached makes subsequent `open`s
         # in different threads snappy.
@@ -326,11 +326,17 @@ class AutoParallelRioReader:
                 try:
                     ds = SelfCleaningDatasetReader(self.url, sharing=False)
                 except Exception as e:
+                    # Optimization: if a nodata error happens while opening, use a NodataReader
+                    # to avoid opeing the bad URL again and again. This assumes nodata errors are
+                    # non-transient.
+                    # TODO: just return None instead?
+                    # Note that a retryable error will bubble up to `read_with_retry`, eventually
+                    # retrying the whole `read`, and therefore `_open`.
                     msg = f"Error opening {self.url!r}: {e!r}"
                     if exception_matches(e, self.errors_as_nodata):
                         warnings.warn(msg)
                         return NodataReader(
-                            dtype=self.dtype, fill_value=self.fill_value
+                            url=self.url, dtype=self.dtype, fill_value=self.fill_value
                         )
 
                     raise RuntimeError(msg) from e
@@ -383,22 +389,14 @@ class AutoParallelRioReader:
 
     def read(self, window: Window, **kwargs) -> np.ndarray:
         reader = self.dataset
-        try:
-            result = reader.read(
-                window=window,
-                out_dtype=self.dtype,
-                masked=True,
-                # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
-                # without potentially altering pixels that should have been the ``fill_value``
-                **kwargs,
-            )
-        except Exception as e:
-            msg = f"Error reading {window} from {self.url!r}: {e!r}"
-            if exception_matches(e, self.errors_as_nodata):
-                warnings.warn(msg)
-                return nodata_for_window(window, self.fill_value, self.dtype)
-
-            raise RuntimeError(msg) from e
+        result = reader.read(
+            window=window,
+            out_dtype=self.dtype,
+            masked=True,
+            # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
+            # without potentially altering pixels that should have been the ``fill_value``
+            **kwargs,
+        )
 
         # When the GeoTIFF doesn't have a nodata value, and we're using a VRT, pixels
         # outside the dataset don't get properly masked (they're just 0). Using `add_alpha`
@@ -409,7 +407,9 @@ class AutoParallelRioReader:
         elif result.shape[0] == 1:
             result = result[0]
         else:
-            raise RuntimeError(f"Unexpected shape {result.shape}, expected exactly 1 band.")
+            raise RuntimeError(
+                f"Unexpected shape {result.shape}, expected exactly 1 band."
+            )
 
         scale, offset = self.scale_offset
 
@@ -419,9 +419,9 @@ class AutoParallelRioReader:
             result += offset
 
         result = np.ma.filled(result, fill_value=self.fill_value)
-        assert np.issubdtype(result.dtype, self.dtype), (
-            f"Expected result array with dtype {self.dtype!r}, got {result.dtype!r}"
-        )
+        assert np.issubdtype(
+            result.dtype, self.dtype
+        ), f"Expected result array with dtype {self.dtype!r}, got {result.dtype!r}"
         return result
 
     def close(self) -> None:
