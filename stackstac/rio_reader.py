@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import warnings
 from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, TypedDict, Union
 
 import numpy as np
@@ -13,7 +12,6 @@ from .rio_env import LayeredEnv
 from .timer import time
 from .reader_protocol import Reader
 from .raster_spec import RasterSpec
-from .nodata_reader import NodataReader, exception_matches
 
 if TYPE_CHECKING:
     from rasterio.enums import Resampling
@@ -283,7 +281,6 @@ class PickleState(TypedDict):
     fill_value: Union[int, float]
     scale_offset: Tuple[Union[int, float], Union[int, float]]
     gdal_env: Optional[LayeredEnv]
-    errors_as_nodata: Tuple[Exception, ...]
 
 
 class AutoParallelRioReader:
@@ -306,7 +303,6 @@ class AutoParallelRioReader:
         fill_value: Union[int, float],
         scale_offset: Tuple[Union[int, float], Union[int, float]],
         gdal_env: Optional[LayeredEnv] = None,
-        errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
         self.url = url
         self.spec = spec
@@ -315,7 +311,6 @@ class AutoParallelRioReader:
         self.fill_value = fill_value
         self.scale_offset = scale_offset
         self.gdal_env = gdal_env or DEFAULT_GDAL_ENV
-        self.errors_as_nodata = errors_as_nodata
 
         self._dataset: Optional[ThreadsafeRioDataset] = None
         self._dataset_lock = threading.Lock()
@@ -323,23 +318,7 @@ class AutoParallelRioReader:
     def _open(self) -> ThreadsafeRioDataset:
         with self.gdal_env.open:
             with time(f"Initial read for {self.url!r} on {_curthread()}: {{t}}"):
-                try:
-                    ds = SelfCleaningDatasetReader(self.url, sharing=False)
-                except Exception as e:
-                    # Optimization: if a nodata error happens while opening, use a NodataReader
-                    # to avoid opeing the bad URL again and again. This assumes nodata errors are
-                    # non-transient.
-                    # TODO: just return None instead?
-                    # Note that a retryable error will bubble up to `read_with_retry`, eventually
-                    # retrying the whole `read`, and therefore `_open`.
-                    msg = f"Error opening {self.url!r}: {e!r}"
-                    if exception_matches(e, self.errors_as_nodata):
-                        warnings.warn(msg)
-                        return NodataReader(
-                            url=self.url, dtype=self.dtype, fill_value=self.fill_value
-                        )
-
-                    raise RuntimeError(msg) from e
+                ds = SelfCleaningDatasetReader(self.url, sharing=False)
             if ds.count != 1:
                 ds.close()
                 raise RuntimeError(
@@ -381,7 +360,7 @@ class AutoParallelRioReader:
             return SingleThreadedRioDataset(self.gdal_env, ds, vrt=vrt)
 
     @property
-    def dataset(self):
+    def dataset(self) -> ThreadsafeRioDataset:
         with self._dataset_lock:
             if self._dataset is None:
                 self._dataset = self._open()
@@ -451,7 +430,6 @@ class AutoParallelRioReader:
             "fill_value": self.fill_value,
             "scale_offset": self.scale_offset,
             "gdal_env": self.gdal_env,
-            "errors_as_nodata": self.errors_as_nodata,
         }
 
     def __setstate__(

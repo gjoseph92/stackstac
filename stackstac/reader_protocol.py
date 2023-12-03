@@ -37,7 +37,6 @@ class Reader(Pickleable, Protocol):
         fill_value: Union[int, float],
         scale_offset: Tuple[Union[int, float], Union[int, float]],
         gdal_env: Optional[LayeredEnv],
-        errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
         """
         Construct the Dataset *without* fetching any data.
@@ -59,14 +58,6 @@ class Reader(Pickleable, Protocol):
         gdal_env:
             A `~.LayeredEnv` of GDAL configuration options to use while opening
             and reading datasets. If None (default), `~.DEFAULT_GDAL_ENV` is used.
-        errors_as_nodata:
-            Exception patterns to ignore when opening datasets or reading data.
-            Exceptions matching the pattern will be logged as warnings, and just
-            produce nodata (``fill_value``).
-
-            The exception patterns should be instances of an Exception type to catch,
-            where ``str(exception_pattern)`` is a regex pattern to match against
-            ``str(raised_exception)``.
         """
         # TODO colormaps?
 

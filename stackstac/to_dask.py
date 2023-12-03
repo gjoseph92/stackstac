@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Dict, Literal, NamedTuple, Optional, Tuple, Type, Union
+import re
 import warnings
 
 import dask
@@ -11,8 +12,6 @@ from dask.layers import ArraySliceDep
 import numpy as np
 from rasterio import windows
 from rasterio.enums import Resampling
-
-from stackstac.nodata_reader import exception_matches
 
 from .raster_spec import Bbox, RasterSpec
 from .rio_reader import AutoParallelRioReader, LayeredEnv
@@ -34,6 +33,7 @@ def items_to_dask(
     gdal_env: Optional[LayeredEnv] = None,
     errors_as_nodata: Tuple[Exception, ...] = (),
     retry_errors: Tuple[Exception, ...] = (),
+    retries: int = 0,
 ) -> da.Array:
     "Create a dask Array from an asset table"
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
@@ -80,6 +80,7 @@ def items_to_dask(
             gdal_env,
             errors_as_nodata,
             retry_errors,
+            retries,
             reader,
             dtype=object,
         )
@@ -156,7 +157,6 @@ def asset_table_to_reader_entry(
                 fill_value=fill_value,
                 scale_offset=asset_scale_offset,
                 gdal_env=gdal_env,
-                errors_as_nodata=errors_as_nodata,
             )
 
             # NOTE: to minimize dask graph size, we put things that would be better
@@ -205,7 +205,7 @@ def fetch_raster_window(
                 # would end up copied to even more threads.
 
                 # TODO when the Reader won't be rescaling, support passing `output` to avoid the copy?
-                data = read_with_retry(
+                data = read_handle_errors(
                     entry.reader,
                     current_window,
                     entry.retry_errors,
@@ -233,14 +233,15 @@ def fetch_raster_window(
     return output
 
 
-def read_with_retry(
+def read_handle_errors(
     reader: Reader,
     window: windows.Window,
     retry_errors: Tuple[Exception, ...],
     errors_as_nodata: Tuple[Exception, ...],
     retries: int,
 ) -> np.ndarray | None:
-    for i in range(retries):
+    # TODO: raise when retries exhausted! don't just return None
+    for i in range(retries + 1):
         try:
             return reader.read(window)
         except Exception as e:
@@ -255,6 +256,27 @@ def read_with_retry(
                 return None
 
             raise RuntimeError(msg) from e
+
+
+def exception_matches(e: Exception, patterns: Tuple[Exception, ...]) -> bool:
+    """
+    Whether an exception matches one of the pattern exceptions
+
+    Parameters
+    ----------
+    e:
+        The exception to check
+    patterns:
+        Instances of an Exception type to catch, where ``str(exception_pattern)``
+        is a regex pattern to match against ``str(e)``.
+    """
+    e_type = type(e)
+    e_msg = str(e)
+    for pattern in patterns:
+        if issubclass(e_type, type(pattern)):
+            if re.match(str(pattern), e_msg):
+                return True
+    return False
 
 
 def normalize_chunks(
