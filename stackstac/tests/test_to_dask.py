@@ -36,9 +36,9 @@ def asset_tables(
         np.array(
             [
                 # Encode the (i, j) index in the table in the URL
-                [("fake://0/0", [0, 0, 2, 2]), ("fake://0/1", [0, 0, 2, 2])],
-                [("fake://1/0", [0, 3, 2, 5]), ("fake://1/1", [10, 13, 12, 15])],
-                [("fake://2/0", [1, 3, 2, 6]), ("fake://2/1", [1, 3, 2, 7])],
+                [("fake://0/0", [0, 0, 2, 2], (1, 0)), ("fake://0/1", [0, 0, 2, 2], (1, 0))],
+                [("fake://1/0", [0, 3, 2, 5], (1, 0)), ("fake://1/1", [10, 13, 12, 15], (1, 0))],
+                [("fake://2/0", [1, 3, 2, 6], (1, 0)), ("fake://2/1", [1, 3, 2, 7], (1, 0))],
                 [(None, None), (None, None)],
             ],
             dtype=ASSET_TABLE_DT,
@@ -61,7 +61,8 @@ def asset_tables(
     for (i, j), bounds in np.ndenumerate(bounds_arr):
         if bounds:
             # Encode the (i, j) index in the table in the URL
-            asset_table[i, j] = (f"fake://{i}/{j}", bounds)
+            # TODO generate scale and offset
+            asset_table[i, j] = (f"fake://{i}/{j}", bounds, (1, 0))
 
     return asset_table
 
@@ -138,6 +139,7 @@ def test_items_to_dask(
             i, j = map(int, url[7:].split("/"))
             self.full_data = results[i, j]
             self.window = asset_windows[url]
+            self.url = url
 
             assert spec == spec_
             assert dtype == dtype_
