@@ -240,19 +240,26 @@ def read_handle_errors(
     errors_as_nodata: Tuple[Exception, ...],
     retries: int,
 ) -> np.ndarray | None:
-    # TODO: raise when retries exhausted! don't just return None
-    for i in range(retries + 1):
+    attempt = 0
+    while True:
         try:
             return reader.read(window)
         except Exception as e:
-            msg = f"Error reading {window} from {reader.url!r}: {e!r}"
-            if exception_matches(e, retry_errors):
-                warnings.warn(msg + f" - retry {i}")
+            msg = f"Error reading {window} from {reader.url!r} (attempt {attempt} of {retries}): {e!r}"
+            if attempt < retries and exception_matches(e, retry_errors):
+                warnings.warn(msg)
+                attempt += 1
                 # TODO: sleep
+                # TODO: is sleeping the best way to do this? in principle, we could let some other
+                # request happen while we're waiting (maybe something else from the reader table,
+                # or an entirely different dask task). secede/rejoin might be an option? but might
+                # also encourage higher memory use and make things more complicated.
+                # Also, whatever problem is happening may or may not be independent between assets...
+                # could be some internals of cloud storage that are correlated.
                 continue
 
             if exception_matches(e, errors_as_nodata):
-                warnings.warn(msg + " - ignoring as nodata")
+                warnings.warn("Ignoring as nodata: " + msg)
                 return None
 
             raise RuntimeError(msg) from e
