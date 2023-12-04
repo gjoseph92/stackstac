@@ -23,6 +23,15 @@ from .stac_types import (
 from .to_dask import items_to_dask, ChunksParam
 
 
+DEFAULT_RETRY_ERRORS = (
+    RasterioIOError(r"HTTP response code: (400|429|5\d\d)"),
+    RasterioIOError("Read or write failed"),
+    RasterioIOError("not recognized as a supported file format"),
+)
+
+DEFAULT_ERRORS_AS_NODATA = (RasterioIOError("HTTP response code: 404"),)
+
+
 def stack(
     items: Union[
         ItemCollectionIsh, ItemIsh, Sequence[PystacItem], Sequence[SatstacItem]
@@ -45,14 +54,9 @@ def stack(
     properties: Union[bool, str, Sequence[str]] = True,
     band_coords: bool = True,
     gdal_env: Optional[LayeredEnv] = None,
-    retry_errors: Tuple[Exception, ...] = (
-        RasterioIOError(r"HTTP response code: (400|429|5\d\d)"),
-        RasterioIOError("Read or write failed"),
-        RasterioIOError("not recognized as a supported file format"),
-    ),
-    errors_as_nodata: Tuple[Exception, ...] = (
-        RasterioIOError("HTTP response code: 404"),
-    ),
+    retry_errors: Tuple[Exception, ...] = DEFAULT_RETRY_ERRORS,
+    retries: int = 3,
+    errors_as_nodata: Tuple[Exception, ...] = DEFAULT_ERRORS_AS_NODATA,
     reader: Type[Reader] = AutoParallelRioReader,
 ) -> xr.DataArray:
     """
@@ -252,16 +256,30 @@ def stack(
         Advanced use: a `~.LayeredEnv` of GDAL configuration options to use while opening
         and reading datasets. If None (default), `~.DEFAULT_GDAL_ENV` is used.
         See ``rio_reader.py`` for notes on why these default options were chosen.
+    retry_errors:
+        Exception patterns to retry when opening datasets or reading data.
+        Errors matching the pattern will be logged as warnings, and retried after a delay.
+
+        The exception patterns should be instances of an `Exception` type to catch,
+        where ``str(exception_pattern)`` is a regex pattern to match against
+        ``str(raised_exception)``. For example, ``RasterioIOError("HTTP response code: 404")``
+        (the default). Or ``IOError(r"HTTP response code: 5\\d\\d")``, to catch any 5xx HTTP error.
+        Or ``Exception(".*")`` to catch absolutely anything (that one's probably a bad idea).
+
+        By default, all HTTP 500 errors are retried, as well as ``Read or write failed`` and
+        ``not recognized as a supported file format``.
+    retries:
+        How many times to retry errors in `retry_errors`. Default: 3. Set to 0 to disable retries.
+
+        Note that retries are counted per chunk, not per asset.
     errors_as_nodata:
         Exception patterns to ignore when opening datasets or reading data.
         Exceptions matching the pattern will be logged as warnings, and just
         produce nodata (``fill_value``).
 
-        The exception patterns should be instances of an Exception type to catch,
-        where ``str(exception_pattern)`` is a regex pattern to match against
-        ``str(raised_exception)``. For example, ``RasterioIOError("HTTP response code: 404")``
-        (the default). Or ``IOError(r"HTTP response code: 4\\d\\d")``, to catch any 4xx HTTP error.
-        Or ``Exception(".*")`` to catch absolutely anything (that one's probably a bad idea).
+        The exception patterns should be just like `retry_errors`.
+
+        By default, only HTTP 404 errors are ignored as nodata.
     reader:
         Advanced use: the `~.Reader` type to use. Currently there is only one real reader type:
         `~.AutoParallelRioReader`. However, there's also `~.FakeReader` (which doesn't read data at all,
@@ -315,6 +333,7 @@ def stack(
         gdal_env=gdal_env,
         errors_as_nodata=errors_as_nodata,
         retry_errors=retry_errors,
+        retries=retries,
     )
 
     return xr.DataArray(
