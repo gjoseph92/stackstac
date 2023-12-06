@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Dict, Literal, Optional, Tuple, Type, Union
+from typing import Dict, Literal, NamedTuple, Optional, Tuple, Type, Union
+import re
 import warnings
 
-from affine import Affine
 import dask
 import dask.array as da
 from dask.blockwise import blockwise
@@ -32,9 +32,12 @@ def items_to_dask(
     reader: Type[Reader] = AutoParallelRioReader,
     gdal_env: Optional[LayeredEnv] = None,
     errors_as_nodata: Tuple[Exception, ...] = (),
+    retry_errors: Tuple[Exception, ...] = (),
+    retries: int = 0,
 ) -> da.Array:
     "Create a dask Array from an asset table"
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
+    retry_errors = retry_errors or ()  # be sure it's not None
 
     if not np.can_cast(fill_value, dtype):
         raise ValueError(
@@ -68,7 +71,7 @@ def items_to_dask(
         # don't match, which may not be behavior we can rely on.
         # (The actual content of the annotation is irrelevant here, just that there is one.)
         reader_table = asset_table_dask.map_blocks(
-            asset_table_to_reader_and_window,
+            asset_table_to_reader_entry,
             spec,
             resampling,
             dtype,
@@ -76,6 +79,8 @@ def items_to_dask(
             rescale,
             gdal_env,
             errors_as_nodata,
+            retry_errors,
+            retries,
             reader,
             dtype=object,
         )
@@ -105,10 +110,15 @@ def items_to_dask(
     return rasters
 
 
-ReaderTableEntry = Optional[Tuple[Reader, windows.Window]]
+class ReaderTableEntry(NamedTuple):
+    reader: Reader
+    asset_window: windows.Window
+    errors_as_nodata: Tuple[Exception, ...]
+    retry_errors: Tuple[Exception, ...]
+    retries: int
 
 
-def asset_table_to_reader_and_window(
+def asset_table_to_reader_entry(
     asset_table: np.ndarray,
     spec: RasterSpec,
     resampling: Resampling,
@@ -117,14 +127,16 @@ def asset_table_to_reader_and_window(
     rescale: bool,
     gdal_env: Optional[LayeredEnv],
     errors_as_nodata: Tuple[Exception, ...],
+    retry_errors: Tuple[Exception, ...],
+    retries: int,
     reader: Type[Reader],
 ) -> np.ndarray:
     """
     "Open" an asset table by creating a `Reader` for each asset.
 
     This function converts the asset table (or chunks thereof) into an object array,
-    where each element contains a tuple of the `Reader` and `Window` for that asset,
-    or None if the element has no URL.
+    where each element contains the `ReaderTableEntry` for that asset, or None if the
+    element has no URL.
     """
     reader_table = np.empty_like(asset_table, dtype=object)
     for index, asset_entry in np.ndenumerate(asset_table):
@@ -137,18 +149,26 @@ def asset_table_to_reader_and_window(
             else:
                 asset_scale_offset = (1, 0)
 
-            entry: ReaderTableEntry = (
-                reader(
-                    url=url,
-                    spec=spec,
-                    resampling=resampling,
-                    dtype=dtype,
-                    fill_value=fill_value,
-                    scale_offset=asset_scale_offset,
-                    gdal_env=gdal_env,
-                    errors_as_nodata=errors_as_nodata,
-                ),
-                asset_window,
+            r = reader(
+                url=url,
+                spec=spec,
+                resampling=resampling,
+                dtype=dtype,
+                fill_value=fill_value,
+                scale_offset=asset_scale_offset,
+                gdal_env=gdal_env,
+            )
+
+            # NOTE: to minimize dask graph size, we put things that would be better
+            # suited as arguments for `fetch_raster_window` (like `retry_errors`) into
+            # the reader table instead. This saves pickling the same tuples of exceptions
+            # for every chunk (pickle isn't smart enough to avoid the duplication).
+            entry = ReaderTableEntry(
+                reader=r,
+                asset_window=asset_window,
+                errors_as_nodata=errors_as_nodata,
+                retry_errors=retry_errors,
+                retries=retries,
             )
             reader_table[index] = entry
     return reader_table
@@ -175,18 +195,26 @@ def fetch_raster_window(
     )
 
     all_empty: bool = True
-    entry: ReaderTableEntry
+    entry: ReaderTableEntry | None
     for index, entry in np.ndenumerate(reader_table):
         if entry:
-            reader, asset_window = entry
             # Only read if the window we're fetching actually overlaps with the asset
-            if windows.intersect(current_window, asset_window):
+            if windows.intersect(current_window, entry.asset_window):
                 # NOTE: when there are multiple assets, we _could_ parallelize these reads with our own threadpool.
                 # However, that would probably increase memory usage, since the internal, thread-local GDAL datasets
                 # would end up copied to even more threads.
 
                 # TODO when the Reader won't be rescaling, support passing `output` to avoid the copy?
-                data = reader.read(current_window)
+                data = read_handle_errors(
+                    entry.reader,
+                    current_window,
+                    entry.retry_errors,
+                    entry.errors_as_nodata,
+                    entry.retries,
+                )
+                if data is None:
+                    # A nodata error; just leave this empty in `output`
+                    continue
 
                 if all_empty:
                     # Turn `output` from a broadcast-trick array to a real array, so it's writeable
@@ -203,6 +231,59 @@ def fetch_raster_window(
                 output[index] = data
 
     return output
+
+
+def read_handle_errors(
+    reader: Reader,
+    window: windows.Window,
+    retry_errors: Tuple[Exception, ...],
+    errors_as_nodata: Tuple[Exception, ...],
+    retries: int,
+) -> np.ndarray | None:
+    attempt = 0
+    while True:
+        try:
+            return reader.read(window)
+        except Exception as e:
+            msg = f"Error reading {window} from {reader.url!r} (attempt {attempt} of {retries}): {e!r}"
+            if attempt < retries and exception_matches(e, retry_errors):
+                warnings.warn(msg)
+                attempt += 1
+                # TODO: sleep
+                # TODO: is sleeping the best way to do this? in principle, we could let some other
+                # request happen while we're waiting (maybe something else from the reader table,
+                # or an entirely different dask task). secede/rejoin might be an option? but might
+                # also encourage higher memory use and make things more complicated.
+                # Also, whatever problem is happening may or may not be independent between assets...
+                # could be some internals of cloud storage that are correlated.
+                continue
+
+            if exception_matches(e, errors_as_nodata):
+                warnings.warn("Ignoring as nodata: " + msg)
+                return None
+
+            raise RuntimeError(msg) from e
+
+
+def exception_matches(e: Exception, patterns: Tuple[Exception, ...]) -> bool:
+    """
+    Whether an exception matches one of the pattern exceptions
+
+    Parameters
+    ----------
+    e:
+        The exception to check
+    patterns:
+        Instances of an Exception type to catch, where ``str(exception_pattern)``
+        is a regex pattern to match against ``str(e)``.
+    """
+    e_type = type(e)
+    e_msg = str(e)
+    for pattern in patterns:
+        if issubclass(e_type, type(pattern)):
+            if re.match(str(pattern), e_msg):
+                return True
+    return False
 
 
 def normalize_chunks(

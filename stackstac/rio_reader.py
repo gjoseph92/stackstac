@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import warnings
 from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, TypedDict, Union
 
 import numpy as np
@@ -13,7 +12,6 @@ from .rio_env import LayeredEnv
 from .timer import time
 from .reader_protocol import Reader
 from .raster_spec import RasterSpec
-from .nodata_reader import NodataReader, exception_matches, nodata_for_window
 
 if TYPE_CHECKING:
     from rasterio.enums import Resampling
@@ -42,7 +40,7 @@ DEFAULT_GDAL_ENV = LayeredEnv(
     open=dict(
         GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
         # ^ stop GDAL from requesting `.aux` and `.msk` files from the bucket (speeds up `open` time a lot)
-        VSI_CACHE=True
+        VSI_CACHE=True,
         # ^ cache HTTP requests for opening datasets. This is critical for `ThreadLocalRioDataset`,
         # which re-opens the same URL many times---having the request cached makes subsequent `open`s
         # in different threads snappy.
@@ -283,7 +281,6 @@ class PickleState(TypedDict):
     fill_value: Union[int, float]
     scale_offset: Tuple[Union[int, float], Union[int, float]]
     gdal_env: Optional[LayeredEnv]
-    errors_as_nodata: Tuple[Exception, ...]
 
 
 class AutoParallelRioReader:
@@ -306,7 +303,6 @@ class AutoParallelRioReader:
         fill_value: Union[int, float],
         scale_offset: Tuple[Union[int, float], Union[int, float]],
         gdal_env: Optional[LayeredEnv] = None,
-        errors_as_nodata: Tuple[Exception, ...] = (),
     ) -> None:
         self.url = url
         self.spec = spec
@@ -315,7 +311,6 @@ class AutoParallelRioReader:
         self.fill_value = fill_value
         self.scale_offset = scale_offset
         self.gdal_env = gdal_env or DEFAULT_GDAL_ENV
-        self.errors_as_nodata = errors_as_nodata
 
         self._dataset: Optional[ThreadsafeRioDataset] = None
         self._dataset_lock = threading.Lock()
@@ -323,17 +318,7 @@ class AutoParallelRioReader:
     def _open(self) -> ThreadsafeRioDataset:
         with self.gdal_env.open:
             with time(f"Initial read for {self.url!r} on {_curthread()}: {{t}}"):
-                try:
-                    ds = SelfCleaningDatasetReader(self.url, sharing=False)
-                except Exception as e:
-                    msg = f"Error opening {self.url!r}: {e!r}"
-                    if exception_matches(e, self.errors_as_nodata):
-                        warnings.warn(msg)
-                        return NodataReader(
-                            dtype=self.dtype, fill_value=self.fill_value
-                        )
-
-                    raise RuntimeError(msg) from e
+                ds = SelfCleaningDatasetReader(self.url, sharing=False)
             if ds.count != 1:
                 nr_of_bands = ds.count
                 ds.close()
@@ -376,7 +361,7 @@ class AutoParallelRioReader:
             return SingleThreadedRioDataset(self.gdal_env, ds, vrt=vrt)
 
     @property
-    def dataset(self):
+    def dataset(self) -> ThreadsafeRioDataset:
         with self._dataset_lock:
             if self._dataset is None:
                 self._dataset = self._open()
@@ -384,22 +369,14 @@ class AutoParallelRioReader:
 
     def read(self, window: Window, **kwargs) -> np.ndarray:
         reader = self.dataset
-        try:
-            result = reader.read(
-                window=window,
-                out_dtype=self.dtype,
-                masked=True,
-                # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
-                # without potentially altering pixels that should have been the ``fill_value``
-                **kwargs,
-            )
-        except Exception as e:
-            msg = f"Error reading {window} from {self.url!r}: {e!r}"
-            if exception_matches(e, self.errors_as_nodata):
-                warnings.warn(msg)
-                return nodata_for_window(window, self.fill_value, self.dtype)
-
-            raise RuntimeError(msg) from e
+        result = reader.read(
+            window=window,
+            out_dtype=self.dtype,
+            masked=True,
+            # ^ NOTE: we always do a masked array, so we can safely apply scales and offsets
+            # without potentially altering pixels that should have been the ``fill_value``
+            **kwargs,
+        )
 
         # When the GeoTIFF doesn't have a nodata value, and we're using a VRT, pixels
         # outside the dataset don't get properly masked (they're just 0). Using `add_alpha`
@@ -410,7 +387,9 @@ class AutoParallelRioReader:
         elif result.shape[0] == 1:
             result = result[0]
         else:
-            raise RuntimeError(f"Unexpected shape {result.shape}, expected exactly 1 band.")
+            raise RuntimeError(
+                f"Unexpected shape {result.shape}, expected exactly 1 band."
+            )
 
         scale, offset = self.scale_offset
 
@@ -420,9 +399,9 @@ class AutoParallelRioReader:
             result += offset
 
         result = np.ma.filled(result, fill_value=self.fill_value)
-        assert np.issubdtype(result.dtype, self.dtype), (
-            f"Expected result array with dtype {self.dtype!r}, got {result.dtype!r}"
-        )
+        assert np.issubdtype(
+            result.dtype, self.dtype
+        ), f"Expected result array with dtype {self.dtype!r}, got {result.dtype!r}"
         return result
 
     def close(self) -> None:
@@ -452,7 +431,6 @@ class AutoParallelRioReader:
             "fill_value": self.fill_value,
             "scale_offset": self.scale_offset,
             "gdal_env": self.gdal_env,
-            "errors_as_nodata": self.errors_as_nodata,
         }
 
     def __setstate__(

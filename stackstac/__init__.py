@@ -1,6 +1,6 @@
 from .rio_env import LayeredEnv
 from .rio_reader import DEFAULT_GDAL_ENV, MULTITHREADED_DRIVER_ALLOWLIST
-from .stack import stack
+from .stack import stack, DEFAULT_RETRY_ERRORS, DEFAULT_ERRORS_AS_NODATA
 from .ops import mosaic
 from .geom_utils import reproject_array, array_bounds, array_epsg, xyztile_of_array
 
@@ -13,7 +13,6 @@ except ImportError:
     msg = _traceback.format_exc()
 
     def _missing_imports(*args, **kwargs):
-
         raise ImportError(
             "Optional dependencies for map visualization are missing.\n"
             "Please re-install stackstac with the `viz` extra:\n"
@@ -34,6 +33,8 @@ del importlib
 __all__ = [
     "LayeredEnv",
     "DEFAULT_GDAL_ENV",
+    "DEFAULT_RETRY_ERRORS",
+    "DEFAULT_ERRORS_AS_NODATA",
     "MULTITHREADED_DRIVER_ALLOWLIST",
     "stack",
     "show",
