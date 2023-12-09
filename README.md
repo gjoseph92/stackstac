@@ -64,7 +64,7 @@ pip install stackstac
 
 Windows notes:
 
-It's a good idea to use `conda` to handle installing rasterio on Windows. There's considerably more pain involved with GDAL-type installations using pip. Then `pip install stackstac`.
+It's a good idea to use `conda` to handle installing rasterio on Windows. There's considerably more pain involved with GDAL-type installations using pip. Then `pip install stackstac`.  This will include when upgrading if the new `stackstac` version requires an upgrade of rasterio. e.g. `conda install rasterio=1.2.3` then `pip install --upgrade stackstac'.
 
 ## Things `stackstac` does for you:
 
