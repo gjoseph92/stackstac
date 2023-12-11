@@ -1,0 +1,422 @@
+[
+    {
+        "id": "LC09_L1TP_199027_20221008_20230326_02_T1",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [
+                        0.8854253832019341,
+                        48.50593936854192
+                    ],
+                    [
+                        0.26285287053184364,
+                        46.79961884015438
+                    ],
+                    [
+                        2.6305324360568085,
+                        46.37468271392788
+                    ],
+                    [
+                        3.330195577538132,
+                        48.075774219295695
+                    ],
+                    [
+                        0.8854253832019341,
+                        48.50593936854192
+                    ]
+                ]
+            ]
+        },
+        "bbox": [
+            0.26285287053184364,
+            46.37468271392788,
+            3.330195577538132,
+            48.50593936854192
+        ],
+        "assets": {
+            "B2": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/199/027/LC09_L1TP_199027_20221008_20230326_02_T1/LC09_L1TP_199027_20221008_20230326_02_T1_B2.TIF",
+                "id2": "LC09_L1TP_199027_20221008_20230326_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Blue Band (B2)"
+            },
+            "B3": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/199/027/LC09_L1TP_199027_20221008_20230326_02_T1/LC09_L1TP_199027_20221008_20230326_02_T1_B3.TIF",
+                "id2": "LC09_L1TP_199027_20221008_20230326_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Green Band (B3)"
+            },
+            "B4": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/199/027/LC09_L1TP_199027_20221008_20230326_02_T1/LC09_L1TP_199027_20221008_20230326_02_T1_B4.TIF",
+                "id2": "LC09_L1TP_199027_20221008_20230326_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Red Band (B4)"
+            }
+        },
+        "properties": {
+            "datetime": "2022-10-08T10:41:35.845449Z",
+            "view:off_nadir": 0
+        }
+    },
+    {
+        "id": "LC08_L1TP_198027_20221009_20221013_02_T1",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [
+                        2.432095402737761,
+                        48.50857995792213
+                    ],
+                    [
+                        1.8098548469013855,
+                        46.8018730704457
+                    ],
+                    [
+                        4.1678629873299196,
+                        46.37633562463562
+                    ],
+                    [
+                        4.866830491224445,
+                        48.07781667425339
+                    ],
+                    [
+                        2.432095402737761,
+                        48.50857995792213
+                    ]
+                ]
+            ]
+        },
+        "bbox": [
+            1.8098548469013855,
+            46.37633562463562,
+            4.866830491224445,
+            48.50857995792213
+        ],
+        "assets": {
+            "B2": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/027/LC08_L1TP_198027_20221009_20221013_02_T1/LC08_L1TP_198027_20221009_20221013_02_T1_B2.TIF",
+                "id2": "LC08_L1TP_198027_20221009_20221013_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Blue Band (B2)"
+            },
+            "B3": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/027/LC08_L1TP_198027_20221009_20221013_02_T1/LC08_L1TP_198027_20221009_20221013_02_T1_B3.TIF",
+                "id2": "LC08_L1TP_198027_20221009_20221013_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Green Band (B3)"
+            },
+            "B4": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/027/LC08_L1TP_198027_20221009_20221013_02_T1/LC08_L1TP_198027_20221009_20221013_02_T1_B4.TIF",
+                "id2": "LC08_L1TP_198027_20221009_20221013_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Red Band (B4)"
+            }
+        },
+        "properties": {
+            "datetime": "2022-10-09T10:35:36.466949Z",
+            "view:off_nadir": 0
+        }
+    },
+    {
+        "id": "LC08_L1TP_198028_20221009_20221013_02_T1",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [
+                        1.911418446833477,
+                        47.08716132420589
+                    ],
+                    [
+                        1.3143898002373042,
+                        45.378092264745284
+                    ],
+                    [
+                        3.612713846748114,
+                        44.959779380090914
+                    ],
+                    [
+                        4.283056840990693,
+                        46.66371945193676
+                    ],
+                    [
+                        1.911418446833477,
+                        47.08716132420589
+                    ]
+                ]
+            ]
+        },
+        "bbox": [
+            1.3143898002373042,
+            44.959779380090914,
+            4.283056840990693,
+            47.08716132420589
+        ],
+        "assets": {
+            "B2": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/028/LC08_L1TP_198028_20221009_20221013_02_T1/LC08_L1TP_198028_20221009_20221013_02_T1_B2.TIF",
+                "id2": "LC08_L1TP_198028_20221009_20221013_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Blue Band (B2)"
+            },
+            "B3": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/028/LC08_L1TP_198028_20221009_20221013_02_T1/LC08_L1TP_198028_20221009_20221013_02_T1_B3.TIF",
+                "id2": "LC08_L1TP_198028_20221009_20221013_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Green Band (B3)"
+            },
+            "B4": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/028/LC08_L1TP_198028_20221009_20221013_02_T1/LC08_L1TP_198028_20221009_20221013_02_T1_B4.TIF",
+                "id2": "LC08_L1TP_198028_20221009_20221013_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Red Band (B4)"
+            }
+        },
+        "properties": {
+            "datetime": "2022-10-09T10:36:00.349517Z",
+            "view:off_nadir": 0
+        }
+    },
+    {
+        "id": "LC08_L1TP_198027_20221025_20221107_02_T1",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [
+                        2.414221416451175,
+                        48.50876028226318
+                    ],
+                    [
+                        1.7921547851933306,
+                        46.80222757830497
+                    ],
+                    [
+                        4.150708266299432,
+                        46.376779548043636
+                    ],
+                    [
+                        4.849510562220403,
+                        48.07782691958504
+                    ],
+                    [
+                        2.414221416451175,
+                        48.50876028226318
+                    ]
+                ]
+            ]
+        },
+        "bbox": [
+            1.7921547851933306,
+            46.376779548043636,
+            4.849510562220403,
+            48.50876028226318
+        ],
+        "assets": {
+            "B2": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/027/LC08_L1TP_198027_20221025_20221107_02_T1/LC08_L1TP_198027_20221025_20221107_02_T1_B2.TIF",
+                "id2": "LC08_L1TP_198027_20221025_20221107_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Blue Band (B2)"
+            },
+            "B3": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/027/LC08_L1TP_198027_20221025_20221107_02_T1/LC08_L1TP_198027_20221025_20221107_02_T1_B3.TIF",
+                "id2": "LC08_L1TP_198027_20221025_20221107_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Green Band (B3)"
+            },
+            "B4": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/027/LC08_L1TP_198027_20221025_20221107_02_T1/LC08_L1TP_198027_20221025_20221107_02_T1_B4.TIF",
+                "id2": "LC08_L1TP_198027_20221025_20221107_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Red Band (B4)"
+            }
+        },
+        "properties": {
+            "datetime": "2022-10-25T10:35:40.013503Z",
+            "view:off_nadir": 0
+        }
+    },
+    {
+        "id": "LC08_L1TP_199027_20221101_20221108_02_T1",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [
+                        0.858512670869317,
+                        48.50841068423348
+                    ],
+                    [
+                        0.23639125871657043,
+                        46.80195238918447
+                    ],
+                    [
+                        2.595412435299337,
+                        46.37645380222518
+                    ],
+                    [
+                        3.2943612885583877,
+                        48.077760990232186
+                    ],
+                    [
+                        0.858512670869317,
+                        48.50841068423348
+                    ]
+                ]
+            ]
+        },
+        "bbox": [
+            0.23639125871657043,
+            46.37645380222518,
+            3.2943612885583877,
+            48.50841068423348
+        ],
+        "assets": {
+            "B2": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/199/027/LC08_L1TP_199027_20221101_20221108_02_T1/LC08_L1TP_199027_20221101_20221108_02_T1_B2.TIF",
+                "id2": "LC08_L1TP_199027_20221101_20221108_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Blue Band (B2)"
+            },
+            "B3": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/199/027/LC08_L1TP_199027_20221101_20221108_02_T1/LC08_L1TP_199027_20221101_20221108_02_T1_B3.TIF",
+                "id2": "LC08_L1TP_199027_20221101_20221108_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Green Band (B3)"
+            },
+            "B4": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/199/027/LC08_L1TP_199027_20221101_20221108_02_T1/LC08_L1TP_199027_20221101_20221108_02_T1_B4.TIF",
+                "id2": "LC08_L1TP_199027_20221101_20221108_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Red Band (B4)"
+            }
+        },
+        "properties": {
+            "datetime": "2022-11-01T10:41:52.520710Z",
+            "view:off_nadir": 0
+        }
+    },
+    {
+        "id": "LC09_L1TP_198028_20221102_20230323_02_T1",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [
+                        1.909102504047156,
+                        47.08443966376098
+                    ],
+                    [
+                        1.3125551130299975,
+                        45.375364754038515
+                    ],
+                    [
+                        3.6191594427192393,
+                        44.95785419834833
+                    ],
+                    [
+                        4.289291154449699,
+                        46.66202946589008
+                    ],
+                    [
+                        1.909102504047156,
+                        47.08443966376098
+                    ]
+                ]
+            ]
+        },
+        "bbox": [
+            1.3125551130299975,
+            44.95785419834833,
+            4.289291154449699,
+            47.08443966376098
+        ],
+        "assets": {
+            "B2": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/028/LC09_L1TP_198028_20221102_20230323_02_T1/LC09_L1TP_198028_20221102_20230323_02_T1_B2.TIF",
+                "id2": "LC09_L1TP_198028_20221102_20230323_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Blue Band (B2)"
+            },
+            "B3": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/028/LC09_L1TP_198028_20221102_20230323_02_T1/LC09_L1TP_198028_20221102_20230323_02_T1_B3.TIF",
+                "id2": "LC09_L1TP_198028_20221102_20230323_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Green Band (B3)"
+            },
+            "B4": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2022/198/028/LC09_L1TP_198028_20221102_20230323_02_T1/LC09_L1TP_198028_20221102_20230323_02_T1_B4.TIF",
+                "id2": "LC09_L1TP_198028_20221102_20230323_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Red Band (B4)"
+            }
+        },
+        "properties": {
+            "datetime": "2022-11-02T10:35:51.513949Z",
+            "view:off_nadir": 0
+        }
+    },
+    {
+        "id": "LC09_L1TP_198027_20230206_20230311_02_T1",
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [
+                        2.3667383094782544,
+                        48.505540026652916
+                    ],
+                    [
+                        1.745842356574468,
+                        46.79875966532977
+                    ],
+                    [
+                        4.112442783811361,
+                        46.37499827920248
+                    ],
+                    [
+                        4.810787907026006,
+                        48.07628444541995
+                    ],
+                    [
+                        2.3667383094782544,
+                        48.505540026652916
+                    ]
+                ]
+            ]
+        },
+        "bbox": [
+            1.745842356574468,
+            46.37499827920248,
+            4.810787907026006,
+            48.505540026652916
+        ],
+        "assets": {
+            "B2": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2023/198/027/LC09_L1TP_198027_20230206_20230311_02_T1/LC09_L1TP_198027_20230206_20230311_02_T1_B2.TIF",
+                "id2": "LC09_L1TP_198027_20230206_20230311_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Blue Band (B2)"
+            },
+            "B3": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2023/198/027/LC09_L1TP_198027_20230206_20230311_02_T1/LC09_L1TP_198027_20230206_20230311_02_T1_B3.TIF",
+                "id2": "LC09_L1TP_198027_20230206_20230311_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Green Band (B3)"
+            },
+            "B4": {
+                "href": "s3://usgs-landsat/collection02/level-1/standard/oli-tirs/2023/198/027/LC09_L1TP_198027_20230206_20230311_02_T1/LC09_L1TP_198027_20230206_20230311_02_T1_B4.TIF",
+                "id2": "LC09_L1TP_198027_20230206_20230311_02_T1",
+                "type": "image/vnd.stac.geotiff; cloud-optimized=true",
+                "title": "Red Band (B4)"
+            }
+        },
+        "properties": {
+            "datetime": "2023-02-06T10:35:33.461417Z",
+            "view:off_nadir": 0
+        }
+    }
+]
