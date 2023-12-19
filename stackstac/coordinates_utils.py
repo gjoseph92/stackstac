@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import defaultdict
 
 from typing import Any, Container, Iterable, Iterator, Mapping, TypeVar, Union
 
@@ -83,7 +84,7 @@ def items_to_coords(
         dims
     ), f"{shape=} has {len(shape)} dimensions; {dims=} has {len(dims)}"
 
-    fields = {}
+    fields = defaultdict(lambda: DtypeUpdatingArray(shape))
     # {field:
     #   np.array([
     #       [v_asset_0, v_asset_1, ...],  # item 0
@@ -92,29 +93,33 @@ def items_to_coords(
     #   ])
     # }
     for idx, field, value in items:
+        values = fields[field]
+        values[idx] = value
+
+    deduped = {field: deduplicate_axes(arr.arr) for field, arr in fields.items()}
+
+    return {field: xr.Variable(dims, arr).squeeze() for field, arr in deduped.items()}
+
+
+class DtypeUpdatingArray:
+    _arr: np.ndarray | None
+    _shape: tuple[int, ...]
+
+    def __init__(self, shape: tuple[int, ...]) -> None:
+        self._arr = None
+        self._shape = shape
+
+    def __setitem__(self, idx, value) -> None:
         assert len(idx) == len(
-            shape
-        ), f"Expected {len(shape)}-dimensional index, got {idx}"
+            self._shape
+        ), f"Expected {len(self._shape)}-dimensional index, got {idx}"
+        if self._arr is None:
+            # Based on this first value, we guess whether the dtype will be numeric, or
+            # str/object.
+            dtype, fill = self.dtype_fill_for(value)
+            self._arr = np.full(self._shape, fill, dtype=dtype)
         try:
-            values = fields[field]
-        except KeyError:
-            # Haven't seen this field before, so create the array of its values.
-            # We guess whether the dtype will be numeric, or str/object, based
-            # on this first value.
-            if isinstance(value, (int, float)):
-                dtype = float
-                fill = np.nan
-                # NOTE: we don't use int64, even for ints, because there'd be no
-                # way to represent missing values. Using pandas nullable arrays
-                # could be interesting at some point.
-            else:
-                dtype = object
-                fill = None
-
-            values = fields[field] = np.full(shape, fill, dtype=dtype)
-
-        try:
-            values[idx] = value
+            self._arr[idx] = value
         except (TypeError, ValueError):
             # If our dtype guess was wrong, or a field has values of multiple types,
             # promote the whole array to a more generic dtype.
@@ -122,19 +127,32 @@ def items_to_coords(
             # (so if there did happen to be string values that could be parsed as numbers,
             # we'd do that, which is probably ok?)
             try:
-                new_dtype = np.result_type(value, values)
+                new_dtype = np.result_type(value, self._arr)
             except TypeError:
                 # Thrown when "no common DType exists for the given inputs.
                 # For example they cannot be stored in a single array unless the
                 # dtype is `object`"
-                new_dtype = object
+                new_dtype = np.dtype(object)
 
-            values = fields[field] = values.astype(new_dtype)
-            values[idx] = value
+            self._arr = self._arr.astype(new_dtype)
+            self._arr[idx] = value  # redo insertion with new dtype
 
-    deduped = {field: deduplicate_axes(arr) for field, arr in fields.items()}
+    @staticmethod
+    def dtype_fill_for(x) -> tuple[type | np.dtype, object]:
+        if isinstance(x, (int, float)):
+            # TODO bool, complex
+            return (float, np.nan)
+            # NOTE: we don't use int64, even for ints, because there'd be no
+            # way to represent missing values. Using pandas nullable arrays
+            # could be interesting at some point.
+        else:
+            # TODO datetime?
+            return (object, None)
 
-    return {field: xr.Variable(dims, arr).squeeze() for field, arr in deduped.items()}
+    @property
+    def arr(self) -> np.ndarray:
+        assert self._arr is not None, "Accessing array with no values"
+        return self._arr
 
 
 def deduplicate_axes(arr: np.ndarray) -> np.ndarray:

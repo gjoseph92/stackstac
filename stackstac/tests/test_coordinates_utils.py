@@ -1,7 +1,9 @@
+from datetime import datetime
 import numpy as np
 import pytest
 
 from stackstac.coordinates_utils import (
+    DtypeUpdatingArray,
     deduplicate_axes,
     items_to_coords,
     unnested_items,
@@ -118,21 +120,21 @@ def test_items_to_coords_3d_same_bands():
             "smallsat": {
                 "red": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.2,
+                    "cloudy": True,
                 },
                 "nir": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.2,
+                    "cloudy": True,
                 },
             },
             "bigsat": {
                 "red": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.1,
+                    "cloudy": False,
                 },
                 "nir": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.1,
+                    "cloudy": False,
                 },
             },
         },
@@ -140,21 +142,21 @@ def test_items_to_coords_3d_same_bands():
             "smallsat": {
                 "red": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.6,
+                    "cloudy": True,
                 },
                 "nir": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.6,
+                    "cloudy": True,
                 },
             },
             "bigsat": {
                 "red": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.3,
+                    "cloudy": True,
                 },
                 "nir": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.3,
+                    "cloudy": True,
                 },
             },
         },
@@ -162,21 +164,21 @@ def test_items_to_coords_3d_same_bands():
             "smallsat": {
                 "red": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.0,
+                    "cloudy": False,
                 },
                 "nir": {
                     "type": "geotiff",
-                    "cloud_fraction": 0.0,
+                    "cloudy": False,
                 },
             },
             "bigsat": {
                 "red": {
                     "type": "geotiff",
-                    # "cloud_fraction": 0.0,
+                    # "cloudy": False,
                 },
                 "nir": {
                     "type": "geotiff",
-                    # "cloud_fraction": 0.0,
+                    # "cloudy": False,
                 },
             },
         },
@@ -194,14 +196,14 @@ def test_items_to_coords_3d_same_bands():
         dims=("time", "platform", "band"),
     )
 
-    cloud_fraction = coords["cloud_fraction"]
-    assert cloud_fraction.dims == ("time", "platform")
+    cloudy = coords["cloudy"]
+    assert cloudy.dims == ("time", "platform")
     np.testing.assert_equal(
-        cloud_fraction.values,
+        cloudy.values,
         [
-            [0.2, 0.1],
-            [0.6, 0.3],
-            [0.0, np.nan],
+            [True, False],
+            [True, True],
+            [False, None],
         ],
     )
 
@@ -346,3 +348,33 @@ def test_items_to_coords_3d_different_bands():
             [5, 10, np.nan],
         ],
     )
+
+
+@pytest.mark.parametrize(
+    "values, expected, dtype",
+    [
+        # NOTE: the array will always be initialized to size 4
+        ([3, 4, 5], [3.0, 4.0, 5.0, np.nan], float),
+        ([3, 4, 5, 6], [3.0, 4.0, 5.0, 6.0], float),
+        ([3, 4.1, 5.2], [3.0, 4.1, 5.2, np.nan], float),
+        ([3, "foo"], [3, "foo", None, None], object),
+        (["foo", 3], ["foo", 3, None, None], object),
+        ([3, "4", "5"], [3, "4", "5", None], object),
+        ([2.2, {"x": 1}, 3.3, 4], [2.2, {"x": 1}, 3.3, 4], object),
+        ([True, True, False], [True, True, False, None], object),
+        ([1, True, False], [1, True, False, None], object),
+        (
+            [datetime(2020, 1, 1), datetime(2020, 2, 1), datetime(2020, 3, 1)],
+            [datetime(2020, 1, 1), datetime(2020, 2, 1), datetime(2020, 3, 1), np.nan],
+            np.datetime64,
+        ),
+    ],
+)
+def test_dtype_updating_array(values, expected, dtype):
+    a = DtypeUpdatingArray((4,))
+    for i, x in enumerate(values):
+        a[(i,)] = x
+
+    arr = a.arr
+    np.testing.assert_array_equal(arr, expected)
+    assert arr.dtype == np.dtype(dtype)
