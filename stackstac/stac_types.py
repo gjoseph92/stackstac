@@ -91,7 +91,7 @@ AssetDict = TypedDict(
             Tuple[int, int, int, int, int, int],
             Tuple[int, int, int, int, int, int, int, int, int],
         ],
-        "eo:bands": EOBand,
+        "eo:bands": List[EOBand],
         "sar:polarizations": List[str],
     },
     total=False,
@@ -131,13 +131,12 @@ ItemIsh = Union[SatstacItem, PystacItem, ItemDict]
 ItemCollectionIsh = Union[
     SatstacItemCollection, PystacCatalog, PystacItemCollection, ItemSequence
 ]
+ItemsIsh = Union[
+    ItemCollectionIsh, ItemIsh, Sequence[PystacItem], Sequence[SatstacItem]
+]
 
 
-def items_to_plain(
-    items: Union[
-        ItemCollectionIsh, ItemIsh, Sequence[PystacItem], Sequence[SatstacItem]
-    ]
-) -> ItemSequence:
+def items_to_plain(items: ItemsIsh) -> ItemSequence:
     """
     Convert something like a collection/Catalog of STAC items into a list of plain dicts
 
