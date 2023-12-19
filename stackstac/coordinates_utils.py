@@ -134,7 +134,15 @@ class DtypeUpdatingArray:
                 # dtype is `object`"
                 new_dtype = np.dtype(object)
 
-            self._arr = self._arr.astype(new_dtype)
+            if new_dtype.kind == "O":
+                # Replace previous NaN fill values with None when converting to object array.
+                # Of course, this would convert values that were actually None in the data...
+                assert self._arr.dtype.kind != "O", self._arr.dtype
+                isnan = np.isnan(self._arr)
+                self._arr = np.where(isnan, None, self._arr)  # type: ignore
+            else:
+                self._arr = self._arr.astype(new_dtype)
+
             self._arr[idx] = value  # redo insertion with new dtype
 
     @staticmethod
