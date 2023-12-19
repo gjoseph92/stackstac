@@ -361,6 +361,7 @@ def test_items_to_coords_3d_different_bands():
         (["foo", 3], ["foo", 3, None, None], object),
         ([2.2, {"x": 1}, 3.3, 4], [2.2, {"x": 1}, 3.3, 4], object),
         ([True, True, False], [True, True, False, None], object),
+        ([True, True, False, False], [True, True, False, False], bool),
         # (
         #     [datetime(2020, 1, 1), datetime(2020, 2, 1), datetime(2020, 3, 1)],
         #     [datetime(2020, 1, 1), datetime(2020, 2, 1), datetime(2020, 3, 1), np.nan],
@@ -379,6 +380,6 @@ def test_dtype_updating_array(values, expected, dtype):
     for i, x in enumerate(values):
         a[(i,)] = x
 
-    arr = a.arr
+    arr = a.arr()
     np.testing.assert_array_equal(arr, expected)
     assert arr.dtype == np.dtype(dtype)

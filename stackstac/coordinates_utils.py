@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections import defaultdict
 import datetime
 
-from typing import Any, Container, Iterable, Iterator, Mapping, TypeVar, Union
+from typing import Any, Callable, Container, Iterable, Iterator, Mapping, TypeVar, Union
 
 import numpy as np
 import pandas as pd
@@ -97,7 +97,7 @@ def items_to_coords(
         values = fields[field]
         values[idx] = value
 
-    deduped = {field: deduplicate_axes(arr.arr) for field, arr in fields.items()}
+    deduped = {field: deduplicate_axes(arr.arr()) for field, arr in fields.items()}
 
     return {field: xr.Variable(dims, arr).squeeze() for field, arr in deduped.items()}
 
@@ -105,10 +105,12 @@ def items_to_coords(
 class DtypeUpdatingArray:
     _arr: np.ndarray | None
     _shape: tuple[int, ...]
+    _postprocess: Callable[[np.ndarray], np.ndarray] | None
 
     def __init__(self, shape: tuple[int, ...]) -> None:
         self._arr = None
         self._shape = shape
+        self._postprocess = None
 
     def __setitem__(self, idx, value) -> None:
         assert len(idx) == len(
@@ -117,7 +119,7 @@ class DtypeUpdatingArray:
         if self._arr is None:
             # Based on this first value, we guess whether the dtype will be numeric, or
             # str/object.
-            dtype, fill = self.dtype_fill_for(value)
+            dtype, fill, self._postprocess = self.dtype_fill_postprocess_for(value)
             self._arr = np.full(self._shape, fill, dtype=dtype)
         try:
             self._arr[idx] = value
@@ -144,30 +146,39 @@ class DtypeUpdatingArray:
             else:
                 self._arr = self._arr.astype(new_dtype)
 
+            self._postprocess = None  # postprocess is invalidated if we convert dtypes
             self._arr[idx] = value  # redo insertion with new dtype
 
     @staticmethod
-    def dtype_fill_for(x) -> tuple[type | np.dtype, object]:
+    def dtype_fill_postprocess_for(
+        x,
+    ) -> tuple[type | np.dtype, object, Callable[[np.ndarray], np.ndarray] | None]:
         if isinstance(x, bool):
             # `bool` is a subclass of `int` in Python.
-            return (object, None)
+            def postprocess(arr: np.ndarray) -> np.ndarray:
+                if not (arr == None).any():  # noqa: E711
+                    return arr.astype(bool)
+                return arr
+
+            return (object, None, postprocess)
             # Sadly, we have to use an object array so we can represent missing values.
         if isinstance(x, (int, float)):
             # TODO bool, complex
-            return (float, np.nan)
+            return (float, np.nan, None)
             # NOTE: we don't use int64, even for ints, because there'd be no
             # way to represent missing values. Using pandas nullable arrays
             # could be interesting at some point.
         if isinstance(x, complex):
-            return (complex, np.nan)
+            return (complex, np.nan, None)
         # TODO: datetimes. Handling datetime objects will take some special logic
         # (you can't just assign them), plus not sure about timezones.
 
-        return (object, None)
+        return (object, None, None)
 
-    @property
     def arr(self) -> np.ndarray:
         assert self._arr is not None, "Accessing array with no values"
+        if self._postprocess:
+            return self._postprocess(self._arr)
         return self._arr
 
 
