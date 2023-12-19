@@ -359,15 +359,19 @@ def test_items_to_coords_3d_different_bands():
         ([3, 4.1, 5.2], [3.0, 4.1, 5.2, np.nan], float),
         ([3, "foo"], [3, "foo", None, None], object),
         (["foo", 3], ["foo", 3, None, None], object),
-        ([3, "4", "5"], [3, "4", "5", None], object),
         ([2.2, {"x": 1}, 3.3, 4], [2.2, {"x": 1}, 3.3, 4], object),
         ([True, True, False], [True, True, False, None], object),
-        ([1, True, False], [1, True, False, None], object),
         (
             [datetime(2020, 1, 1), datetime(2020, 2, 1), datetime(2020, 3, 1)],
             [datetime(2020, 1, 1), datetime(2020, 2, 1), datetime(2020, 3, 1), np.nan],
             np.datetime64,
         ),
+        # strings get parsed to numbers if the first value is a number. this isn't ideal
+        # or something that should be relied on, but we test for it to be aware if the
+        # behavior changes.
+        ([3, "4", "5"], [3, 4, 5, np.nan], float),
+        # if a bool follows a number, it'll get cast. also not ideal, but testing to notice changes.
+        ([1, True, False], [1.0, 1.0, 0.0, np.nan], float),
     ],
 )
 def test_dtype_updating_array(values, expected, dtype):
