@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
+import datetime
 
 from typing import Any, Container, Iterable, Iterator, Mapping, TypeVar, Union
 
@@ -147,15 +148,22 @@ class DtypeUpdatingArray:
 
     @staticmethod
     def dtype_fill_for(x) -> tuple[type | np.dtype, object]:
+        if isinstance(x, bool):
+            # `bool` is a subclass of `int` in Python.
+            return (object, None)
+            # Sadly, we have to use an object array so we can represent missing values.
         if isinstance(x, (int, float)):
             # TODO bool, complex
             return (float, np.nan)
             # NOTE: we don't use int64, even for ints, because there'd be no
             # way to represent missing values. Using pandas nullable arrays
             # could be interesting at some point.
-        else:
-            # TODO datetime?
-            return (object, None)
+        if isinstance(x, complex):
+            return (complex, np.nan)
+        # TODO: datetimes. Handling datetime objects will take some special logic
+        # (you can't just assign them), plus not sure about timezones.
+
+        return (object, None)
 
     @property
     def arr(self) -> np.ndarray:
