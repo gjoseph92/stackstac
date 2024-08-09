@@ -17,7 +17,7 @@ build:
       # Install PDM in its own isolated environment, so docs deps don't trample its deps
       - curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3 -
       # TODO how to get `pdm` on the $PATH?
-      - $HOME/.local/bin/pdm info
+      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH $HOME/.local/bin/pdm info
       # https://github.com/pdm-project/pdm/discussions/1365#discussioncomment-3581356
       # NOTE: pandoc fails in isolation mode
       - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH $HOME/.local/bin/pdm sync -v --no-isolation -G viz -dG docs
