@@ -10,6 +10,10 @@ build:
   jobs:
     post_install:
       - env
+      - ls -al $READTHEDOCS_VIRTUALENV_PATH
+      - python --version
+      - python -c "import sys; print(sys.executable)"
+      - ls -l $(python -c "import sys; print(sys.executable)")
       # Install PDM in its own isolated environment, so docs deps don't trample its deps
       - curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3 -
       # TODO how to get `pdm` on the $PATH?
