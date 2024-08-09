@@ -36,7 +36,7 @@ def items_to_dask(
     "Create a dask Array from an asset table"
     errors_as_nodata = errors_as_nodata or ()  # be sure it's not None
 
-    if not np.can_cast(fill_value, dtype):
+    if not np.can_cast(type(fill_value), dtype):
         raise ValueError(
             f"The fill_value {fill_value} is incompatible with the output dtype {dtype}. "
             f"Either use `dtype={np.array(fill_value).dtype.name!r}`, or pick a different `fill_value`."
