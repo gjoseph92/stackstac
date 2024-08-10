@@ -359,7 +359,6 @@ class AutoParallelRioReader:
                         **self.spec.vrt_params,
                     )
             else:
-                logger.info(f"Skipping VRT for {self.url!r}")
                 vrt = None
 
         if ds.driver in MULTITHREADED_DRIVER_ALLOWLIST:
