@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1 (2024-08-09)
+- Support NumPy 2.0 [@floriandeboissieu](https://github.com/floriandeboissieu) [@gjoseph92](https://github.com/gjoseph92)
+- Require pandas 2.0, fix `'infer_datetime_format' is deprecated` warning, fix NaT values in time dimension [@gjoseph92](https://github.com/gjoseph92) [bastien-k](https://github.com/bastien-k) [clausmichele](https://github.com/clausmichele) [J6767](https://github.com/J6767)
+- Fix `Unexpected shape` error with `errors_as_nodata` [@gjoseph92](https://github.com/gjoseph92) [fkroeber](https://github.com/fkroeber)
+- Fix error when generating error message for multi-band rasters [yellowcap](https://github.com/yellowcap)
+- Remove annoying `Skipping VRT` log statement [@gjoseph92](https://github.com/gjoseph92)
+
 ## 0.5.0 (2023-09-19)
 - **Breaking change in specific scenarios:** `rescale=True` now uses STAC metadata from `raster:bands`, instead of metadata set per GeoTIFF [@RSchueder](https://github.com/RSchueder)
 - Fix black stripes when mosaicing (introduced in 0.4.4) [@gjoseph92](https://github.com/gjoseph92) [@lhcorralo](https://github.com/lhcorralo)
