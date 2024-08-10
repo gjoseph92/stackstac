@@ -42,7 +42,7 @@ DEFAULT_GDAL_ENV = LayeredEnv(
     open=dict(
         GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
         # ^ stop GDAL from requesting `.aux` and `.msk` files from the bucket (speeds up `open` time a lot)
-        VSI_CACHE=True
+        VSI_CACHE=True,
         # ^ cache HTTP requests for opening datasets. This is critical for `ThreadLocalRioDataset`,
         # which re-opens the same URL many times---having the request cached makes subsequent `open`s
         # in different threads snappy.
@@ -70,11 +70,9 @@ MULTITHREADED_DRIVER_ALLOWLIST = {"GTiff"}
 class ThreadsafeRioDataset(Protocol):
     scale_offset: Tuple[Union[int, float], Union[int, float]]
 
-    def read(self, window: Window, **kwargs) -> np.ndarray:
-        ...
+    def read(self, window: Window, **kwargs) -> np.ndarray: ...
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
 
 class SingleThreadedRioDataset:
@@ -408,8 +406,14 @@ class AutoParallelRioReader:
             result = np.ma.masked_array(result[0], mask=result[1] == 0)
         elif result.shape[0] == 1:
             result = result[0]
-        else:
-            raise RuntimeError(f"Unexpected shape {result.shape}, expected exactly 1 band.")
+        elif result.ndim != 2:
+            # We should only be getting `result.ndim == 2` in the case when `_open` produced a `NodataReader`.
+            # `Reader`s always return 2D arrays, whereas `rasterio.read` returns 3D. Pedantically, `NodataReader`
+            # shouldn't be a `Reader`, but a `ThreadsafeRioDataset`, and it should return a 3D array,
+            # just to be more consistent.
+            raise RuntimeError(
+                f"Unexpected shape {result.shape}, expected exactly 1 band."
+            )
 
         scale, offset = self.scale_offset
 
@@ -419,9 +423,9 @@ class AutoParallelRioReader:
             result += offset
 
         result = np.ma.filled(result, fill_value=self.fill_value)
-        assert np.issubdtype(result.dtype, self.dtype), (
-            f"Expected result array with dtype {self.dtype!r}, got {result.dtype!r}"
-        )
+        assert np.issubdtype(
+            result.dtype, self.dtype
+        ), f"Expected result array with dtype {self.dtype!r}, got {result.dtype!r}"
         return result
 
     def close(self) -> None:
