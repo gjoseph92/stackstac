@@ -76,6 +76,7 @@ util = [
     "sphinx-autobuild>=2021.3.14",
     "twine>=3.4.1",
     "dask-pyspy>=0.4.0",
+    "shapely>=2.0.5",
 ]
 
 [build-system]
