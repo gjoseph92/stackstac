@@ -9,8 +9,11 @@ from .reader_protocol import Reader
 State = Tuple[np.dtype, Union[int, float]]
 
 
+# NOTE: this really should be a `ThreadsafeRioDataset` in `rio_reader.py`,
+# not a `Reader` (it's never used as one).
 class NodataReader:
     "Reader that returns a constant (nodata) value for all reads"
+
     scale_offset = (1.0, 0.0)
 
     def __init__(
