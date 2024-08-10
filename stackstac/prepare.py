@@ -408,12 +408,12 @@ def to_coords(
         errors="raise",
         format="ISO8601",
     )
+    # Convert to UTC and drop timezone info if present, since xarray can't handle
+    # tz-aware DatetimeIndexes: https://github.com/pydata/xarray/issues/3291.
+    # Since all STAC timestamps should be UTC (https://github.com/radiantearth/stac-spec/issues/1095),
+    # we feel safe assuming that if `times.tz is None`, it's already in UTC.
     if times.tz is not None:
-        # xarray can't handle tz-aware DatetimeIndexes, so we convert to UTC and drop the timezone
-        # https://github.com/pydata/xarray/issues/3291.
-        # The `tz is None` case is typically a manifestation of https://github.com/pandas-dev/pandas/issues/41047.
-        # Since all STAC timestamps should be UTC (https://github.com/radiantearth/stac-spec/issues/1095),
-        # we feel safe assuming that any tz-naive datetimes are already in UTC.
+        # `tz_convert(None)` converts to UTC and drops timezone information.
         times = times.tz_convert(None)
 
     dims = ["time", "band", "y", "x"]
