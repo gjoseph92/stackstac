@@ -1,196 +1,165 @@
-from typing import (
-    Container,
-    Dict,
-    Hashable,
-    Iterable,
-    Literal,
-    Mapping,
-    Sequence,
-    Union,
-    TypeVar,
-)
-
 import numpy as np
+import pandas as pd
 import xarray as xr
+from itertools import chain
 
 
-# properties can contain lists; need some way to tell them a singleton list
-# apart from the list of properties we're collecting
-class _ourlist(list):
-    pass
-
-
-def metadata_to_coords(
-    items: Iterable[Mapping[str, object]],
-    dim_name: str,
-    fields: Union[str, Sequence[str], Literal[True]] = True,
-    skip_fields: Container[str] = (),
-) -> Dict[str, xr.Variable]:
-    return dict_to_coords(
-        accumulate_metadata(
-            items,
-            fields=[fields] if isinstance(fields, str) else fields,
-            skip_fields=skip_fields,
-        ),
-        dim_name,
-    )
-
-
-T = TypeVar("T", bound=Hashable)
-
-
-def accumulate_metadata(
-    items: Iterable[Mapping[T, object]],
-    fields: Union[Sequence[T], Literal[True]] = True,
-    skip_fields: Container[T] = (),
-) -> Dict[T, object]:
+def is_constant(arr):
     """
-    Accumulate a sequence of multiple similar dicts into a single dict of lists.
+    Return True if arr is constant along the first dimension
 
-    Each field will contain a list of all the values for that field (equal length to ``items``).
-    For items where the field didn't exist, None is used.
+    Parameters
+    ----------
+    arr:
+        list or array
+    """
+    is_constant = True
+    first_value = arr[0]
+    for i in arr:
+        if i != first_value:
+            is_constant = False
+            break
+    return is_constant
 
-    Fields with only one unique value are flattened down to just that single value.
+
+def flatten(arr):
+    """
+    Flatten a list
+
+    Parameters
+    ----------
+    arr:
+        list or array
+    """
+    return [item for sublist in arr for item in sublist]
+
+
+def accumulate_assets_coords(items, asset_ids, coords):
+    """
+    Accumulate and deduplicate coordinnates (as per xarray nomenclature) from the items 'assets'
 
     Parameters
     ----------
     items:
-        Iterable of dicts to accumulate
-    fields:
-        Only use these fields. If True, use all fields.
-    skip_fields:
-        Skip these fields.
+        list of stac items (in dictionnary format)
+    asset_ids:
+        list asset keys to be considered
+    coords:
+        dictionnary of existing coords to avoid overwriting them
     """
-    all_fields: Dict[T, object] = {}
-    for i, item in enumerate(items):
-        # Inductive case: update existing fields
-        for existing_field, existing_value in all_fields.items():
-            new_value = item.get(existing_field, None)
-            if new_value == existing_value:
-                # leave fields that are the same for every item as singletons
-                continue
-            if isinstance(existing_value, _ourlist):
-                # we already have a list going; add to it
-                existing_value.append(new_value)
-            else:
-                # all prior values were the same; this is the first different one
-                all_fields[existing_field] = _ourlist(
-                    [existing_value] * i + [new_value]
-                )
 
-        # Base case 1: add any never-before-seen fields, when inferring field names
-        if fields is True:
-            for new_field in item.keys() - all_fields.keys():
-                if new_field in skip_fields:
-                    continue
-                value = item[new_field]
-                all_fields[new_field] = (
-                    value if i == 0 else _ourlist([None] * i + [value])
-                )
-        # Base case 2: initialize with predefined fields
-        elif i == 0:
-            all_fields.update(
-                (field, item.get(field, None))
-                for field in fields
-                if field not in skip_fields
+    # Selecting assets from 'asset_ids' and ordering them
+    assets_items = [
+        [item["assets"][asset_id] for asset_id in asset_ids] for item in items
+    ]
+
+    # List of all assets keys (deduplicated)
+    asset_keys = [
+        key
+        for key in set(chain.from_iterable(flatten(assets_items)))
+        if key not in coords.keys()
+    ]
+
+    # Flatening cases with 'eo:bands'
+    if "eo:bands" in asset_keys:
+        out = []
+        for assets_item in assets_items:
+            for asset in assets_item:
+                eo = asset.pop("eo:bands", [{}])
+                asset.update(eo[0] if isinstance(eo, list) else {})
+            out.append(assets_item)
+        assets_items = out
+        asset_keys = set(chain.from_iterable(flatten(assets_items)))
+
+    # Making sure all assets have all asset_keys and filling the others with np.nan
+    assets_items = [
+        [[asset.get(key, np.nan) for key in asset_keys] for asset in assets_item]
+        for assets_item in assets_items
+    ]
+
+    # Facilitating transposing via numpy for duplicates finding
+    assets_items = np.array(assets_items, dtype=object)
+
+    # Dropping all nulls
+    nan_mask = pd.notnull(assets_items).any(axis=2).any(axis=0)
+    assets_items = assets_items[:, nan_mask, :]
+
+    # Looping through assets_keys and determining what is unique and what is not
+    assets_coords = {}
+    for asset_key, band_oriented_coords, time_oriented_coords in zip(
+        asset_keys, assets_items.transpose(2, 1, 0), assets_items.transpose(2, 0, 1)
+    ):
+        is_band_dependant = is_constant(band_oriented_coords.tolist())
+        is_time_dependant = is_constant(time_oriented_coords.tolist())
+
+        if is_time_dependant and is_band_dependant:
+            # same than band_oriented_coords[0, 0]
+            constant = time_oriented_coords[0, 0]
+            # xarray doesn't support passing a list as a constant coords for now
+            assets_coords[asset_key] = str(constant) if isinstance(constant, list) else constant
+            
+        elif is_time_dependant:
+            assets_coords[asset_key] = xr.Variable(["band"], time_oriented_coords[0])
+        elif is_band_dependant:
+            assets_coords[asset_key] = xr.Variable(["time"], band_oriented_coords[0])
+        else:
+            # rioxarray convention is ordered: time, band, y, x
+            assets_coords[asset_key] = xr.Variable(
+                ["time", "band"], time_oriented_coords
             )
 
-    return all_fields
+    return assets_coords
 
 
-def accumulate_metadata_only_allsame(
-    items: Iterable[Mapping[T, object]],
-    skip_fields: Container[T] = (),
-) -> Dict[T, object]:
+def accumulate_properties_coords(items, coords):
     """
-    Accumulate multiple similar dicts into a single flattened dict of only consistent values.
-
-    If the value of a field differs between items, the field is dropped.
-    If the value of a field is the same for all items that contain that field, the field is kept.
-
-    Note this means that missing fields are ignored, not treated as different.
+    Accumulate and deduplicate coordinnates (as per xarray nomenclature) from the items 'properties'
 
     Parameters
     ----------
     items:
-        Iterable of dicts to accumulate
-    skip_fields:
-        Skip these fields when ``fields`` is True.
+        list of stac items (in dictionnary format)
+    coords:
+        dictionnary of existing coords to avoid overwriting them
     """
-    all_fields: Dict[T, object] = {}
-    for item in items:
-        for field, value in item.items():
-            if field in skip_fields:
-                continue
-            if field not in all_fields:
-                all_fields[field] = value
-            else:
-                if value != all_fields[field]:
-                    all_fields[field] = None
+    # Selecting properties only
+    properties_items = [item["properties"] for item in items]
 
-    return {field: value for field, value in all_fields.items() if value is not None}
+    # List of all assets keys (deduplicated)
+    properties_keys = [
+        key
+        for key in set(chain.from_iterable(properties_items))
+        if key not in coords.keys()
+    ]
 
+    # Making sure all properties have all properties_keys and ordering them
+    properties_items = [
+        [properties_item.get(key, np.nan) for key in properties_keys]
+        for properties_item in properties_items
+    ]
 
-def dict_to_coords(
-    metadata: Dict[str, object], dim_name: str
-) -> Dict[str, xr.Variable]:
-    """
-    Convert the output of `accumulate_metadata` into a dict of xarray Variables.
+    # Facilitating transposing via numpy for duplicates finding
+    properties_items = np.array(properties_items, dtype=object)
 
-    1-length lists and scalar values become 0D variables.
+    # Dropping all nulls
+    nan_mask = pd.notnull(properties_items).any(axis=0)
+    properties_items = properties_items[:, nan_mask]
 
-    Instances of ``_ourlist`` become 1D variables for ``dim_name``.
+    # Looping through properties_keys and determining what is unique and what is not
+    properties_coords = {}
+    for properties_key, time_oriented_coords in zip(
+        properties_keys, properties_items.T
+    ):
+        is_time_dependant = not is_constant(time_oriented_coords.tolist())
 
-    Any other things with >= 1 dimension are dropped, because they probably don't line up
-    with the other dimensions of the final array.
-    """
-    coords = {}
-    for field, props in metadata.items():
-        while isinstance(props, list) and not isinstance(props, _ourlist):
-            # a list scalar (like `instruments = ['OLI', 'TIRS']`).
-
-            # first, unpack (arbitrarily-nested) 1-element lists.
-            # keep re-checking if it's still a list
-            if len(props) == 1:
-                props = props[0]
-                continue
-
-            # for now, treat multi-item lists as a set so xarray can interpret them as 0D variables.
-            # (numpy very much does not like to create object arrays containing python lists;
-            # `set` is basically a hack to make a 0D ndarray containing a Python object with multiple items.)
-            try:
-                props = set(props)
-            except TypeError:
-                # if it's not set-able, just give up
-                break
-
-        props_arr = np.squeeze(
-            np.array(
-                props,
-                # Avoid DeprecationWarning creating ragged arrays when elements are lists/tuples of different lengths
-                dtype="object"
-                if (
-                    isinstance(props, _ourlist)
-                    and len(set(len(x) if isinstance(x, (list, tuple)) else type(x) for x in props))
-                    > 1
-                )
-                else None,
+        if is_time_dependant:
+            properties_coords[properties_key] = xr.Variable(
+                ["time"], time_oriented_coords
             )
-        )
+        else:
+            # rioxarray convention is ordered: time, band, y, x
+            constant = time_oriented_coords[0]
+            # xarray doesn't support passing a list as a constant coords for now
+            properties_coords[properties_key] = str(constant) if isinstance(constant, list) else constant
 
-        if (
-            props_arr.ndim > 1
-            or props_arr.ndim == 1
-            and not isinstance(props, _ourlist)
-        ):
-            # probably a list-of-lists situation. the other dims likely don't correspond to
-            # our "bands", "y", and "x" dimensions, and xarray won't let us use unrelated
-            # dimensions. so just skip it for now.
-            continue
-
-        coords[field] = xr.Variable(
-            (dim_name,) if props_arr.ndim == 1 else (),
-            props_arr,
-        )
-
-    return coords
+    return properties_coords
