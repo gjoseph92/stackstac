@@ -31,6 +31,16 @@ ASSET_TABLE_DT = np.dtype(
     [("url", object), ("bounds", "float64", 4), ("scale_offset", "float64", 2)]
 )
 
+def get_crs(item, default = None) -> Optional[int]:
+    props = item.get("properties", {})
+    crs = props.get("proj:code")
+    if isinstance(crs, str) and crs.startswith("EPSG:"):
+        crs = int(crs.split(":")[1])
+    else:
+        crs = props.get("proj:epsg")
+    if crs is None:
+        crs = default
+    return crs
 
 class Mimetype(NamedTuple):
     type: str
@@ -131,7 +141,7 @@ def prepare_items(
         raise ValueError("Zero asset IDs requested")
 
     for item_i, item in enumerate(items):
-        item_epsg = item["properties"].get("proj:epsg")
+        item_epsg = get_crs(item)
         item_bbox = item["properties"].get("proj:bbox")
         item_shape = item["properties"].get("proj:shape")
         item_transform = item["properties"].get("proj:transform")
@@ -143,7 +153,7 @@ def prepare_items(
             except KeyError:
                 continue
 
-            asset_epsg = asset.get("proj:epsg", item_epsg)
+            asset_epsg = get_crs(asset, item_epsg)
             asset_bbox = asset.get("proj:bbox", item_bbox)
             asset_shape = asset.get("proj:shape", item_shape)
             asset_transform = asset.get("proj:transform", item_transform)
