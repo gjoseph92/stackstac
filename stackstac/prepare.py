@@ -61,7 +61,7 @@ def prepare_items(
     assets: Optional[Union[List[str], AbstractSet[str]]] = frozenset(
         ["image/tiff", "image/x.geotiff", "image/vnd.stac.geotiff", "image/jp2"]
     ),
-    epsg: Optional[int] = None,
+    crs: Optional[Union[str, int]] = None,
     resolution: Optional[Union[IntFloat, Resolutions]] = None,
     bounds: Optional[Bbox] = None,
     bounds_latlon: Optional[Bbox] = None,
@@ -74,7 +74,7 @@ def prepare_items(
             f"Cannot give both `bounds` {bounds} and `bounds_latlon` {bounds_latlon}."
         )
 
-    out_epsg = epsg
+    out_crs = crs
     out_bounds = bounds
     if resolution is not None and not isinstance(resolution, tuple):
         resolution = (resolution, resolution)
@@ -131,7 +131,7 @@ def prepare_items(
         raise ValueError("Zero asset IDs requested")
 
     for item_i, item in enumerate(items):
-        item_epsg = item["properties"].get("proj:epsg")
+        item_crs = item["properties"].get("proj:code", item["properties"].get("proj:epsg"))
         item_bbox = item["properties"].get("proj:bbox")
         item_shape = item["properties"].get("proj:shape")
         item_transform = item["properties"].get("proj:transform")
@@ -143,7 +143,7 @@ def prepare_items(
             except KeyError:
                 continue
 
-            asset_epsg = asset.get("proj:epsg", item_epsg)
+            asset_crs = asset.get("proj:code", asset.get("proj:epsg", item_crs))
             asset_bbox = asset.get("proj:bbox", item_bbox)
             asset_shape = asset.get("proj:shape", item_shape)
             asset_transform = asset.get("proj:transform", item_transform)
@@ -185,29 +185,29 @@ def prepare_items(
             asset_affine = None
 
             # Auto-compute CRS
-            if epsg is None:
-                if asset_epsg is None:
+            if crs is None:
+                if asset_crs is None:
                     raise ValueError(
                         f"Cannot pick a common CRS, since asset {id!r} of item "
                         f"{item_i} {item['id']!r} does not have one.\n\n"
-                        "Please specify a CRS with the `epsg=` argument."
+                        "Please specify a CRS with the `crs=` argument."
                     )
-                if out_epsg is None:
-                    out_epsg = asset_epsg
-                elif out_epsg != asset_epsg:
+                if out_crs is None:
+                    out_crs = asset_crs
+                elif out_crs != asset_crs:
                     raise ValueError(
                         f"Cannot pick a common CRS, since assets have multiple CRSs: asset {id!r} of item "
-                        f"{item_i} {item['id']!r} is in EPSG:{asset_epsg}, "
-                        f"but assets before it were in EPSG:{out_epsg}.\n\n"
-                        "Please specify a CRS with the `epsg=` argument."
+                        f"{item_i} {item['id']!r} is in {asset_crs}, "
+                        f"but assets before it were in {out_crs}.\n\n"
+                        "Please specify a CRS with the `crs=` argument."
                     )
 
-            assert isinstance(out_epsg, int), f"`out_epsg` not found. {out_epsg=}"
+            assert isinstance(out_crs, int), f"`out_crs` not found. {out_crs=}"
             # ^ because if it was None initially, and we didn't error out in the above check, it's now always set
 
             if bounds_latlon is not None and out_bounds is None:
                 out_bounds = bounds = geom_utils.reproject_bounds(
-                    bounds_latlon, 4326, out_epsg
+                    bounds_latlon, 4326, out_crs
                 )
                 # NOTE: we wait to reproject until now, so we can use the inferred CRS
 
@@ -219,7 +219,7 @@ def prepare_items(
             # just reproject that and use it
             if (
                 asset_bbox is not None
-                and asset_epsg is not None
+                and asset_crs is not None
                 and asset_transform == item_transform
                 and asset_shape == item_shape
                 # TODO this still misses the case where the asset overrides bbox, but not transform/shape.
@@ -229,7 +229,7 @@ def prepare_items(
                 # then transform from item, then latlon bbox from item
             ):
                 asset_bbox_proj = geom_utils.reproject_bounds(
-                    asset_bbox, asset_epsg, out_epsg
+                    asset_bbox, asset_crs, out_crs
                 )
 
             # If there's no bbox (or asset-level metadata is more accurate), compute one from the shape and geotrans
@@ -237,15 +237,15 @@ def prepare_items(
                 if (
                     asset_transform is not None
                     and asset_shape is not None
-                    and asset_epsg is not None
+                    and asset_crs is not None
                 ):
                     asset_affine = affine.Affine(*asset_transform[:6])
                     asset_bbox_proj = geom_utils.bounds_from_affine(
                         asset_affine,
                         asset_shape[0],
                         asset_shape[1],
-                        asset_epsg,
-                        out_epsg,
+                        asset_crs,
+                        out_crs,
                     )
 
                 # There's no bbox, nor shape and transform. The only info we have is `item.bbox` in lat-lon.
@@ -258,7 +258,7 @@ def prepare_items(
                         else:
                             # TODO handle error
                             asset_bbox_proj = geom_utils.reproject_bounds(
-                                bbox_lonlat, 4326, out_epsg
+                                bbox_lonlat, 4326, out_crs
                             )
                             item_bbox_proj = asset_bbox_proj
                             # ^ so we can reuse for other assets
@@ -268,9 +268,9 @@ def prepare_items(
             # Auto-compute resolutions
             if resolution is None:
                 # Prefer computing resolutions from a geotrans, if it exists
-                if asset_transform is not None and asset_epsg is not None:
+                if asset_transform is not None and asset_crs is not None:
                     asset_affine = asset_affine or affine.Affine(*asset_transform[:6])
-                    if asset_epsg == out_epsg:
+                    if asset_crs == out_crs:
                         # Fastpath-ish when asset is already in the output CRS:
                         # pull directly from geotrans coefficients
                         if not asset_affine.is_rectilinear:
@@ -291,7 +291,7 @@ def prepare_items(
                         )
 
                         transformer = geom_utils.cached_transformer(
-                            asset_epsg, out_epsg, always_xy=True
+                            asset_crs, out_crs, always_xy=True
                         )
                         out_px_corner_xs, out_px_corner_ys = transformer.transform(
                             px_corner_xs, px_corner_ys, errcheck=True
@@ -308,11 +308,11 @@ def prepare_items(
                             f"since asset {id!r} on item {item_i} {item['id']!r} "
                             f"doesn't provide enough metadata to determine its native resolution.\n"
                             f"We'd need at least one of (in order of preference):\n"
-                            f"- The `proj:transform` and `proj:epsg` fields set on the asset, or on the item\n"
+                            f"- The `proj:transform` and `proj:epsg`/`proj:code` fields set on the asset, or on the item\n"
                             f"- The `proj:shape` and one of `proj:bbox` or `bbox` fields set on the asset, "
                             "or on the item\n\n"
                             "Please specify the `resolution=` argument to set the output resolution manually. "
-                            f"(Remember that resolution must be in the units of your CRS (http://epsg.io/{out_epsg})"
+                            f"(Remember that resolution must be in the units of your CRS (http://epsg.io/{out_crs})"
                             "---not necessarily meters."
                         )
 
@@ -371,12 +371,12 @@ def prepare_items(
     # At this point, everything has been set (or there was as error)
     assert out_bounds, f"{out_bounds=}"
     assert out_resolutions_xy is not None, f"{out_resolutions_xy=}"
-    assert out_epsg is not None, f"{out_epsg=}"
+    assert out_crs is not None, f"{out_crs=}"
 
     if snap_bounds:
         out_bounds = geom_utils.snapped_bounds(out_bounds, out_resolutions_xy)
     spec = RasterSpec(
-        epsg=out_epsg,
+        crs=out_crs,
         bounds=out_bounds,
         resolutions_xy=out_resolutions_xy,
     )
@@ -556,14 +556,14 @@ def to_coords(
                 )
             )
 
-    # Add `epsg` last in case it's also a field in properties; our data model assumes it's a coordinate
-    coords["epsg"] = spec.epsg
+    # Add `crs` last in case it's also a field in properties; our data model assumes it's a coordinate
+    coords["crs"] = spec.crs
 
     return coords, dims
 
 
 def to_attrs(spec: RasterSpec) -> Dict[str, Any]:
-    attrs = {"spec": spec, "crs": f"epsg:{spec.epsg}", "transform": spec.transform}
+    attrs = {"spec": spec, "crs": spec.crs, "transform": spec.transform}
 
     resolutions = spec.resolutions_xy
     if resolutions[0] == resolutions[1]:

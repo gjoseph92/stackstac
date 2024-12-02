@@ -2,7 +2,7 @@ from .rio_env import LayeredEnv
 from .rio_reader import DEFAULT_GDAL_ENV, MULTITHREADED_DRIVER_ALLOWLIST
 from .stack import stack
 from .ops import mosaic
-from .geom_utils import reproject_array, array_bounds, array_epsg, xyztile_of_array
+from .geom_utils import reproject_array, array_bounds, array_crs, xyztile_of_array
 
 try:
     from . import show as _show  # helpful for debugging
@@ -42,7 +42,7 @@ __all__ = [
     "mosaic",
     "reproject_array",
     "array_bounds",
-    "array_epsg",
+    "array_crs",
     "xyztile_of_array",
     "__version__",
 ]

@@ -449,7 +449,7 @@ def register(
     """
     loop = ensure_server()
 
-    geom_utils.array_epsg(arr)  # just for the error
+    geom_utils.array_crs(arr)  # just for the error
     if arr.ndim == 2:
         assert set(arr.dims) == {"x", "y"}
         arr = arr.expand_dims("band")
@@ -656,7 +656,7 @@ def add_to_map(
     ----------
     arr:
         `~xarray.DataArray` to visualize. Must have ``x`` and ``y``, and optionally ``band`` dims,
-        and the ``epsg`` coordinate set.
+        and the ``crs`` coordinate set.
 
         ``arr`` must have 1-3 bands. Single-band data can be colormapped; multi-band data will be
         displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
@@ -740,7 +740,7 @@ def show(
     ----------
     arr:
         `~xarray.DataArray` to visualize. Must have ``x`` and ``y``, and optionally ``band`` dims,
-        and the ``epsg`` coordinate set.
+        and the ``crs`` coordinate set.
 
         ``arr`` must have 1-3 bands. Single-band data can be colormapped; multi-band data will be
         displayed as RGB. For 2-band arrays, the first band will be duplicated into the third band's spot,
@@ -782,14 +782,14 @@ def show(
     """
     map_ = ipyleaflet.Map(**map_kwargs)
     if center is None or zoom is None:
-        west, south, east, north = geom_utils.array_bounds(arr, to_epsg=4326)
+        west, south, east, north = geom_utils.array_bounds(arr, to_crs=4326)
 
         if center is None:
             center = south + (north - south) / 2, west + (east - west) / 2
 
         if zoom is None:
             west_m, south_m, east_m, north_m = geom_utils.reproject_bounds(
-                (west, south, east, north), from_epsg=4326, to_epsg=3857
+                (west, south, east, north), from_crs=4326, to_crs=3857
             )
             size_m = max(east_m - west_m, north_m - south_m)
             target_map_size_px = 800

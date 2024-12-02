@@ -15,7 +15,7 @@ class RasterSpec:
     Spatial parameters defining the grid for a raster.
     """
 
-    epsg: int
+    _crs: str
     bounds: Bbox
     resolutions_xy: Resolutions
 
@@ -27,6 +27,17 @@ class RasterSpec:
         minx, miny, maxx, maxy = self.bounds
         assert minx < maxx, f"Invalid bounds: {minx=} >= {maxx=}"
         assert miny < maxy, f"Invalid bounds: {miny=} >= {maxy=}"
+
+    @property
+    def crs(self) -> str:
+        return self._crs
+
+    @crs.setter
+    def crs(self, v: Union[str, int]) -> None:
+        if isinstance(v, int):
+            v = f"EPSG:{v}"
+        
+        self._crs = v
 
     @cached_property
     def transform(self) -> affine.Affine:
@@ -56,7 +67,7 @@ class RasterSpec:
     def vrt_params(self) -> dict:
         height, width = self.shape
         return {
-            "crs": self.epsg,
+            "crs": self.crs,
             "transform": self.transform,
             "height": height,
             "width": width,

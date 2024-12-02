@@ -343,7 +343,7 @@ class AutoParallelRioReader:
 
             # Only make a VRT if the dataset doesn't match the spatial spec we want
             if self.spec.vrt_params != {
-                "crs": ds.crs.to_epsg(),
+                "crs": ds.crs.to_string(),
                 "transform": ds.transform,
                 "height": ds.height,
                 "width": ds.width,

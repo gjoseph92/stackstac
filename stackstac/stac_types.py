@@ -102,6 +102,7 @@ PropertiesDict = TypedDict(
     {
         "datetime": Optional[str],
         "proj:epsg": Optional[int],
+        "proj:code": Optional[str],
         "proj:bbox": Tuple[float, float, float, float],
         "proj:shape": Tuple[int, int],
         "proj:transform": Union[

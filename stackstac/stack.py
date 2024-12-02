@@ -30,7 +30,7 @@ def stack(
     assets: Optional[Union[List[str], AbstractSet[str]]] = frozenset(
         ["image/tiff", "image/x.geotiff", "image/vnd.stac.geotiff", "image/jp2"]
     ),
-    epsg: Optional[int] = None,
+    crs: Optional[Union[str, int]] = None,
     resolution: Optional[Union[IntFloat, Resolutions]] = None,
     bounds: Optional[Bbox] = None,
     bounds_latlon: Optional[Bbox] = None,
@@ -59,7 +59,7 @@ def stack(
     We'll try to choose the output coordinate reference system, resolution, and bounds
     based on the metadata in the STAC items. However, if not all items have the necessary
     metadata, or aren't in the same coordinate reference system, you'll have specify these
-    yourself---``epsg`` and ``resolution`` are the two parameters you'll set most often.
+    yourself---``crs`` and ``resolution`` are the two parameters you'll set most often.
 
     Examples
     --------
@@ -71,7 +71,7 @@ def stack(
     >>> xr_stack = stackstac.stack(items)
     >>>
     >>> # Reproject to 100-meter resolution in web mercator
-    >>> xr_stack = stackstac.stack(items, epsg=3857, resolution=100)
+    >>> xr_stack = stackstac.stack(items, crs=3857, resolution=100)
     >>>
     >>> # Only use specific asset IDs
     >>> xr_stack = stackstac.stack(items, assets=["B01", "B03", "B02"])
@@ -122,10 +122,10 @@ def stack(
         are not yet supported.
 
         .. _MT: https://github.com/radiantearth/stac-spec/blob/master/best-practices.md#common-media-types-in-stac
-    epsg:
-        Reproject into this coordinate reference system, as given by an `EPSG code <http://epsg.io>`_.
+    crs:
+        Reproject into this coordinate reference system, as given by an CRS string (authority:code) or `EPSG code <http://epsg.io>`_.
         If None (default), uses whatever CRS is set on all the items. In this case, all Items/Assets
-        must have the ``proj:epsg`` field, and it must be the same value for all of them.
+        must have the ``proj:epsg`` or ``proj:code`` field, and it must be the same value for all of them.
     resolution:
         Output resolution. Careful: this must be given in the output CRS's units!
         For example, with ``epsg=4326`` (meaning lat-lon), the units are degrees of
@@ -146,7 +146,7 @@ def stack(
     bounds:
         Output spatial bounding-box, as a tuple of ``(min_x, min_y, max_x, max_y)``.
         This defines the ``(west, south, east, north)`` rectangle the output array will cover.
-        Values must be in the same coordinate reference system as ``epsg``.
+        Values must be in the same coordinate reference system as ``crs``.
 
         If None (default), the bounding box of all the input items is automatically used.
         (This only requires the ``bbox`` field to be set on each Item, which is a required
@@ -218,7 +218,7 @@ def stack(
     xy_coords:
         Whether to add geospatial coordinate labels for the ``x`` and ``y`` dimensions of the DataArray,
         allowing for spatial indexing. The coordinates will be in the coordinate reference system given
-        by ``epsg``
+        by ``crs``
 
         If ``"topleft"`` (default), the coordinates are for each pixel's upper-left corner,
         following raster conventions.
@@ -290,7 +290,7 @@ def stack(
     asset_table, spec, asset_ids, plain_items = prepare_items(
         plain_items,
         assets=assets,
-        epsg=epsg,
+        crs=crs,
         resolution=resolution,
         bounds=bounds,
         bounds_latlon=bounds_latlon,

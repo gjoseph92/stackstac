@@ -16,7 +16,7 @@ cached_transformer = functools.lru_cache(pyproj.Transformer.from_crs)
 
 
 def bounds_from_affine(
-    af: affine.Affine, ysize: int, xsize: int, from_epsg: int, to_epsg: int
+    af: affine.Affine, ysize: int, xsize: int, from_crs: Union[str, int], to_crs: Union[str, int]
 ) -> Bbox:
     ul_x, ul_y = af * (0, 0)
     ll_x, ll_y = af * (0, ysize)
@@ -26,8 +26,8 @@ def bounds_from_affine(
     xs = [ul_x, ll_x, lr_x, ur_x]
     ys = [ul_y, ll_y, lr_y, ur_y]
 
-    if from_epsg != to_epsg:
-        transformer = cached_transformer(from_epsg, to_epsg, always_xy=True)
+    if from_crs != to_crs:
+        transformer = cached_transformer(from_crs, to_crs, always_xy=True)
         # TODO handle error
         xs_proj, ys_proj = transformer.transform(xs, ys, errcheck=True)
     else:
@@ -39,8 +39,8 @@ def bounds_from_affine(
 
 # TODO: use `rio.warp.transform_bounds` instead, for densification? or add our own densification?
 # ours is likely faster due to transformer caching.
-def reproject_bounds(bounds: Bbox, from_epsg: int, to_epsg: int) -> Bbox:
-    if from_epsg == to_epsg:
+def reproject_bounds(bounds: Bbox, from_crs: Union[str, int], to_crs: Union[str, int]) -> Bbox:
+    if from_crs == to_crs:
         return bounds
 
     minx, miny, maxx, maxy = bounds
@@ -48,7 +48,7 @@ def reproject_bounds(bounds: Bbox, from_epsg: int, to_epsg: int) -> Bbox:
     # read this in pairs, downward by column
     xs = [minx, minx, maxx, maxx]
     ys = [maxy, miny, miny, maxy]
-    transformer = cached_transformer(from_epsg, to_epsg, always_xy=True)
+    transformer = cached_transformer(from_crs, to_crs, always_xy=True)
     xs_proj, ys_proj = transformer.transform(xs, ys, errcheck=True)  # TODO handle error
     return min(xs_proj), min(ys_proj), max(xs_proj), max(ys_proj)
 
@@ -80,11 +80,11 @@ def snapped_bounds(bounds: Bbox, resolutions_xy: Resolutions) -> Bbox:
     return (minx, miny, maxx, maxy)
 
 
-def array_epsg(
+def array_crs(
     arr: xr.DataArray, default: Union[int, NO_DEFAULT_LITERAL] = NO_DEFAULT
 ) -> int:
     """
-    Get the coordinate reference system of a `~xarray.DataArray` as an EPSG code.
+    Get the coordinate reference system of a `~xarray.DataArray` as an CRS code.
 
     Parameters
     ----------
@@ -97,33 +97,33 @@ def array_epsg(
     Returns
     -------
     int:
-        EPSG code
+        CRS code
 
     Raises
     ------
     ValueError:
-        If the `~xarray.DataArray` has no ``epsg`` coordinate, and ``default`` is not given.
+        If the `~xarray.DataArray` has no ``crs`` coordinate, and ``default`` is not given.
     """
 
     # TODO look at `crs` in attrs; more compatibility with rioxarray data model
     try:
-        epsg = arr.epsg
+        crs = arr.crs
     except AttributeError:
         if default != NO_DEFAULT:
             return default
     else:
-        return epsg.item()
+        return crs.item()
 
     # NOTE: raise out here for shorter traceback
     raise ValueError(
-        f"DataArray {arr.name!r} does not have the `epsg` coordinate set, "
+        f"DataArray {arr.name!r} does not have the `crs` coordinate set, "
         "so we don't know what coordinate reference system it's in.\n"
-        "Please set it using `arr.assign_coords(epsg=<EPSG code as int>)` "
+        "Please set it using `arr.assign_coords(crs=<CRS code as str or int>)` "
         "(note that this returns a new object)."
     )
 
 
-def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
+def array_bounds(arr: xr.DataArray, to_crs: Optional[int] = None) -> Bbox:
     """
     Get the bounds of a `~xarray.DataArray`.
 
@@ -138,10 +138,10 @@ def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
         The ``x`` and ``y`` coordinates are assumed to indicate the top-left corner
         of each pixel, not the center. They're also assumed to be evenly spaced
         (constant resolution), and must be monotonic.
-    to_epsg:
-        CRS to reproject the bounds to, as an EPSG code. If None (default),
+    to_crs:
+        CRS to reproject the bounds to, as an CRS code. If None (default),
         the bounds are not reprojected. If not None, the `~xarray.DataArray` must have
-        an ``epsg`` coordinate.
+        an ``crs`` coordinate.
 
     Returns
     -------
@@ -157,7 +157,7 @@ def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
     ValueError:
         If ``x`` or ``y`` coordinates are not monotonic.
     ValueError:
-        If ``to_epsg`` is given, and the CRS of the ``~xarray.DataArray`` cannot be determined by `array_epsg`.
+        If ``to_crs`` is given, and the CRS of the ``~xarray.DataArray`` cannot be determined by `array_crs`.
 
 
     """
@@ -197,10 +197,10 @@ def array_bounds(arr: xr.DataArray, to_epsg: Optional[int] = None) -> Bbox:
             max(ys),
         )
 
-    if to_epsg is None:
+    if to_crs is None:
         return bounds
 
-    return reproject_bounds(bounds, array_epsg(arr), to_epsg)
+    return reproject_bounds(bounds, array_crs(arr), to_crs)
 
 
 def reproject_array(
@@ -227,7 +227,7 @@ def reproject_array(
     Parameters
     ----------
     arr:
-        Array to reproject. It must have ``epsg``, ``x``, and ``y`` coordinates.
+        Array to reproject. It must have ``crs``, ``x``, and ``y`` coordinates.
         The ``x`` and ``y`` coordinates are assumed to indicate the top-left corner
         of each pixel, not the center.
     spec:
@@ -247,9 +247,9 @@ def reproject_array(
     # so this both won't scale, and can be crazy slow in dask graph construction
     # (and the rechunk probably eliminates any hope of sending an HLG to the scheduler).
 
-    from_epsg = array_epsg(arr)
+    from_crs = array_crs(arr)
     if (
-        from_epsg == spec.epsg
+        from_crs == spec.crs
         and array_bounds(arr) == spec.bounds
         and arr.shape[:-2] == spec.shape
     ):
@@ -273,7 +273,7 @@ def reproject_array(
     x = np.linspace(minx, maxx, width, endpoint=False)
     y = np.linspace(maxy, miny, height, endpoint=False)
 
-    if from_epsg == spec.epsg:
+    if from_crs == spec.crs:
         # Simpler case: just interpolate within the same CRS
         result = arr.interp(
             x=x, y=y, method=interpolation, kwargs=dict(fill_value=fill_value)
@@ -284,7 +284,7 @@ def reproject_array(
     # We do this by, for each point in the output grid, generating
     # the coordinates in the _input_ CRS that correspond to that point.
 
-    reverse_transformer = cached_transformer(spec.epsg, from_epsg, always_xy=True)
+    reverse_transformer = cached_transformer(spec.crs, from_crs, always_xy=True)
 
     xs, ys = np.meshgrid(x, y, copy=False)
     src_xs, src_ys = reverse_transformer.transform(xs, ys, errcheck=True)
@@ -293,8 +293,8 @@ def reproject_array(
     ys_indexer = xr.DataArray(src_ys, dims=["y", "x"], coords=dict(y=y, x=x))
 
     # TODO maybe just drop old dims instead?
-    old_xdim = f"x_{from_epsg}"
-    old_ydim = f"y_{from_epsg}"
+    old_xdim = f"x_{from_crs}"
+    old_ydim = f"y_{from_crs}"
 
     result = arr.rename(x=old_xdim, y=old_ydim).interp(
         {old_xdim: xs_indexer, old_ydim: ys_indexer},
@@ -329,7 +329,7 @@ def xyztile_of_array(
     Parameters
     ----------
     arr:
-        DataArray to extract a map tile from. Must have ``x`` and ``y``, and the ``epsg`` coordinate set.
+        DataArray to extract a map tile from. Must have ``x`` and ``y``, and the ``crs`` coordinate set.
     x:
         X index of the tile
     y:
@@ -356,7 +356,7 @@ def xyztile_of_array(
         )
     bounds = mercantile.xy_bounds(mercantile.Tile(x, y, z))
 
-    if not bounds_overlap(bounds, array_bounds(arr, to_epsg=3857)):
+    if not bounds_overlap(bounds, array_bounds(arr, to_crs=3857)):
         return None
 
     minx, miny, maxx, maxy = bounds
@@ -367,7 +367,7 @@ def xyztile_of_array(
     tile = reproject_array(
         arr,
         RasterSpec(
-            epsg=3857,
+            crs=3857,
             bounds=bounds,
             resolutions_xy=(
                 (maxx - minx) / tilesize,
