@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Optional, Protocol, Tuple, Type, TypedDict, Un
 
 import numpy as np
 import rasterio as rio
+from rasterio import transform
+from rasterio.transform import from_gcps
 from rasterio.vrt import WarpedVRT
 
 from .rio_env import LayeredEnv
@@ -342,23 +344,41 @@ class AutoParallelRioReader:
                 )
 
             # Only make a VRT if the dataset doesn't match the spatial spec we want
-            if self.spec.vrt_params != {
-                "crs": ds.crs.to_epsg(),
-                "transform": ds.transform,
+            # Determine current spatial parameters based on GCP presence
+            if ds.gcps[0]:  # Check if there are GCPs
+                current_crs = ds.gcps[1].to_epsg()
+                current_transform = transform.from_gcps(ds.gcps[0])
+            else:
+                current_crs = ds.crs.to_epsg()
+                current_transform = ds.transform
+            
+            current_params = {
+                "crs": current_crs,
+                "transform": current_transform,
                 "height": ds.height,
                 "width": ds.width,
-            }:
+            }
+            
+            if self.spec.vrt_params != current_params:
+                # Prepare VRT parameters
+                vrt_kwargs = dict(self.spec.vrt_params)
+                if ds.gcps[0]:
+                    # Add GCP-based source parameters
+                    vrt_kwargs.update({
+                        "src_crs": ds.gcps[1],
+                        "src_transform": current_transform,
+                        "src_nodata": ds.nodata,
+                    })
                 with self.gdal_env.open_vrt:
                     vrt = WarpedVRT(
                         ds,
                         sharing=False,
                         resampling=self.resampling,
                         add_alpha=ds.nodata is None,
-                        **self.spec.vrt_params,
+                        **vrt_kwargs,
                     )
             else:
                 vrt = None
-
         if ds.driver in MULTITHREADED_DRIVER_ALLOWLIST:
             return ThreadLocalRioDataset(self.gdal_env, ds, vrt=vrt)
             # ^ NOTE: this forces all threads to wait for the `open()` we just did before they can open their
